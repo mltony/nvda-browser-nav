@@ -1,0 +1,48 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the IndentNav package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: IndentNav 1.1\n"
+"Report-Msgid-Bugs-To: nvda-translations@freelists.org\n"
+"POT-Creation-Date: 2018-11-23 09:05+1000\n"
+"PO-Revision-Date: 2018-12-13 11:29+0100\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Last-Translator: Simone Dal Maso <simone.dalmaso@gmail.com>\n"
+"Language-Team: \n"
+"X-Generator: Poedit 1.8.7\n"
+
+#. Add-on summary, usually the user visible name of the addon.
+#. Translators: Summary for this add-on to be shown on installation and add-on information.
+msgid "IndentNav"
+msgstr "IndentNav"
+
+#. Add-on description
+#. Translators: Long description to be shown for this add-on on add-on information from add-ons manager
+msgid ""
+"Indentation Navigation addon.\n"
+"It allows NVDA users to navigate by indentation level or offset of lines or "
+"paragraphs.\n"
+"In browsers it allows to quickly find paragraphs with the same offset from "
+"the left edge of the screen, such as first level comments in a hierarchical "
+"tree of comments.\n"
+"Also while editing source code in many programming languages, it allows to "
+"jump between the lines of the same indentation level, as well as quickly "
+"find lines with greater or lesser indentation level."
+msgstr ""
+"Componente aggiuntivo Indentation Navigation.\n"
+"Consente agli utenti di NVDA di navigare per livelli di rientri, oppure per "
+"gruppi di righe o anche per paragrafi.\n"
+"Nei browser permette di trovare rapidamente i paragrafi basandosi sulla "
+"medesima distanza dal bordo sinistro dello schermo, per esempio in una "
+"visualizzazione ad albero di commenti, ci si potrà spostare solo tra i "
+"commenti del primo livello della gerarchia.\n"
+"Anche quando si modifica il codice sorgente di molti linguaggi di "
+"programmazione, consente di passare velocemente tra le righe dello stesso "
+"livello di rientro, oppure individuare le righe con un livello di rientro "
+"più grande o più piccolo."
