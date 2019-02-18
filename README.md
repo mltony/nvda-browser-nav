@@ -4,7 +4,7 @@ For example, with BrowserNav you can find vertically aligned paragraphs, that is
 You can also find paragraphs written in the same font size or style.
 BrowserNav also provides new QuickNav commands: P for next paragraph and Y for next tab.
 ## Download
-Current stable release: [BrowserNav v1.0](https://github.com/mltony/nvda-browser-nav/releases/download/v1.0/BrowserNav-1.0.nvda-addon).
+Current stable release: [BrowserNav v1.1](https://github.com/mltony/nvda-browser-nav/releases/download/v1.1/BrowserNav-1.1.nvda-addon).
 
 ## Usage in browsers
 BrowserNav can be used to navigate by  horizontal offset from the left edge of the screen, by font size, or by font style. 
