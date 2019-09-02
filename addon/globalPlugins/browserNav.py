@@ -459,5 +459,50 @@ injectBrowseModeKeystroke(
         roles=[controlTypes.ROLE_TAB],
         errorMessage=_("No previous tab")),
     doc="Jump to previous tab")
+    
+#Dialog
+injectBrowseModeKeystroke(
+    "kb:K",
+    "nextDialog",
+    script=lambda self, gesture: gp.findByRole(
+        direction=1,
+        roles=[controlTypes.ROLE_DIALOG],
+        errorMessage=_("No next dialog")),
+    doc="Jump to next dialog")
+injectBrowseModeKeystroke(
+    "kb:Shift+K",
+    "previousDialog",
+    script=lambda self, gesture: gp.findByRole(
+        direction=-1,
+        roles=[controlTypes.ROLE_DIALOG],
+        errorMessage=_("No previous dialog")),
+    doc="Jump to previous dialog")
+
+menuTypes = [
+    controlTypes.ROLE_MENU,
+    controlTypes.ROLE_MENUBAR,
+    controlTypes.ROLE_MENUITEM,
+    controlTypes.ROLE_POPUPMENU,
+    controlTypes.ROLE_CHECKMENUITEM,
+    controlTypes.ROLE_RADIOMENUITEM,
+    controlTypes.ROLE_TEAROFFMENU,
+    controlTypes.ROLE_MENUBUTTON,
+]
+injectBrowseModeKeystroke(
+    "kb:Z",
+    "nextMenu",
+    script=lambda self, gesture: gp.findByRole(
+        direction=1,
+        roles=menuTypes,
+        errorMessage=_("No next menu")),
+    doc="Jump to next menu")
+injectBrowseModeKeystroke(
+    "kb:Shift+Z",
+    "previousMenu",
+    script=lambda self, gesture: gp.findByRole(
+        direction=-1,
+        roles=menuTypes,
+        errorMessage=_("No previous menu")),
+    doc="Jump to previous menu")
 
 
