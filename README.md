@@ -23,6 +23,8 @@ Keystrokes:
 * NVDA+O: Switch rotor setting between horizontal offset, font size, font size with font style.
 * P or Shift+P: Jump to next or previous paragraph.
 * Y or Shift+Y: Jump to next or previous tab.
+* K or Shift+K: Jump to next or previous dialog.
+* Z or Shift+Z: Jump to next or previous menu.
 
 ## Source code
 Source code is available at <http://github.com/mltony/nvda-indent-nav>.
