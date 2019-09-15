@@ -461,20 +461,21 @@ injectBrowseModeKeystroke(
     doc="Jump to previous tab")
     
 #Dialog
+dialogTypes = [(controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
 injectBrowseModeKeystroke(
-    "kb:K",
+    "kb:J",
     "nextDialog",
     script=lambda self, gesture: gp.findByRole(
         direction=1,
-        roles=[controlTypes.ROLE_DIALOG],
+        roles=dialogTypes,
         errorMessage=_("No next dialog")),
     doc="Jump to next dialog")
 injectBrowseModeKeystroke(
-    "kb:Shift+K",
+    "kb:Shift+J",
     "previousDialog",
     script=lambda self, gesture: gp.findByRole(
         direction=-1,
-        roles=[controlTypes.ROLE_DIALOG],
+        roles=dialogTypes,
         errorMessage=_("No previous dialog")),
     doc="Jump to previous dialog")
 
@@ -504,5 +505,4 @@ injectBrowseModeKeystroke(
         roles=menuTypes,
         errorMessage=_("No previous menu")),
     doc="Jump to previous menu")
-
 
