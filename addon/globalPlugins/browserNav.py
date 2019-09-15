@@ -461,7 +461,7 @@ injectBrowseModeKeystroke(
     doc="Jump to previous tab")
     
 #Dialog
-dialogTypes = [(controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
+dialogTypes = [controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
 injectBrowseModeKeystroke(
     "kb:J",
     "nextDialog",
