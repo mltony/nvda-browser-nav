@@ -239,6 +239,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def __init__(self, *args, **kwargs):
         super(GlobalPlugin, self).__init__(*args, **kwargs)
         self.createMenu()
+        self.injectBrowseModeKeystrokes()
 
     def createMenu(self):
         def _popupMenu(evt):
@@ -341,8 +342,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         return tuple(result)
 
     def moveInBrowser(self, increment, errorMessage, op):
-        import time
-        t0 = time.time()
         (
             extractFormattingFunc,
             extractIndentFunc,
@@ -361,11 +360,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             result =textInfo.move(textInfos.UNIT_PARAGRAPH, increment)
             if result == 0:
                 return self.endOfDocument(errorMessage)
-            #indent = extractIndentFunc(textInfo, formatting)
-            if False:
-                indent = extractIndentFunc(textInfo, None)
-                if not op(indent, origIndent):
-                    continue
             textInfo.expand(textInfos.UNIT_PARAGRAPH)
             text = textInfo.text
             if speech.isBlank(text):
@@ -377,10 +371,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 if op(indent, origIndent):
                     textInfo.updateCaret()
                     self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-                    #speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
-                    t1 = time.time()
-                    dt = int(1000 * (t1-t0))
-                    ui.message(f"time {dt}")
+                    speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
                     return
             distance += 1
 
@@ -521,4 +512,3 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 roles=menuTypes,
                 errorMessage=_("No previous menu")),
             doc="Jump to previous menu")
-
