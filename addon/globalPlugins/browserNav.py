@@ -36,12 +36,6 @@ def myAssert(condition):
         raise RuntimeError("Assertion failed")
 
 
-def createMenu():
-    def _popupMenu(evt):
-        gui.mainFrame._popupSettingsDialog(SettingsDialog)
-    prefsMenuItem  = gui.mainFrame.sysTrayIcon.preferencesMenu.Append(wx.ID_ANY, _("BrowserNav..."))
-    gui.mainFrame.sysTrayIcon.Bind(wx.EVT_MENU, _popupMenu, prefsMenuItem)
-
 def initConfiguration():
     confspec = {
         "crackleVolume" : "integer( default=25, min=0, max=100)",
@@ -69,8 +63,6 @@ def setConfig(key, value):
 
 addonHandler.initTranslation()
 initConfiguration()
-createMenu()
-
 
 class SettingsDialog(gui.SettingsDialog):
     # Translators: Title for the settings dialog
@@ -244,6 +236,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     scriptCategory = _("BrowserNav")
     beeper = Beeper()
 
+    def __init__(self, *args, **kwargs):
+        super(GlobalPlugin, self).__init__(*args, **kwargs)
+        self.createMenu()
+
+    def createMenu(self):
+        def _popupMenu(evt):
+            gui.mainFrame._popupSettingsDialog(SettingsDialog)
+        self.prefsMenuItem  = gui.mainFrame.sysTrayIcon.preferencesMenu.Append(wx.ID_ANY, _("BrowserNav..."))
+        gui.mainFrame.sysTrayIcon.Bind(wx.EVT_MENU, _popupMenu, self.prefsMenuItem)
+
+    def terminate(self):
+        prefMenu = gui.mainFrame.sysTrayIcon.preferencesMenu
+        prefMenu.Remove(self.prefsMenuItem)
 
     def script_moveToNextSibling(self, gesture):
         mode = getMode()
@@ -336,6 +341,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         return tuple(result)
 
     def moveInBrowser(self, increment, errorMessage, op):
+        import time
+        t0 = time.time()
         (
             extractFormattingFunc,
             extractIndentFunc,
@@ -354,6 +361,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             result =textInfo.move(textInfos.UNIT_PARAGRAPH, increment)
             if result == 0:
                 return self.endOfDocument(errorMessage)
+            #indent = extractIndentFunc(textInfo, formatting)
+            if False:
+                indent = extractIndentFunc(textInfo, None)
+                if not op(indent, origIndent):
+                    continue
             textInfo.expand(textInfos.UNIT_PARAGRAPH)
             text = textInfo.text
             if speech.isBlank(text):
@@ -365,7 +377,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 if op(indent, origIndent):
                     textInfo.updateCaret()
                     self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-                    speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                    #speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                    t1 = time.time()
+                    dt = int(1000 * (t1-t0))
+                    ui.message(f"time {dt}")
                     return
             distance += 1
 
@@ -397,112 +412,113 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 return
 
 
-gp = GlobalPlugin()
-def injectBrowseModeKeystroke(keystroke, funcName, script=None, doc=None):
-    cls = browseMode.BrowseModeTreeInterceptor
-    scriptFuncName = "script_" + funcName
-    if script is None:
-        gpFunc = getattr(gp, scriptFuncName)
-        script = lambda self, gesture: gpFunc(gesture)
-    script.__name__ = scriptFuncName
-    script.category = "BrowserNav"
-    if doc is not None:
-        script.__doc__ = doc
-    setattr(cls, scriptFuncName, script)
-    cls._BrowseModeTreeInterceptor__gestures[keystroke] = funcName
+    def injectBrowseModeKeystroke(self, keystroke, funcName, script=None, doc=None):
+        gp = self
+        cls = browseMode.BrowseModeTreeInterceptor
+        scriptFuncName = "script_" + funcName
+        if script is None:
+            gpFunc = getattr(gp, scriptFuncName)
+            script = lambda self, gesture: gpFunc(gesture)
+        script.__name__ = scriptFuncName
+        script.category = "BrowserNav"
+        if doc is not None:
+            script.__doc__ = doc
+        setattr(cls, scriptFuncName, script)
+        cls._BrowseModeTreeInterceptor__gestures[keystroke] = funcName
 
-injectBrowseModeKeystroke(
-    "kb:NVDA+Alt+DownArrow",
-    "moveToNextSibling",
-    doc="Moves to next sibling in browser")
-injectBrowseModeKeystroke(
-    "kb:NVDA+Alt+UpArrow",
-    "moveToPreviousSibling",
-    doc="Moves to previous sibling in browser")
-injectBrowseModeKeystroke(
-    "kb:NVDA+Alt+LeftArrow",
-    "moveToParent",
-    doc="Moves to parent in browser")
-injectBrowseModeKeystroke(
-    "kb:NVDA+Alt+RightArrow",
-    "moveToChild",
-    doc="Moves to next child in browser")
-injectBrowseModeKeystroke(
-    "kb:NVDA+O",
-    "rotor",
-    doc="Adjusts BrowserNav rotor")
-injectBrowseModeKeystroke(
-    "kb:P",
-    "nextParagraph",
-    script=lambda self, gesture: self.script_moveByParagraph_forward(gesture),
-    doc="Jump to next paragraph")
-injectBrowseModeKeystroke(
-    "kb:Shift+P",
-    "previousParagraph",
-    script=lambda self, gesture: self.script_moveByParagraph_back(gesture),
-    doc="Jump to previous paragraph")
-# Example page with tabs:
-# https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
-injectBrowseModeKeystroke(
-    "kb:Y",
-    "nextTab",
-    script=lambda self, gesture: gp.findByRole(
-        direction=1,
-        roles=[controlTypes.ROLE_TAB],
-        errorMessage=_("No next tab")),
-    doc="Jump to next tab")
-injectBrowseModeKeystroke(
-    "kb:Shift+Y",
-    "previousTab",
-    script=lambda self, gesture: gp.findByRole(
-        direction=-1,
-        roles=[controlTypes.ROLE_TAB],
-        errorMessage=_("No previous tab")),
-    doc="Jump to previous tab")
-    
-#Dialog
-dialogTypes = [controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
-injectBrowseModeKeystroke(
-    "kb:J",
-    "nextDialog",
-    script=lambda self, gesture: gp.findByRole(
-        direction=1,
-        roles=dialogTypes,
-        errorMessage=_("No next dialog")),
-    doc="Jump to next dialog")
-injectBrowseModeKeystroke(
-    "kb:Shift+J",
-    "previousDialog",
-    script=lambda self, gesture: gp.findByRole(
-        direction=-1,
-        roles=dialogTypes,
-        errorMessage=_("No previous dialog")),
-    doc="Jump to previous dialog")
+    def injectBrowseModeKeystrokes(self):
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Alt+DownArrow",
+            "moveToNextSibling",
+            doc="Moves to next sibling in browser")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Alt+UpArrow",
+            "moveToPreviousSibling",
+            doc="Moves to previous sibling in browser")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Alt+LeftArrow",
+            "moveToParent",
+            doc="Moves to parent in browser")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Alt+RightArrow",
+            "moveToChild",
+            doc="Moves to next child in browser")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+O",
+            "rotor",
+            doc="Adjusts BrowserNav rotor")
+        self.injectBrowseModeKeystroke(
+            "kb:P",
+            "nextParagraph",
+            script=lambda self, gesture: self.script_moveByParagraph_forward(gesture),
+            doc="Jump to next paragraph")
+        self.injectBrowseModeKeystroke(
+            "kb:Shift+P",
+            "previousParagraph",
+            script=lambda self, gesture: self.script_moveByParagraph_back(gesture),
+            doc="Jump to previous paragraph")
+        # Example page with tabs:
+        # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
+        self.injectBrowseModeKeystroke(
+            "kb:Y",
+            "nextTab",
+            script=lambda self, gesture: gp.findByRole(
+                direction=1,
+                roles=[controlTypes.ROLE_TAB],
+                errorMessage=_("No next tab")),
+            doc="Jump to next tab")
+        self.injectBrowseModeKeystroke(
+            "kb:Shift+Y",
+            "previousTab",
+            script=lambda self, gesture: gp.findByRole(
+                direction=-1,
+                roles=[controlTypes.ROLE_TAB],
+                errorMessage=_("No previous tab")),
+            doc="Jump to previous tab")
 
-menuTypes = [
-    controlTypes.ROLE_MENU,
-    controlTypes.ROLE_MENUBAR,
-    controlTypes.ROLE_MENUITEM,
-    controlTypes.ROLE_POPUPMENU,
-    controlTypes.ROLE_CHECKMENUITEM,
-    controlTypes.ROLE_RADIOMENUITEM,
-    controlTypes.ROLE_TEAROFFMENU,
-    controlTypes.ROLE_MENUBUTTON,
-]
-injectBrowseModeKeystroke(
-    "kb:Z",
-    "nextMenu",
-    script=lambda self, gesture: gp.findByRole(
-        direction=1,
-        roles=menuTypes,
-        errorMessage=_("No next menu")),
-    doc="Jump to next menu")
-injectBrowseModeKeystroke(
-    "kb:Shift+Z",
-    "previousMenu",
-    script=lambda self, gesture: gp.findByRole(
-        direction=-1,
-        roles=menuTypes,
-        errorMessage=_("No previous menu")),
-    doc="Jump to previous menu")
+        #Dialog
+        dialogTypes = [controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
+        self.injectBrowseModeKeystroke(
+            "kb:J",
+            "nextDialog",
+            script=lambda self, gesture: gp.findByRole(
+                direction=1,
+                roles=dialogTypes,
+                errorMessage=_("No next dialog")),
+            doc="Jump to next dialog")
+        self.injectBrowseModeKeystroke(
+            "kb:Shift+J",
+            "previousDialog",
+            script=lambda self, gesture: gp.findByRole(
+                direction=-1,
+                roles=dialogTypes,
+                errorMessage=_("No previous dialog")),
+            doc="Jump to previous dialog")
+
+        menuTypes = [
+            controlTypes.ROLE_MENU,
+            controlTypes.ROLE_MENUBAR,
+            controlTypes.ROLE_MENUITEM,
+            controlTypes.ROLE_POPUPMENU,
+            controlTypes.ROLE_CHECKMENUITEM,
+            controlTypes.ROLE_RADIOMENUITEM,
+            controlTypes.ROLE_TEAROFFMENU,
+            controlTypes.ROLE_MENUBUTTON,
+        ]
+        self.injectBrowseModeKeystroke(
+            "kb:Z",
+            "nextMenu",
+            script=lambda self, gesture: gp.findByRole(
+                direction=1,
+                roles=menuTypes,
+                errorMessage=_("No next menu")),
+            doc="Jump to next menu")
+        self.injectBrowseModeKeystroke(
+            "kb:Shift+Z",
+            "previousMenu",
+            script=lambda self, gesture: gp.findByRole(
+                direction=-1,
+                roles=menuTypes,
+                errorMessage=_("No previous menu")),
+            doc="Jump to previous menu")
 
