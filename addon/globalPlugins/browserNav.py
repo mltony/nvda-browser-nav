@@ -389,8 +389,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 self.endOfDocument(errorMessage)
                 return
             textInfo.expand(textInfos.UNIT_PARAGRAPH)
-            obj = textInfo.focusableNVDAObjectAtStart
-            if obj.role in roles:
+            obj = textInfo.NVDAObjectAtStart
+            if obj is not None and obj.role in roles:
                 textInfo.updateCaret()
                 self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                 speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
