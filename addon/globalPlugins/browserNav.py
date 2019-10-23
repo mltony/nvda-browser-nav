@@ -441,19 +441,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:P",
             "nextParagraph",
-            script=lambda self, gesture: self.script_moveByParagraph_forward(gesture),
+            script=lambda selfself, gesture: self.script_moveByParagraph_forward(gesture),
             doc="Jump to next paragraph")
         self.injectBrowseModeKeystroke(
             "kb:Shift+P",
             "previousParagraph",
-            script=lambda self, gesture: self.script_moveByParagraph_back(gesture),
+            script=lambda selfself, gesture: self.script_moveByParagraph_back(gesture),
             doc="Jump to previous paragraph")
         # Example page with tabs:
         # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
         self.injectBrowseModeKeystroke(
             "kb:Y",
             "nextTab",
-            script=lambda self, gesture: gp.findByRole(
+            script=lambda selfself, gesture: self.findByRole(
                 direction=1,
                 roles=[controlTypes.ROLE_TAB],
                 errorMessage=_("No next tab")),
@@ -461,7 +461,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:Shift+Y",
             "previousTab",
-            script=lambda self, gesture: gp.findByRole(
+            script=lambda selfself, gesture: self.findByRole(
                 direction=-1,
                 roles=[controlTypes.ROLE_TAB],
                 errorMessage=_("No previous tab")),
@@ -472,7 +472,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:J",
             "nextDialog",
-            script=lambda self, gesture: gp.findByRole(
+            script=lambda selfself, gesture: self.findByRole(
                 direction=1,
                 roles=dialogTypes,
                 errorMessage=_("No next dialog")),
@@ -480,7 +480,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:Shift+J",
             "previousDialog",
-            script=lambda self, gesture: gp.findByRole(
+            script=lambda selfself, gesture: self.findByRole(
                 direction=-1,
                 roles=dialogTypes,
                 errorMessage=_("No previous dialog")),
@@ -499,7 +499,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:Z",
             "nextMenu",
-            script=lambda self, gesture: gp.findByRole(
+            script=lambda selfself, gesture: self.findByRole(
                 direction=1,
                 roles=menuTypes,
                 errorMessage=_("No next menu")),
@@ -507,7 +507,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:Shift+Z",
             "previousMenu",
-            script=lambda self, gesture: gp.findByRole(
+            script=lambda selfself, gesture: self.findByRole(
                 direction=-1,
                 roles=menuTypes,
                 errorMessage=_("No previous menu")),
