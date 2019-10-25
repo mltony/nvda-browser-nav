@@ -270,19 +270,38 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         mode = getMode()
         op = PARENT_OPERATORS[mode]
         # Translators: error message if parent could not be found
-        errorMessage = _("No paragraph  with {qualifier} {mode} in the document").format(
+        errorMessage = _("No previous paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
         self.moveInBrowser(-1, errorMessage, op)
+        
+    def script_moveToNextParent(self, gesture):
+        mode = getMode()
+        op = PARENT_OPERATORS[mode]
+        # Translators: error message if parent could not be found
+        errorMessage = _("No next paragraph  with {qualifier} {mode} in the document").format(
+            mode=BROWSE_MODES[mode],
+            qualifier=OPERATOR_STRINGS[op])
+        self.moveInBrowser(1, errorMessage, op)
+        
 
     def script_moveToChild(self, gesture):
         mode = getMode()
         op = CHILD_OPERATORS[mode]
-        # Translators: error message if parent could not be found
-        errorMessage = _("No paragraph  with {qualifier} {mode} in the document").format(
+        # Translators: error message if child could not be found
+        errorMessage = _("No next paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
         self.moveInBrowser(1, errorMessage, op)
+        
+    def script_moveToPreviousChild(self, gesture):
+        mode = getMode()
+        op = CHILD_OPERATORS[mode]
+        # Translators: error message if child could not be found
+        errorMessage = _("No previous paragraph  with {qualifier} {mode} in the document").format(
+            mode=BROWSE_MODES[mode],
+            qualifier=OPERATOR_STRINGS[op])
+        self.moveInBrowser(-1, errorMessage, op)
 
     def script_rotor(self, gesture):
         mode = getMode()
@@ -434,6 +453,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "kb:NVDA+Alt+RightArrow",
             "moveToChild",
             doc="Moves to next child in browser")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Alt+Home",
+            "moveToParent",
+            doc="Moves to next parent in browser")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Alt+End",
+            "moveToNextParent",
+            doc="Moves to next parent in browser")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Alt+PageDown",
+            "moveToChild",
+            doc="Moves to next child in browser")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Alt+PageUp",
+            "moveToPreviousChild",
+            doc="Moves to previous child in browser")
+            
         self.injectBrowseModeKeystroke(
             "kb:NVDA+O",
             "rotor",

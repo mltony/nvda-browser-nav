@@ -18,8 +18,10 @@ BrowserNav works in any browser supported by NVDA.
 Keystrokes:
 
 * NVDA+Alt+UpArrow or DownArrow: Jump to previous or next paragraph with the same horizontal offset or font size.
-* NVDA+alt+LeftArrow: Jump to previous paragraph with lesser offset or greater font size.
-* NVDA+Alt+RightArrow: Jump to next paragraph with greater offset or smaller font size.
+* NVDA+Alt+Home or NVDA+alt+LeftArrow: Jump to previous paragraph with lesser offset or greater font size (parent paragraph).
+* NVDA+Alt+End: Jump to next paragraph with lesser offset or greater font size (next parent paragraph).
+* NVDA+Alt+PageDown or NVDA+Alt+RightArrow: Jump to next paragraph with greater offset or smaller font size (child paragraph).
+* NVDA+Alt+PageUp: Jump to previous paragraph with greater offset or smaller font size (previous child paragraph).
 * NVDA+O: Switch rotor setting between horizontal offset, font size, font size with font style.
 * P or Shift+P: Jump to next or previous paragraph.
 * Y or Shift+Y: Jump to next or previous tab.
