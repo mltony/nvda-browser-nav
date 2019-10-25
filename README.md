@@ -27,6 +27,7 @@ Keystrokes:
 * Y or Shift+Y: Jump to next or previous tab.
 * K or Shift+K: Jump to next or previous dialog.
 * Z or Shift+Z: Jump to next or previous menu.
+* 0 or Shift+0: Jump to next or previous tree view.
 
 ## Source code
 Source code is available at <http://github.com/mltony/nvda-indent-nav>.

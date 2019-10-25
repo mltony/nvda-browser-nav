@@ -548,3 +548,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 roles=menuTypes,
                 errorMessage=_("No previous menu")),
             doc="Jump to previous menu")
+        self.injectBrowseModeKeystroke(
+            "kb:0",
+            "nextTreeView",
+            script=lambda selfself, gesture: self.findByRole(
+                direction=1,
+                roles=[controlTypes.ROLE_TREEVIEW],
+                errorMessage=_("No next tree view")),
+            doc="Jump to next tree view")
+        self.injectBrowseModeKeystroke(
+            "kb:Shift+0",
+            "previousTreeView",
+            script=lambda selfself, gesture: self.findByRole(
+                direction=-1,
+                roles=[controlTypes.ROLE_TREEVIEW],
+                errorMessage=_("No previous tree view")),
+            doc="Jump to previous tree view")
