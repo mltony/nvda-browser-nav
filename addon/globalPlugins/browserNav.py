@@ -19,6 +19,7 @@ import config
 import ctypes
 import globalPluginHandler
 import gui
+from logHandler import log
 import NVDAHelper
 import operator
 import re
@@ -419,6 +420,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 textInfo.updateCaret()
                 self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                 speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                textInfo.collapse()
+                focus._set_selection(textInfo)
                 return
 
     def findByControlField(self, direction, role, errorMessage):
@@ -451,10 +454,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 textInfo.updateCaret()
                 self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                 speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                textInfo.collapse()
+                focus._set_selection(textInfo)
                 return
-
-
-
 
     def injectBrowseModeKeystroke(self, keystrokes, funcName, script=None, doc=None):
         gp = self
