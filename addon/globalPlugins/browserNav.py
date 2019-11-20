@@ -274,7 +274,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
         self.moveInBrowser(-1, errorMessage, op)
-        
+
     def script_moveToNextParent(self, gesture):
         mode = getMode()
         op = PARENT_OPERATORS[mode]
@@ -283,7 +283,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
         self.moveInBrowser(1, errorMessage, op)
-        
+
 
     def script_moveToChild(self, gesture):
         mode = getMode()
@@ -293,7 +293,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
         self.moveInBrowser(1, errorMessage, op)
-        
+
     def script_moveToPreviousChild(self, gesture):
         mode = getMode()
         op = CHILD_OPERATORS[mode]
@@ -421,8 +421,42 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
                 return
 
+    def findByControlField(self, direction, role, errorMessage):
+        def getUniqueId(info):
+            fields = info.getTextWithFields()
+            for field in fields:
+                if (
+                    isinstance(field, textInfos.FieldCommand)
+                    and field.command == "controlStart"
+                    and "role" in field.field
+                    and field.field['role'] == role
+                ):
+                    return field.field.get('uniqueID', 0)
+            return None
+        focus = api.getFocusObject().treeInterceptor
+        textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
+        textInfo.expand(textInfos.UNIT_PARAGRAPH)
+        originalId = getUniqueId(textInfo)
+        distance = 0
+        while True:
+            distance += 1
+            textInfo.collapse()
+            result = textInfo.move(textInfos.UNIT_PARAGRAPH, direction)
+            if result == 0:
+                self.endOfDocument(errorMessage)
+                return
+            textInfo.expand(textInfos.UNIT_PARAGRAPH)
+            newId = getUniqueId(textInfo)
+            if newId is not None and (newId != originalId):
+                textInfo.updateCaret()
+                self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
+                speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                return
 
-    def injectBrowseModeKeystroke(self, keystroke, funcName, script=None, doc=None):
+
+
+
+    def injectBrowseModeKeystroke(self, keystrokes, funcName, script=None, doc=None):
         gp = self
         cls = browseMode.BrowseModeTreeInterceptor
         scriptFuncName = "script_" + funcName
@@ -434,7 +468,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if doc is not None:
             script.__doc__ = doc
         setattr(cls, scriptFuncName, script)
-        cls._BrowseModeTreeInterceptor__gestures[keystroke] = funcName
+        if not isinstance(keystrokes, list):
+            keystrokes = [keystrokes]
+        for keystroke in keystrokes:
+            cls._BrowseModeTreeInterceptor__gestures[keystroke] = funcName
 
     def injectBrowseModeKeystrokes(self):
         self.injectBrowseModeKeystroke(
@@ -446,30 +483,22 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "moveToPreviousSibling",
             doc="Moves to previous sibling in browser")
         self.injectBrowseModeKeystroke(
-            "kb:NVDA+Alt+LeftArrow",
-            "moveToParent",
-            doc="Moves to parent in browser")
-        self.injectBrowseModeKeystroke(
-            "kb:NVDA+Alt+RightArrow",
-            "moveToChild",
-            doc="Moves to next child in browser")
-        self.injectBrowseModeKeystroke(
-            "kb:NVDA+Alt+Home",
+            ["kb:NVDA+Alt+LeftArrow", "kb:NVDA+Alt+Home"],
             "moveToParent",
             doc="Moves to next parent in browser")
         self.injectBrowseModeKeystroke(
-            "kb:NVDA+Alt+End",
+            ["kb:NVDA+Control+Alt+LeftArrow", "kb:NVDA+Alt+End"],
             "moveToNextParent",
             doc="Moves to next parent in browser")
         self.injectBrowseModeKeystroke(
-            "kb:NVDA+Alt+PageDown",
+            ["kb:NVDA+Alt+RightArrow", "kb:NVDA+Alt+PageDown"],
             "moveToChild",
             doc="Moves to next child in browser")
         self.injectBrowseModeKeystroke(
-            "kb:NVDA+Alt+PageUp",
+            ["kb:NVDA+Control+Alt+RightArrow", "kb:NVDA+Alt+PageUp"],
             "moveToPreviousChild",
             doc="Moves to previous child in browser")
-            
+
         self.injectBrowseModeKeystroke(
             "kb:NVDA+O",
             "rotor",
@@ -564,3 +593,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 roles=[controlTypes.ROLE_TREEVIEW],
                 errorMessage=_("No previous tree view")),
             doc="Jump to previous tree view")
+        self.injectBrowseModeKeystroke(
+            "kb:9",
+            "nextToolBar",
+            script=lambda selfself, gesture: self.findByControlField(
+                direction=1,
+                role=controlTypes.ROLE_TOOLBAR,
+                errorMessage=_("No next tool bar")),
+            doc="Jump to next tool bar")
+        self.injectBrowseModeKeystroke(
+            "kb:Shift+9",
+            "previousToolBar",
+            script=lambda selfself, gesture: self.findByControlField(
+                direction=-1,
+                role=controlTypes.ROLE_TOOLBAR,
+                errorMessage=_("No previous tool bar")),
+            doc="Jump to previous tool bar")            
