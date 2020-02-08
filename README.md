@@ -32,4 +32,3 @@ Keystrokes:
 
 ## Source code
 Source code is available at <http://github.com/mltony/nvda-indent-nav>.
-
