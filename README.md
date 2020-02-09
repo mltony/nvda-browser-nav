@@ -15,7 +15,7 @@ BrowserNav can be used to navigate by  horizontal offset from the left edge of t
 
 BrowserNav works in any browser supported by NVDA.
 
-Keystrokes:
+## Keystrokes:
 
 * NVDA+Alt+UpArrow or DownArrow: Jump to previous or next paragraph with the same horizontal offset or font size.
 * NVDA+Alt+Home or NVDA+alt+LeftArrow: Jump to previous paragraph with lesser offset or greater font size (parent paragraph).
@@ -29,6 +29,26 @@ Keystrokes:
 * Z or Shift+Z: Jump to next or previous menu.
 * 0 or Shift+0: Jump to next or previous tree view.
 * 9 or Shift+9: Jump to next or previous tool bar.
+* NVDA+E: edit semi-accessible edit boxes - see next section
+
+## Editing semi-accessible edit boxes
+
+Many modern web applications, notably Jupyter among others,  use edit boxes, that are not that accessible, e.g. they appear blank, but you can copy text in and out of them using Control+A, Control+C and Control+V keystrokes.
+
+BrowserNav offers an experimental feature to edit those edit boxes in a more convenient way. IN order to use it:
+
+1. Find edit box in the browser window.
+2. Press NVDA+E.
+3. A new window will appear with the contents of that edit box.
+4. Edit the contents of that edit box in this window.
+5. Once you're done, you can press Escape to close the accessible edit window and update the edit box on the web page.
+6. Alternatively, you can press Control+Enter, Shift+Enter or Alt+Enter. This will close the window, update the edit box and pass on the gesture on to the web application.
+
+Notes:
+
+* At this time, BrowserNav doesn't support editing blank edit boxes. Make sure edit box is not blank before editing it.
+* Make sure to release Control, Shift or Alt modifiers quickly affter pressing Control+Enter, Shift+Enter, or Alt+Enter. Holding them for over a second will cause problems.
+* This feature is currently experimental.
 
 ## Source code
 Source code is available at <http://github.com/mltony/nvda-indent-nav>.

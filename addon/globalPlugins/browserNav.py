@@ -19,6 +19,7 @@ import config
 import ctypes
 import globalPluginHandler
 import gui
+import keyboardHandler
 from logHandler import log
 import NVDAHelper
 import operator
@@ -28,9 +29,20 @@ from scriptHandler import script
 import speech
 import struct
 import textInfos
+import time
 import tones
 import ui
+import winUser
 import wx
+
+debug = False
+if debug:
+    f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
+def mylog(s):
+    if debug:
+        print(str(s), file=f)
+        f.flush()
+
 
 def myAssert(condition):
     if not condition:
@@ -150,6 +162,21 @@ OPERATOR_STRINGS = {
     operator.gt: _("greater"),
 }
 
+controlCharacter = "➉" # U+2789, Dingbat circled sans-serif digit ten
+kbdControlC = keyboardHandler.KeyboardInputGesture.fromName("Control+c")
+kbdControlV = keyboardHandler.KeyboardInputGesture.fromName("Control+v")
+kbdControlA = keyboardHandler.KeyboardInputGesture.fromName("Control+a")
+kbdControlHome = keyboardHandler.KeyboardInputGesture.fromName("Control+Home")
+kbdControlEnd = keyboardHandler.KeyboardInputGesture.fromName("Control+End")
+
+allModifiers = [
+    winUser.VK_LCONTROL, winUser.VK_RCONTROL,
+    winUser.VK_LSHIFT, winUser.VK_RSHIFT, winUser.VK_LMENU,
+    winUser.VK_RMENU, winUser.VK_LWIN, winUser.VK_RWIN, 
+]
+
+
+
 class Beeper:
     BASE_FREQ = speech.IDT_BASE_FREQUENCY
     def getPitch(self, indent):
@@ -231,8 +258,82 @@ class Beeper:
         return result
 
 
+class EditTextDialog(wx.Dialog):
+    def __init__(self, parent, text, onTextComplete):
+        # Translators: Title of calibration dialog
+        title_string = _("Edit text")
+        super(EditTextDialog, self).__init__(parent, title=title_string)
+        self.text = text
+        self.onTextComplete = onTextComplete
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        sHelper = gui.guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+
+        self.textCtrl = wx.TextCtrl(self, style=wx.TE_MULTILINE)
+        self.textCtrl.Bind(wx.EVT_CHAR, self.onChar)
+        self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
+        sHelper.addItem(self.textCtrl)
+        self.textCtrl.SetValue(text)
+        self.SetFocus()
+        self.Maximize(True)
+
+    def onChar(self, event):
+        c = event.ControlDown()
+        s = event.ShiftDown()
+        a = event.AltDown()
+        keyCode = event.GetKeyCode()
+        #mylog(f"Key {keyCode} CSA {c} {s} {a}")
+        if event.GetKeyCode() in [10, 13]:
+            # 13 means Enter
+            # 10 means Control+Enter
+            modifiers = [
+                event.ControlDown(),
+                event.ShiftDown(),
+                event.AltDown(),
+            ]
+            if not any(modifiers):
+                # Just pure enter without any modifiers
+                # Perform Autoindent
+                curPos = self.textCtrl.GetInsertionPoint
+                lineNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")) - 1
+                lineText = self.textCtrl.GetLineText(lineNum)
+                m = re.search("^\s*", lineText)
+                if m:
+                    self.textCtrl.WriteText("\n" + m.group(0))
+                else:
+                    self.textCtrl.WriteText("\n")
+            else:
+                modifierNames = [
+                    "control",
+                    "shift",
+                    "alt",
+                ]
+                modifierTokens = [
+                    modifierNames[i]
+                    for i in range(len(modifiers))
+                    if modifiers[i]
+                ]
+                keystrokeName = "+".join(modifierTokens + ["Enter"])
+                self.keystroke = keyboardHandler.KeyboardInputGesture.fromName(keystrokeName)
+                self.text = self.textCtrl.GetValue()
+                self.EndModal(wx.ID_OK)
+                wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, self.keystroke))
+        elif event.GetKeyCode() == 9:
+            # 9 means tab
+            self.textCtrl.WriteText("    ")
+        elif event.GetKeyCode() == 1:
+            # Control+A
+            self.textCtrl.SetSelection(-1,-1)
+        else:
+            event.Skip()
 
 
+    def OnKeyUP(self, event):
+        keyCode = event.GetKeyCode()
+        if keyCode == wx.WXK_ESCAPE:
+            self.text = self.textCtrl.GetValue()
+            self.EndModal(wx.ID_CANCEL)
+            wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, None))
+        event.Skip()
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     scriptCategory = _("BrowserNav")
     beeper = Beeper()
@@ -458,6 +559,117 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 focus._set_selection(textInfo)
                 return
 
+    def script_editJupyter(self, gesture, selfself):
+        fg=winUser.getForegroundWindow()
+        if not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
+            selfself._focusLastFocusableObject()
+            obj = selfself._lastFocusableObj
+        else:
+            obj=selfself.currentNVDAObject
+        if obj.role != controlTypes.ROLE_EDITABLETEXT:
+            ui.message(_("Not editable"))
+            return
+        self.startInjectingKeystrokes()
+        try:
+            kbdControlA.send()
+            text = self.getSelection()
+        finally:
+            self.endInjectingKeystrokes()
+        def onTextComplete(result, text, keystroke, timeout=None):
+            if timeout is None:
+                timeout = time.time() + 1
+            #Wait until modifiers are released:
+            if True:
+                good = False
+                if time.time() > timeout:
+                    raise Exception("BrowserNav timeout waiting for Control Shift and Alt to be released!")
+                if True:
+                    status = [
+                        winUser.getKeyState(k) & 32768
+                        for k in allModifiers
+                    ]
+                    if not any(status):
+                        good = True
+                    else:
+                        wx.CallAfter(lambda: onTextComplete(result, text, keystroke, timeout))
+                        return
+                if not good:
+                    raise Exception("Some modifiers are still down after 1 second!")
+            if winUser.getForegroundWindow() != fg:
+                winUser.setForegroundWindow(fg)
+                winUser.setFocus(fg)
+                time.sleep(0.1)
+            self.startInjectingKeystrokes()
+            try:
+                self.copyToClip(text)
+                kbdControlA.send()
+                kbdControlV.send()
+                kbdControlHome.send()
+                kbdControlEnd.send()
+                if keystroke is not None:
+                    k = keystroke._get_displayName()
+                    #mylog(f"hahaha sending {k}")
+                    keystroke.send()
+                # Now we need to sleep a little, so that Control+V keystroke picks up the right state of clipboard, not the original one, that we're going to restore right after the sleep
+                time.sleep(.1)
+            finally:
+                self.endInjectingKeystrokes()
+
+        self.popupEditTextDialog(text, onTextComplete)
+
+    def startInjectingKeystrokes(self):
+        self.restoreKeyboardState()
+        self.clipboardBackup = api.getClipData()
+
+    def endInjectingKeystrokes(self):
+        self.copyToClip(self.clipboardBackup)
+
+    def restoreKeyboardState(self):
+        """
+        Most likely this class is called from within a gesture. This means that Some of the modifiers, like
+        Shift, Control, Alt are pressed at the moment.
+        We need to virtually release them in order to send other keystrokes to VSCode.
+        """
+        modifiers = [winUser.VK_LCONTROL, winUser.VK_RCONTROL,
+            winUser.VK_LSHIFT, winUser.VK_RSHIFT, winUser.VK_LMENU,
+            winUser.VK_RMENU, winUser.VK_LWIN, winUser.VK_RWIN, ]
+        for k in modifiers:
+            if winUser.getKeyState(k) & 32768:
+                winUser.keybd_event(k, 0, 2, 0)
+
+    def copyToClip(self, text):
+        lastException = None
+        for i in range(10):
+            try:
+                api.copyToClip(text)
+                return
+            except PermissionError as e:
+                lastException = e
+                wx.Yield()
+                continue
+        raise Exception(lastException)
+
+    def getSelection(self):
+        self.copyToClip(controlCharacter)
+        kbdControlC.send()
+        t0 = time.time()
+        while True:
+            try:
+                data = api.getClipData()
+                if data != controlCharacter:
+                    return data
+            except PermissionError:
+                pass
+            wx.Yield()
+            if time.time() - t0 > 1.0:
+                raise Exception("Time out while trying to copy data out of VSCode.")
+
+    def popupEditTextDialog(self, text, onTextComplete):
+        gui.mainFrame.prePopup()
+        d = EditTextDialog(gui.mainFrame, text, onTextComplete)
+        result = d.Show()
+        gui.mainFrame.postPopup()
+
     def injectBrowseModeKeystroke(self, keystrokes, funcName, script=None, doc=None):
         gp = self
         cls = browseMode.BrowseModeTreeInterceptor
@@ -610,4 +822,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=-1,
                 role=controlTypes.ROLE_TOOLBAR,
                 errorMessage=_("No previous tool bar")),
-            doc="Jump to previous tool bar")            
+            doc="Jump to previous tool bar")
+        # Edit Jupyter
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+E",
+            "editJupyter",
+            script=lambda selfself, gesture: self.script_editJupyter(gesture, selfself),
+            doc="Edit semi-accessible edit box.")
