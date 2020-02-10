@@ -59,6 +59,7 @@ def initConfiguration():
         "useColor" : "boolean( default=True)",
         "useBackgroundColor" : "boolean( default=True)",
         "useBoldItalic" : "boolean( default=True)",
+        "marks" : "string( default='(^upvote$|^up vote$)')",
     }
     config.conf.spec["browsernav"] = confspec
 
@@ -133,6 +134,10 @@ class SettingsDialog(gui.SettingsDialog):
         label = _("Use bold and italic attributes for style")
         self.useBoldItalicCheckBox = sHelper.addItem(wx.CheckBox(self, label=label))
         self.useBoldItalicCheckBox.Value = getConfig("useBoldItalic")
+      # BrowserMarks regexp text edit
+        self.marksEdit = gui.guiHelper.LabeledControlHelper(self, _("Browser marks regexp"), wx.TextCtrl).control
+        self.marksEdit.Value = getConfig("marks")
+
 
     def onOk(self, evt):
         config.conf["browsernav"]["crackleVolume"] = self.crackleVolumeSlider.Value
@@ -142,6 +147,7 @@ class SettingsDialog(gui.SettingsDialog):
         config.conf["browsernav"]["useColor"] = self.useColorCheckBox.Value
         config.conf["browsernav"]["useBackgroundColor"] = self.useBackgroundColorCheckBox.Value
         config.conf["browsernav"]["useBoldItalic"] = self.useBoldItalicCheckBox.Value
+        config.conf["browsernav"]["marks"] = self.marksEdit.Value
         super(SettingsDialog, self).onOk(evt)
 
 
@@ -172,7 +178,7 @@ kbdControlEnd = keyboardHandler.KeyboardInputGesture.fromName("Control+End")
 allModifiers = [
     winUser.VK_LCONTROL, winUser.VK_RCONTROL,
     winUser.VK_LSHIFT, winUser.VK_RSHIFT, winUser.VK_LMENU,
-    winUser.VK_RMENU, winUser.VK_LWIN, winUser.VK_RWIN, 
+    winUser.VK_RMENU, winUser.VK_LWIN, winUser.VK_RWIN,
 ]
 
 
@@ -503,6 +509,34 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if getConfig("noNextTextMessage"):
             ui.message(message)
 
+    def findMark(self, direction, regexp, errorMessage):
+        r = re.compile(regexp)
+        focus = api.getFocusObject().treeInterceptor
+        textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
+        textInfo.expand(textInfos.UNIT_PARAGRAPH)
+        distance = 0
+        while True:
+            distance += 1
+            textInfo.collapse()
+            result = textInfo.move(textInfos.UNIT_PARAGRAPH, direction)
+            if result == 0:
+                self.endOfDocument(errorMessage)
+                return
+            textInfo.expand(textInfos.UNIT_PARAGRAPH)
+            m = r.search(textInfo.text)
+            if m:
+                textInfo.collapse()
+                textInfo.move(textInfos.UNIT_CHARACTER, m.start(0))
+                end = textInfo.copy()
+                end.move(textInfos.UNIT_CHARACTER, len(m.group(0)))
+                textInfo.setEndPoint(end, "endToEnd")
+                textInfo.updateCaret()
+                self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
+                speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                textInfo.collapse()
+                focus._set_selection(textInfo)
+                return
+
     def findByRole(self, direction, roles, errorMessage):
         focus = api.getFocusObject().treeInterceptor
         textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
@@ -688,6 +722,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             cls._BrowseModeTreeInterceptor__gestures[keystroke] = funcName
 
     def injectBrowseModeKeystrokes(self):
+      # Indentation navigation
         self.injectBrowseModeKeystroke(
             "kb:NVDA+Alt+DownArrow",
             "moveToNextSibling",
@@ -712,21 +747,34 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             ["kb:NVDA+Control+Alt+RightArrow", "kb:NVDA+Alt+PageUp"],
             "moveToPreviousChild",
             doc="Moves to previous child in browser")
-
+      #Rotor
         self.injectBrowseModeKeystroke(
             "kb:NVDA+O",
             "rotor",
             doc="Adjusts BrowserNav rotor")
+
+      # Marks
         self.injectBrowseModeKeystroke(
-            "kb:P",
-            "nextParagraph",
-            script=lambda selfself, gesture: self.script_moveByParagraph_forward(gesture),
-            doc="Jump to next paragraph")
+            "kb:j",
+            "nextMark",
+            script=lambda selfself, gesture: self.findMark(1, getConfig("marks"), "No next browser mark. To configure browser marks, go to BrowserNav settings."),
+            doc="Jump to next browser mark.")
         self.injectBrowseModeKeystroke(
-            "kb:Shift+P",
-            "previousParagraph",
-            script=lambda selfself, gesture: self.script_moveByParagraph_back(gesture),
-            doc="Jump to previous paragraph")
+            "kb:Shift+j",
+            "previousMark",
+            script=lambda selfself, gesture: self.findMark(-1, getConfig("marks"), _("No previous browser mark. To configure browser marks, go to BrowserNav settings.")),
+            doc="Jump to previous browser mark.")
+        if False:
+            self.injectBrowseModeKeystroke(
+                "",
+                "nextParagraph",
+                script=lambda selfself, gesture: self.script_moveByParagraph_forward(gesture),
+                doc="Jump to next paragraph")        
+            self.injectBrowseModeKeystroke(
+                "",
+                "previousParagraph",
+                script=lambda selfself, gesture: self.script_moveByParagraph_back(gesture),
+                doc="Jump to previous paragraph")
         # Example page with tabs:
         # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
         self.injectBrowseModeKeystroke(
@@ -749,7 +797,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         #Dialog
         dialogTypes = [controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
         self.injectBrowseModeKeystroke(
-            "kb:J",
+            "kb:P",
             "nextDialog",
             script=lambda selfself, gesture: self.findByRole(
                 direction=1,
@@ -757,7 +805,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 errorMessage=_("No next dialog")),
             doc="Jump to next dialog")
         self.injectBrowseModeKeystroke(
-            "kb:Shift+J",
+            "kb:Shift+P",
             "previousDialog",
             script=lambda selfself, gesture: self.findByRole(
                 direction=-1,

@@ -23,9 +23,9 @@ BrowserNav works in any browser supported by NVDA.
 * NVDA+Alt+PageDown or NVDA+Alt+RightArrow: Jump to next paragraph with greater offset or smaller font size (child paragraph).
 * NVDA+Alt+PageUp or NVDA+Control+Alt+RightArrow: Jump to previous paragraph with greater offset or smaller font size (previous child paragraph).
 * NVDA+O: Switch rotor setting between horizontal offset, font size, font size with font style.
-* P or Shift+P: Jump to next or previous paragraph.
+* J or Shift+J: Jump to next or previous browser mark. Browser marks are keywords that you search on web pages often and can be configured in BrowserNav settings.
 * Y or Shift+Y: Jump to next or previous tab.
-* K or Shift+K: Jump to next or previous dialog.
+* P or Shift+P: Jump to next or previous dialog.
 * Z or Shift+Z: Jump to next or previous menu.
 * 0 or Shift+0: Jump to next or previous tree view.
 * 9 or Shift+9: Jump to next or previous tool bar.
