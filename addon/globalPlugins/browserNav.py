@@ -31,6 +31,7 @@ import struct
 import textInfos
 import time
 import tones
+import types
 import ui
 import winUser
 import wx
@@ -174,6 +175,8 @@ kbdControlV = keyboardHandler.KeyboardInputGesture.fromName("Control+v")
 kbdControlA = keyboardHandler.KeyboardInputGesture.fromName("Control+a")
 kbdControlHome = keyboardHandler.KeyboardInputGesture.fromName("Control+Home")
 kbdControlEnd = keyboardHandler.KeyboardInputGesture.fromName("Control+End")
+kbdBackquote = keyboardHandler.KeyboardInputGesture.fromName("`")
+kbdDelete = keyboardHandler.KeyboardInputGesture.fromName("Delete")
 
 allModifiers = [
     winUser.VK_LCONTROL, winUser.VK_RCONTROL,
@@ -181,7 +184,32 @@ allModifiers = [
     winUser.VK_RMENU, winUser.VK_LWIN, winUser.VK_RWIN,
 ]
 
+def executeAsynchronously(gen):
+    """
+    This function executes a generator-function in such a manner, that allows updates from the operating system to be processed during execution.
+    For an example of such generator function, please see GlobalPlugin.script_editJupyter.
+    Specifically, every time the generator function yilds a positive number,, the rest of the generator function will be executed
+    from within wx.CallLater() call.
+    If generator function yields a value of 0, then the rest of the generator function
+    will be executed from within wx.CallAfter() call.
+    This allows clear and simple expression of the logic inside the generator function, while still allowing NVDA to process update events from the operating system.
+    Essentially the generator function will be paused every time it calls yield, then the updates will be processed by NVDA and then the remainder of generator function will continue executing.
+    """
+    if not isinstance(gen, types.GeneratorType):
+        raise Exception("Generator function required")
+    try:
+        value = gen.__next__()
+    except StopIteration:
+        return
+    l = lambda gen=gen: executeAsynchronously(gen)
+    if value == 0:
+        wx.CallAfter(l)
+    else:
+        wx.CallLater(value, l)
 
+class EditBoxUpdateError(Exception):
+    def __init__(self, *args, **kwargs):
+        super(EditBoxUpdateError, self).__init__(*args, **kwargs)
 
 class Beeper:
     BASE_FREQ = speech.IDT_BASE_FREQUENCY
@@ -266,6 +294,7 @@ class Beeper:
 
 class EditTextDialog(wx.Dialog):
     def __init__(self, parent, text, onTextComplete):
+        self.tabValue = "    "
         # Translators: Title of calibration dialog
         title_string = _("Edit text")
         super(EditTextDialog, self).__init__(parent, title=title_string)
@@ -283,18 +312,15 @@ class EditTextDialog(wx.Dialog):
         self.Maximize(True)
 
     def onChar(self, event):
-        c = event.ControlDown()
-        s = event.ShiftDown()
-        a = event.AltDown()
+        control = event.ControlDown()
+        shift = event.ShiftDown()
+        alt = event.AltDown()
         keyCode = event.GetKeyCode()
-        #mylog(f"Key {keyCode} CSA {c} {s} {a}")
         if event.GetKeyCode() in [10, 13]:
             # 13 means Enter
             # 10 means Control+Enter
             modifiers = [
-                event.ControlDown(),
-                event.ShiftDown(),
-                event.AltDown(),
+                control, shift, alt
             ]
             if not any(modifiers):
                 # Just pure enter without any modifiers
@@ -323,12 +349,43 @@ class EditTextDialog(wx.Dialog):
                 self.text = self.textCtrl.GetValue()
                 self.EndModal(wx.ID_OK)
                 wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, self.keystroke))
-        elif event.GetKeyCode() == 9:
-            # 9 means tab
-            self.textCtrl.WriteText("    ")
+        elif event.GetKeyCode() == wx.WXK_TAB:
+            if alt or control:
+                event.Skip()
+            elif not shift:
+                # Just Tab
+                self.textCtrl.WriteText(self.tabValue)
+            else:
+                # Shift+Tab
+                curPos = self.textCtrl.GetInsertionPoint()
+                lineNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")) - 1
+                priorText = self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() )
+                text = self.textCtrl.GetValue()
+                postText = text[len(priorText):]
+                if priorText.endswith(self.tabValue):
+                    newText = priorText[:-len(self.tabValue)] + postText
+                    self.textCtrl.SetValue(newText)
+                    self.textCtrl.SetInsertionPoint(curPos - len(self.tabValue))
         elif event.GetKeyCode() == 1:
             # Control+A
             self.textCtrl.SetSelection(-1,-1)
+        elif event.GetKeyCode() == wx.WXK_HOME:
+            if not any([control, shift, alt]):
+                curPos = self.textCtrl.GetInsertionPoint()
+                lineNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")) - 1
+                colNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")[-1])
+                lineText = self.textCtrl.GetLineText(lineNum)
+                m = re.search("^\s*", lineText)
+                if not m:
+                    raise Exception("This regular expression must match always.")
+                indent = len(m.group(0))
+                if indent == colNum:
+                    newColNum = 0
+                else:
+                    newColNum = indent
+                self.textCtrl.SetInsertionPoint(curPos - colNum + newColNum)
+            else:
+                event.Skip()
         else:
             event.Skip()
 
@@ -340,6 +397,7 @@ class EditTextDialog(wx.Dialog):
             self.EndModal(wx.ID_CANCEL)
             wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, None))
         event.Skip()
+
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     scriptCategory = _("BrowserNav")
     beeper = Beeper()
@@ -603,12 +661,99 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if obj.role != controlTypes.ROLE_EDITABLETEXT:
             ui.message(_("Not editable"))
             return
+        if False:
+            textInfo = obj.makeTextInfo(textInfos.POSITION_SELECTION)
+            text = textInfo.text
+            l = len(text)
+            ui.message(f"Length {l}")
+            return
         self.startInjectingKeystrokes()
         try:
-            kbdControlA.send()
-            text = self.getSelection()
+            kbdControlHome.send()
+            kbdBackquote.send()
+            try:
+                kbdControlA.send()
+                text = self.getSelection()
+            finally:
+                kbdControlHome.send()
+                kbdDelete.send()
         finally:
             self.endInjectingKeystrokes()
+        if (len(text) == 0) or (text[0] != '`'):
+            ui.message("Failed to copy text from semi-accessible edit-box")
+            return
+        text = text[1:]
+        def updateText(result, text, keystroke):
+            # 1 second to finish all the operations
+            timeout = time.time() + 1
+            try:
+              # step 1. wait for all modifiers to be released
+                while True:
+                    if time.time() > timeout:
+                        raise EditBoxUpdateError(_("Timed out during release modifiers stage"))
+                    status = [
+                        winUser.getKeyState(k) & 32768
+                        for k in allModifiers
+                    ]
+                    if not any(status):
+                        break
+                    yield 1
+              # Step 2: switch back to that browser window
+                while  winUser.getForegroundWindow() != fg:
+                    if time.time() > timeout:
+                        raise EditBoxUpdateError(_("Timed out during switch to browser window stage"))
+                    winUser.setForegroundWindow(fg)
+                    winUser.setFocus(fg)
+                    yield 1
+              # Step 3: start sending keys
+                self.startInjectingKeystrokes()
+                try:
+                    self.copyToClip(text)
+                  # Step 3.1: Send Control+A and wait for the selection to appear
+                    kbdControlHome.send()
+                    # Sending backquote character to ensure that the edit box is not empty
+                    kbdBackquote.send()
+                    kbdControlA.send()
+                    while True:
+                        yield 1
+                        focus = api.getFocusObject()
+                        if focus.role != controlTypes.ROLE_EDITABLETEXT:
+                            raise EditBoxUpdateError(_("Browser state has changed. Focused element is not an edit box."))
+                        if time.time() > timeout:
+                            raise EditBoxUpdateError(_("Timed out during Control+A stage"))
+                        textInfo = focus.makeTextInfo(textInfos.POSITION_SELECTION)
+                        text = textInfo.text
+                        if len(text) > 0:
+                            break
+                  # Step 3.1 Send Control+V and wait for the selection to disappear
+                    kbdControlV.send()
+                    kbdControlHome.send()
+                    while True:
+                        yield 1
+                        focus = api.getFocusObject()
+                        if focus.role != controlTypes.ROLE_EDITABLETEXT:
+                            raise EditBoxUpdateError(_("Browser state has changed. Focused element is not an edit box."))
+                        if time.time() > timeout:
+                            raise EditBoxUpdateError(_("Timed out during Control+V stage"))
+                        textInfo = focus.makeTextInfo(textInfos.POSITION_SELECTION)
+                        text = textInfo.text
+                        mylog(f"text='{text}'")
+                        if len(text) == 0:
+                            break
+                  # Step 3.3: send the original keystroke, e.g. Control+Enter
+                    if keystroke is not None:
+                        keystroke.send()
+                finally:
+                    self.endInjectingKeystrokes()
+            except EditBoxUpdateError as e:
+                self.copyToClip(text)
+                message = ("BrowserNav failed to update edit box.")
+                message += "\n" + str(e)
+                message += "\n" + _("Last edited text has been copied to the clipboard.")
+                gui.messageBox(message)
+
+
+
         def onTextComplete(result, text, keystroke, timeout=None):
             if timeout is None:
                 timeout = time.time() + 1
@@ -645,11 +790,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     #mylog(f"hahaha sending {k}")
                     keystroke.send()
                 # Now we need to sleep a little, so that Control+V keystroke picks up the right state of clipboard, not the original one, that we're going to restore right after the sleep
-                time.sleep(.1)
+                time.sleep(.4)
             finally:
                 self.endInjectingKeystrokes()
 
-        self.popupEditTextDialog(text, onTextComplete)
+        self.popupEditTextDialog(
+            text,
+            lambda result, text, keystroke: executeAsynchronously(updateText(result, text, keystroke))
+        )
 
     def startInjectingKeystrokes(self):
         self.restoreKeyboardState()
@@ -769,7 +917,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 "",
                 "nextParagraph",
                 script=lambda selfself, gesture: self.script_moveByParagraph_forward(gesture),
-                doc="Jump to next paragraph")        
+                doc="Jump to next paragraph")
             self.injectBrowseModeKeystroke(
                 "",
                 "previousParagraph",
