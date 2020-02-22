@@ -42,13 +42,15 @@ BrowserNav offers an experimental feature to edit those edit boxes in a more con
 3. A new window will appear with the contents of that edit box.
 4. Edit the contents of that edit box in this window.
 5. Once you're done, you can press Escape to close the accessible edit window and update the edit box on the web page.
-6. Alternatively, you can press Control+Enter, Shift+Enter or Alt+Enter. This will close the window, update the edit box and pass on the gesture on to the web application.
+6. Alternatively, you can press Control+Enter, Shift+Enter or Alt+Enter. This will close the edit window, update the edit box and pass on the gesture on to the web application.
+7. In order to close the edit window without saving changes, press Alt+F4.
+8. At any time, if the contents of previously edited text is lost, press NVDA+Control+E to copy it to clipboard.
 
 Notes:
 
-* At this time, BrowserNav doesn't support editing blank edit boxes. Make sure edit box is not blank before editing it.
+* Do not change the state of the browser, e.g. do not switch tabs and do not focus other elements within the tab while edit text window is open. Doing so will prevent BrowserNav from correctly updating text in the edit box.
 * Make sure to release Control, Shift or Alt modifiers quickly affter pressing Control+Enter, Shift+Enter, or Alt+Enter. Holding them for over a second will cause problems.
-* This feature is currently experimental.
+* This feature is currently experimental. Please expect only about 90-95% success rate.
 
 ## Source code
 Source code is available at <http://github.com/mltony/nvda-indent-nav>.

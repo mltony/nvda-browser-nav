@@ -406,6 +406,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         super(GlobalPlugin, self).__init__(*args, **kwargs)
         self.createMenu()
         self.injectBrowseModeKeystrokes()
+        self.lastJupyterText = ""
 
     def createMenu(self):
         def _popupMenu(evt):
@@ -684,8 +685,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             return
         text = text[1:]
         def updateText(result, text, keystroke):
+            self.lastJupyterText = text
             # 1 second to finish all the operations
-            timeout = time.time() + 1
+            timeout = time.time() + 2
             try:
               # step 1. wait for all modifiers to be released
                 while True:
@@ -752,52 +754,17 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 message += "\n" + _("Last edited text has been copied to the clipboard.")
                 gui.messageBox(message)
 
-
-
-        def onTextComplete(result, text, keystroke, timeout=None):
-            if timeout is None:
-                timeout = time.time() + 1
-            #Wait until modifiers are released:
-            if True:
-                good = False
-                if time.time() > timeout:
-                    raise Exception("BrowserNav timeout waiting for Control Shift and Alt to be released!")
-                if True:
-                    status = [
-                        winUser.getKeyState(k) & 32768
-                        for k in allModifiers
-                    ]
-                    if not any(status):
-                        good = True
-                    else:
-                        wx.CallAfter(lambda: onTextComplete(result, text, keystroke, timeout))
-                        return
-                if not good:
-                    raise Exception("Some modifiers are still down after 1 second!")
-            if winUser.getForegroundWindow() != fg:
-                winUser.setForegroundWindow(fg)
-                winUser.setFocus(fg)
-                time.sleep(0.1)
-            self.startInjectingKeystrokes()
-            try:
-                self.copyToClip(text)
-                kbdControlA.send()
-                kbdControlV.send()
-                kbdControlHome.send()
-                kbdControlEnd.send()
-                if keystroke is not None:
-                    k = keystroke._get_displayName()
-                    #mylog(f"hahaha sending {k}")
-                    keystroke.send()
-                # Now we need to sleep a little, so that Control+V keystroke picks up the right state of clipboard, not the original one, that we're going to restore right after the sleep
-                time.sleep(.4)
-            finally:
-                self.endInjectingKeystrokes()
-
         self.popupEditTextDialog(
             text,
             lambda result, text, keystroke: executeAsynchronously(updateText(result, text, keystroke))
         )
+
+    def script_copyJupyterText(self, gesture, selfself):
+        if len(self.lastJupyterText) > 0:
+            self.copyToClip(self.lastJupyterText)
+            ui.message(_("Last Jupyter text has been copied to clipboard."))
+        else:
+            ui.message(_("No last Jupyter text., or last Jupyter text is empty."))
 
     def startInjectingKeystrokes(self):
         self.restoreKeyboardState()
@@ -1025,3 +992,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "editJupyter",
             script=lambda selfself, gesture: self.script_editJupyter(gesture, selfself),
             doc="Edit semi-accessible edit box.")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Control+E",
+            "copyJupyterText",
+            script=lambda selfself, gesture: self.script_copyJupyterText(gesture, selfself),
+            doc="Copy the last text from semi-accessible edit box to clipboard.")
