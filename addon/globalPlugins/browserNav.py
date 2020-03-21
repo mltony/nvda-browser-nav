@@ -19,8 +19,10 @@ import config
 import ctypes
 import globalPluginHandler
 import gui
+import inputCore
 import keyboardHandler
 from logHandler import log
+import nvwave
 import NVDAHelper
 import operator
 import re
@@ -220,6 +222,16 @@ class Beeper:
     PAUSE_LEN = 5 # millis
     MAX_CRACKLE_LEN = 400 # millis
     MAX_BEEP_COUNT = MAX_CRACKLE_LEN // (BEEP_LEN + PAUSE_LEN)
+    
+    def __init__(self):
+        self.player = nvwave.WavePlayer(
+            channels=2,
+            samplesPerSec=int(tones.SAMPLE_RATE),
+            bitsPerSample=16,
+            outputDevice=config.conf["speech"]["outputDevice"],
+            wantDucking=False
+        )
+
 
 
     def fancyCrackle(self, levels, volume):
@@ -236,8 +248,8 @@ class Beeper:
                 ctypes.cast(ctypes.byref(buf, bufPtr), ctypes.POINTER(ctypes.c_char)),
                 self.getPitch(l), beepLen, volume, volume)
             bufPtr += pauseBufSize # add a short pause
-        tones.player.stop()
-        tones.player.feed(buf.raw)
+        self.player.stop()
+        self.player.feed(buf.raw)
 
     def simpleCrackle(self, n, volume):
         return self.fancyCrackle([0] * n, volume)
@@ -267,7 +279,7 @@ class Beeper:
         if bufSize % intSize != 0:
             bufSize += intSize
             bufSize -= (bufSize % intSize)
-        tones.player.stop()
+        self.player.stop()
         bbs = []
         result = [0] * (bufSize//intSize)
         for freq in freqs:
@@ -279,7 +291,7 @@ class Beeper:
         maxInt = 1 << (8 * intSize)
         result = map(lambda x : x %maxInt, result)
         packed = struct.pack("<%dQ" % (bufSize // intSize), *result)
-        tones.player.feed(packed)
+        self.player.feed(packed)
 
     def uniformSample(self, a, m):
         n = len(a)
@@ -290,7 +302,8 @@ class Beeper:
         for i in range(0, m*n, n):
             result.append(a[i  // m])
         return result
-
+    def stop(self):
+        self.player.stop()
 
 class EditTextDialog(wx.Dialog):
     def __init__(self, parent, text, onTextComplete):
@@ -397,6 +410,37 @@ class EditTextDialog(wx.Dialog):
             self.EndModal(wx.ID_CANCEL)
             wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, None))
         event.Skip()
+        
+jupyterUpdateInProgress = False
+
+originalExecuteGesture = None
+beeper = Beeper()
+blockBeeper = Beeper()
+blockKeysUntil = 0
+def preExecuteGesture(selfself, gesture, *args, **kwargs):
+    global blockKeysUntil
+    now = time.time()
+    if now < blockKeysUntil:
+        # Block this keystroke!
+        blockBeeper.fancyBeep("DG#", length=100, left=50, right=50)
+        return
+    return originalExecuteGesture(selfself, gesture, *args, **kwargs)
+    
+def blockAllKeys(timeoutSeconds):
+    global blockKeysUntil
+    now = time.time()
+    if blockKeysUntil > now:
+        raise Exception("Keys are already blocked")
+    blockKeysUntil =now  + timeoutSeconds
+    beeper.fancyBeep("CDGA", length=int(1000 * timeoutSeconds), left=5, right=5)
+    
+def unblockAllKeys():
+    global blockKeysUntil
+    blockKeysUntil = 0
+    beeper.stop()
+    
+
+
 
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     scriptCategory = _("BrowserNav")
@@ -407,6 +451,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.createMenu()
         self.injectBrowseModeKeystrokes()
         self.lastJupyterText = ""
+        global originalExecuteGesture
+        originalExecuteGesture = inputCore.InputManager.executeGesture
+        inputCore.InputManager.executeGesture = preExecuteGesture
+
 
     def createMenu(self):
         def _popupMenu(evt):
@@ -653,6 +701,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 return
 
     def script_editJupyter(self, gesture, selfself):
+        global jupyterUpdateInProgress
+        if jupyterUpdateInProgress:
+            ui.message("Jupyter cell update in progress!")
+            self.beeper.fancyBeep("AF#", length=100, left=20, right=20)
+            return
         fg=winUser.getForegroundWindow()
         if not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
             selfself._focusLastFocusableObject()
@@ -662,12 +715,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if obj.role != controlTypes.ROLE_EDITABLETEXT:
             ui.message(_("Not editable"))
             return
-        if False:
-            textInfo = obj.makeTextInfo(textInfos.POSITION_SELECTION)
-            text = textInfo.text
-            l = len(text)
-            ui.message(f"Length {l}")
-            return
+        uniqueID = obj.IA2UniqueID
         self.startInjectingKeystrokes()
         try:
             kbdControlHome.send()
@@ -684,10 +732,22 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             ui.message("Failed to copy text from semi-accessible edit-box")
             return
         text = text[1:]
+        def getFocusObjectVerified():
+                focus = api.getFocusObject()
+                if focus.role != controlTypes.ROLE_EDITABLETEXT:
+                    raise EditBoxUpdateError(_("Browser state has changed. Focused element is not an edit box."))
+                if (uniqueID is not None) and (uniqueID != 0):
+                    if uniqueID != focus.IA2UniqueID:
+                        raise EditBoxUpdateError(_("Browser state has changed. Different element on the page is now focused."))
+                return focus
+        
         def updateText(result, text, keystroke):
+            global jupyterUpdateInProgress
+            jupyterUpdateInProgress = True
             self.lastJupyterText = text
-            # 1 second to finish all the operations
-            timeout = time.time() + 2
+            timeoutSeconds = 3
+            timeout = time.time() + timeoutSeconds
+            blockAllKeys(timeoutSeconds)
             try:
               # step 1. wait for all modifiers to be released
                 while True:
@@ -718,23 +778,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     kbdControlA.send()
                     while True:
                         yield 1
-                        focus = api.getFocusObject()
-                        if focus.role != controlTypes.ROLE_EDITABLETEXT:
-                            raise EditBoxUpdateError(_("Browser state has changed. Focused element is not an edit box."))
+                        focus = getFocusObjectVerified()
                         if time.time() > timeout:
                             raise EditBoxUpdateError(_("Timed out during Control+A stage"))
                         textInfo = focus.makeTextInfo(textInfos.POSITION_SELECTION)
                         text = textInfo.text
                         if len(text) > 0:
                             break
-                  # Step 3.1 Send Control+V and wait for the selection to disappear
+                  # Step 3.2 Send Control+V and wait for the selection to disappear
                     kbdControlV.send()
                     kbdControlHome.send()
                     while True:
                         yield 1
-                        focus = api.getFocusObject()
-                        if focus.role != controlTypes.ROLE_EDITABLETEXT:
-                            raise EditBoxUpdateError(_("Browser state has changed. Focused element is not an edit box."))
+                        focus = getFocusObjectVerified()
                         if time.time() > timeout:
                             raise EditBoxUpdateError(_("Timed out during Control+V stage"))
                         textInfo = focus.makeTextInfo(textInfos.POSITION_SELECTION)
@@ -742,17 +798,26 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         mylog(f"text='{text}'")
                         if len(text) == 0:
                             break
-                  # Step 3.3: send the original keystroke, e.g. Control+Enter
-                    if keystroke is not None:
-                        keystroke.send()
                 finally:
+                  # Step 3.3. Sleep for a bit more just to make sure things have propagated. 
+                  # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
+                  # or it will paste the original contents of clipboard.
+                    yield 100
                     self.endInjectingKeystrokes()
+              # Step 4: send the original keystroke, e.g. Control+Enter
+                if keystroke is not None:
+                    keystroke.send()                    
             except EditBoxUpdateError as e:
+                tones.player.stop()
+                jupyterUpdateInProgress = False
                 self.copyToClip(text)
                 message = ("BrowserNav failed to update edit box.")
                 message += "\n" + str(e)
                 message += "\n" + _("Last edited text has been copied to the clipboard.")
                 gui.messageBox(message)
+            finally:    
+                unblockAllKeys()
+                jupyterUpdateInProgress = False
 
         self.popupEditTextDialog(
             text,
