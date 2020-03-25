@@ -222,7 +222,7 @@ class Beeper:
     PAUSE_LEN = 5 # millis
     MAX_CRACKLE_LEN = 400 # millis
     MAX_BEEP_COUNT = MAX_CRACKLE_LEN // (BEEP_LEN + PAUSE_LEN)
-    
+
     def __init__(self):
         self.player = nvwave.WavePlayer(
             channels=2,
@@ -410,7 +410,7 @@ class EditTextDialog(wx.Dialog):
             self.EndModal(wx.ID_CANCEL)
             wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, None))
         event.Skip()
-        
+
 jupyterUpdateInProgress = False
 
 originalExecuteGesture = None
@@ -425,7 +425,7 @@ def preExecuteGesture(selfself, gesture, *args, **kwargs):
         blockBeeper.fancyBeep("DG#", length=100, left=50, right=50)
         return
     return originalExecuteGesture(selfself, gesture, *args, **kwargs)
-    
+
 def blockAllKeys(timeoutSeconds):
     global blockKeysUntil
     now = time.time()
@@ -433,12 +433,12 @@ def blockAllKeys(timeoutSeconds):
         raise Exception("Keys are already blocked")
     blockKeysUntil =now  + timeoutSeconds
     beeper.fancyBeep("CDGA", length=int(1000 * timeoutSeconds), left=5, right=5)
-    
+
 def unblockAllKeys():
     global blockKeysUntil
     blockKeysUntil = 0
     beeper.stop()
-    
+
 
 
 
@@ -740,12 +740,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     if uniqueID != focus.IA2UniqueID:
                         raise EditBoxUpdateError(_("Browser state has changed. Different element on the page is now focused."))
                 return focus
-        
+
         def updateText(result, text, keystroke):
             global jupyterUpdateInProgress
             jupyterUpdateInProgress = True
             self.lastJupyterText = text
-            timeoutSeconds = 3
+            timeoutSeconds = 5
             timeout = time.time() + timeoutSeconds
             blockAllKeys(timeoutSeconds)
             try:
@@ -767,6 +767,26 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     winUser.setForegroundWindow(fg)
                     winUser.setFocus(fg)
                     yield 1
+              # Step 2.1: Ensure that the browser window is fully focused.
+                # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
+                step21timeout = time.time() + 1 # Leave 1 second for this step
+                while True:
+                    if time.time() > step21timeout:
+                        raise EditBoxUpdateError(_("Timed out during switch to window stage"))
+                    focus = api.getFocusObject()
+                    if focus.role in [
+                        controlTypes.ROLE_FRAME,
+                        controlTypes.ROLE_DOCUMENT,
+                    ]:
+                        # All good, Firefox is burning cpu, keep sleeping!
+                        yield 50
+                        continue
+                    elif focus.role == controlTypes.ROLE_EDITABLETEXT:
+                        # perfect!
+                        break
+                    else:
+                        raise EditBoxUpdateError(_("Error during switch to window stage, focused element role is %d") % focus.role)
+
               # Step 3: start sending keys
                 self.startInjectingKeystrokes()
                 try:
@@ -799,14 +819,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         if len(text) == 0:
                             break
                 finally:
-                  # Step 3.3. Sleep for a bit more just to make sure things have propagated. 
+                  # Step 3.3. Sleep for a bit more just to make sure things have propagated.
                   # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
                   # or it will paste the original contents of clipboard.
                     yield 100
                     self.endInjectingKeystrokes()
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
-                    keystroke.send()                    
+                    keystroke.send()
             except EditBoxUpdateError as e:
                 tones.player.stop()
                 jupyterUpdateInProgress = False
@@ -815,7 +835,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 message += "\n" + str(e)
                 message += "\n" + _("Last edited text has been copied to the clipboard.")
                 gui.messageBox(message)
-            finally:    
+            finally:
                 unblockAllKeys()
                 jupyterUpdateInProgress = False
 
@@ -875,7 +895,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             except PermissionError:
                 pass
             wx.Yield()
-            if time.time() - t0 > 1.0:
+            if time.time() - t0 > 2.0:
                 raise Exception("Time out while trying to copy data out of VSCode.")
 
     def popupEditTextDialog(self, text, onTextComplete):
