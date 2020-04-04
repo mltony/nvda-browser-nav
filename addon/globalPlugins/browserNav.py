@@ -38,7 +38,7 @@ import ui
 import winUser
 import wx
 
-debug = False
+debug = True
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -735,7 +735,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         def getFocusObjectVerified():
                 focus = api.getFocusObject()
                 if focus.role != controlTypes.ROLE_EDITABLETEXT:
-                    raise EditBoxUpdateError(_("Browser state has changed. Focused element is not an edit box."))
+                    raise EditBoxUpdateError(_("Browser state has changed. Focused element is not an edit box. Role: %d.") % focus.role)
                 if (uniqueID is not None) and (uniqueID != 0):
                     if uniqueID != focus.IA2UniqueID:
                         raise EditBoxUpdateError(_("Browser state has changed. Different element on the page is now focused."))
@@ -769,21 +769,29 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     yield 1
               # Step 2.1: Ensure that the browser window is fully focused.
                 # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
-                step21timeout = time.time() + 1 # Leave 1 second for this step
+                #step21timeout = time.time() + 1 # Leave 1 second for this step
+                goodCounter = 0
+                roles = []
+                kbdControlHome.send()
                 while True:
-                    if time.time() > step21timeout:
+                    if time.time() > timeout:
                         raise EditBoxUpdateError(_("Timed out during switch to window stage"))
                     focus = api.getFocusObject()
+                    roles.append(focus.role)
                     if focus.role in [
                         controlTypes.ROLE_FRAME,
                         controlTypes.ROLE_DOCUMENT,
                     ]:
                         # All good, Firefox is burning cpu, keep sleeping!
-                        yield 50
+                        yield 10
+                        goodCounter = 0
                         continue
                     elif focus.role == controlTypes.ROLE_EDITABLETEXT:
-                        # perfect!
-                        break
+                        goodCounter += 1
+                        if goodCounter > 10:
+                            tones.beep(1000, 100)
+                            break
+                        yield 10
                     else:
                         raise EditBoxUpdateError(_("Error during switch to window stage, focused element role is %d") % focus.role)
 
@@ -838,6 +846,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             finally:
                 unblockAllKeys()
                 jupyterUpdateInProgress = False
+                mylog(str(roles))
 
         self.popupEditTextDialog(
             text,
@@ -895,7 +904,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             except PermissionError:
                 pass
             wx.Yield()
-            if time.time() - t0 > 2.0:
+            #kbdControlC.send()
+            if time.time() - t0 > 3.0:
                 raise Exception("Time out while trying to copy data out of VSCode.")
 
     def popupEditTextDialog(self, text, onTextComplete):
