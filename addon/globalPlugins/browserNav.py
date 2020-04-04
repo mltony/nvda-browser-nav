@@ -710,6 +710,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
             selfself._focusLastFocusableObject()
             obj = selfself._lastFocusableObj
+            time.sleep(10/1000) # sleep a bit to make sure that this object has properly focused
         else:
             obj=selfself.currentNVDAObject
         if obj.role != controlTypes.ROLE_EDITABLETEXT:
@@ -723,6 +724,18 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             try:
                 kbdControlA.send()
                 text = self.getSelection()
+                if False:
+                    # This alternative method doesn't work for large cells: apparently the selection is just "-" if your cell is too large :(
+                    timeout = time.time() + 3
+                    while True:
+                        if time.time() > timeout:
+                            raise EditBoxUpdateError(_("Time out while waiting for selection to appear."))
+                        api.processPendingEvents(processEventQueue=False)
+                        textInfo = obj.makeTextInfo(textInfos.POSITION_SELECTION)
+                        text = textInfo.text
+                        if len(text) != 0:
+                            break
+                        time.sleep(10/1000)
             finally:
                 kbdControlHome.send()
                 kbdDelete.send()
@@ -769,6 +782,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     yield 1
               # Step 2.1: Ensure that the browser window is fully focused.
                 # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
+                obj.setFocus()
                 #step21timeout = time.time() + 1 # Leave 1 second for this step
                 goodCounter = 0
                 roles = []
@@ -894,9 +908,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def getSelection(self):
         self.copyToClip(controlCharacter)
-        kbdControlC.send()
         t0 = time.time()
+        timeout = t0+3
+        lastControlCTimestamp = 0
         while True:
+            if time.time() - lastControlCTimestamp > 1:
+                lastControlCTimestamp = time.time()
+                kbdControlC.send()
+            if time.time() > timeout:
+                raise Exception("Time out while trying to copy data out of application.")
+
             try:
                 data = api.getClipData()
                 if data != controlCharacter:
@@ -904,9 +925,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             except PermissionError:
                 pass
             wx.Yield()
-            #kbdControlC.send()
-            if time.time() - t0 > 3.0:
-                raise Exception("Time out while trying to copy data out of VSCode.")
+            time.sleep(10/1000)
 
     def popupEditTextDialog(self, text, onTextComplete):
         gui.mainFrame.prePopup()
