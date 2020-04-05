@@ -16,6 +16,7 @@ import api
 import browseMode
 import controlTypes
 import config
+import core
 import ctypes
 import globalPluginHandler
 import gui
@@ -753,16 +754,22 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     if uniqueID != focus.IA2UniqueID:
                         raise EditBoxUpdateError(_("Browser state has changed. Different element on the page is now focused."))
                 return focus
+                
+        def sleepAndPump():
+            time.sleep(10/1000)
+            api.processPendingEvents(processEventQueue=True)
 
         def updateText(result, text, keystroke):
+            mylog('c10')
             global jupyterUpdateInProgress
             jupyterUpdateInProgress = True
             self.lastJupyterText = text
             timeoutSeconds = 5
             timeout = time.time() + timeoutSeconds
-            blockAllKeys(timeoutSeconds)
+            #blockAllKeys(timeoutSeconds)
             try:
               # step 1. wait for all modifiers to be released
+                mylog('c20')
                 while True:
                     if time.time() > timeout:
                         raise EditBoxUpdateError(_("Timed out during release modifiers stage"))
@@ -772,32 +779,39 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     ]
                     if not any(status):
                         break
-                    yield 1
+                    sleepAndPump()
               # Step 2: switch back to that browser window
+                mylog('c30')
                 while  winUser.getForegroundWindow() != fg:
                     if time.time() > timeout:
                         raise EditBoxUpdateError(_("Timed out during switch to browser window stage"))
                     winUser.setForegroundWindow(fg)
                     winUser.setFocus(fg)
-                    yield 1
+                    sleepAndPump()
               # Step 2.1: Ensure that the browser window is fully focused.
                 # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
+                mylog('c30')
                 obj.setFocus()
                 #step21timeout = time.time() + 1 # Leave 1 second for this step
                 goodCounter = 0
                 roles = []
                 kbdControlHome.send()
+                ii = 0
                 while True:
+                    ii += 1
+                    mylog(f'ii={ii}')
                     if time.time() > timeout:
+                        mylog('timeout waiting for role')
                         raise EditBoxUpdateError(_("Timed out during switch to window stage"))
                     focus = api.getFocusObject()
                     roles.append(focus.role)
                     if focus.role in [
                         controlTypes.ROLE_FRAME,
                         controlTypes.ROLE_DOCUMENT,
+                        controlTypes.ROLE_PANE,
                     ]:
                         # All good, Firefox is burning cpu, keep sleeping!
-                        yield 10
+                        sleepAndPump()
                         goodCounter = 0
                         continue
                     elif focus.role == controlTypes.ROLE_EDITABLETEXT:
@@ -805,12 +819,13 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         if goodCounter > 10:
                             tones.beep(1000, 100)
                             break
-                        yield 10
+                        sleepAndPump()
                     else:
                         raise EditBoxUpdateError(_("Error during switch to window stage, focused element role is %d") % focus.role)
 
               # Step 3: start sending keys
                 self.startInjectingKeystrokes()
+                mylog('c40')
                 try:
                     self.copyToClip(text)
                   # Step 3.1: Send Control+A and wait for the selection to appear
@@ -819,19 +834,27 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     kbdBackquote.send()
                     kbdControlA.send()
                     while True:
-                        yield 1
+                        sleepAndPump()
                         focus = getFocusObjectVerified()
+                        if focus.IA2UniqueID != uniqueID:
+                            mylog('uniqueId mismatch!')
+                        else:
+                            mylog('unique id match!')
                         if time.time() > timeout:
                             raise EditBoxUpdateError(_("Timed out during Control+A stage"))
                         textInfo = focus.makeTextInfo(textInfos.POSITION_SELECTION)
                         text = textInfo.text
                         if len(text) > 0:
+                            mylog(f'Found text "{text}"')
                             break
                   # Step 3.2 Send Control+V and wait for the selection to disappear
+                    mylog('c50')
+                    return
                     kbdControlV.send()
                     kbdControlHome.send()
+                    return
                     while True:
-                        yield 1
+                        sleepAndPump()
                         focus = getFocusObjectVerified()
                         if time.time() > timeout:
                             raise EditBoxUpdateError(_("Timed out during Control+V stage"))
@@ -844,27 +867,29 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                   # Step 3.3. Sleep for a bit more just to make sure things have propagated.
                   # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
                   # or it will paste the original contents of clipboard.
-                    yield 100
+                    time.sleep(100)
                     self.endInjectingKeystrokes()
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
                     keystroke.send()
             except EditBoxUpdateError as e:
+                #unblockAllKeys()
                 tones.player.stop()
                 jupyterUpdateInProgress = False
                 self.copyToClip(text)
                 message = ("BrowserNav failed to update edit box.")
                 message += "\n" + str(e)
                 message += "\n" + _("Last edited text has been copied to the clipboard.")
-                gui.messageBox(message)
+                #gui.messageBox(message)
             finally:
-                unblockAllKeys()
+                #unblockAllKeys()
                 jupyterUpdateInProgress = False
                 mylog(str(roles))
 
         self.popupEditTextDialog(
             text,
-            lambda result, text, keystroke: executeAsynchronously(updateText(result, text, keystroke))
+            #lambda result, text, keystroke: executeAsynchronously(updateText(result, text, keystroke))
+            lambda result, text, keystroke: core.callLater(1, updateText, result, text, keystroke)
         )
 
     def script_copyJupyterText(self, gesture, selfself):
