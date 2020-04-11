@@ -38,7 +38,7 @@ import ui
 import winUser
 import wx
 
-debug = True
+debug = False
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -711,24 +711,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
             selfself._focusLastFocusableObject()
             obj = selfself._lastFocusableObj
-            timeout = time.time() + 1
+            timeout = time.time() + 2
+            # Wait until the element we'd like to focus is actually focused
             while True:
                 if time.time() > timeout:
                     raise EditBoxUpdateError(_("Timeout while trying to focus current edit box."))
                 focus = api.getFocusObject()
-                caretInfo=selfself.makeTextInfo(textInfos.POSITION_CARET)
-                cFocus = caretInfo._get_focusableNVDAObjectAtStart()
-                mylog(f'_lastCaretMoveWasFocus = {selfself._lastCaretMoveWasFocus}')
-                mylog(f'roles: {obj.role} {focus.role} {cFocus.role}')
                 if obj.IA2UniqueID == focus.IA2UniqueID:
                     break
-                else:
-                    mylog(f'mismatch! {obj.IA2UniqueID}  {focus.IA2UniqueID}')
-                    t1 = obj.makeTextInfo(textInfos.POSITION_ALL).text
-                    t2 = focus.makeTextInfo(textInfos.POSITION_ALL).text
-                    #mylog(f'obj = "{t1}"')
-                    #mylog(f'focus = "{t2}"')
-                    
                 time.sleep(10/1000) # sleep a bit to make sure that this object has properly focused
                 api.processPendingEvents(processEventQueue=True)
         else:
@@ -858,7 +848,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                             raise EditBoxUpdateError(_("Timed out during Control+V stage"))
                         textInfo = focus.makeTextInfo(textInfos.POSITION_SELECTION)
                         text = textInfo.text
-                        mylog(f"text='{text}'")
                         if len(text) == 0:
                             break
                   # Step 3.3 Send Control+Shift+Down, so that NVDA at least sees the first line of each edit box
@@ -884,7 +873,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             finally:
                 unblockAllKeys()
                 jupyterUpdateInProgress = False
-                mylog(str(roles))
 
         self.popupEditTextDialog(
             text,
