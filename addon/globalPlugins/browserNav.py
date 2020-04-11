@@ -176,6 +176,7 @@ kbdControlC = keyboardHandler.KeyboardInputGesture.fromName("Control+c")
 kbdControlV = keyboardHandler.KeyboardInputGesture.fromName("Control+v")
 kbdControlA = keyboardHandler.KeyboardInputGesture.fromName("Control+a")
 kbdControlHome = keyboardHandler.KeyboardInputGesture.fromName("Control+Home")
+kbdControlShiftDown = keyboardHandler.KeyboardInputGesture.fromName("Control+Shift+DownArrow")
 kbdControlEnd = keyboardHandler.KeyboardInputGesture.fromName("Control+End")
 kbdBackquote = keyboardHandler.KeyboardInputGesture.fromName("`")
 kbdDelete = keyboardHandler.KeyboardInputGesture.fromName("Delete")
@@ -710,7 +711,26 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
             selfself._focusLastFocusableObject()
             obj = selfself._lastFocusableObj
-            time.sleep(10/1000) # sleep a bit to make sure that this object has properly focused
+            timeout = time.time() + 1
+            while True:
+                if time.time() > timeout:
+                    raise EditBoxUpdateError(_("Timeout while trying to focus current edit box."))
+                focus = api.getFocusObject()
+                caretInfo=selfself.makeTextInfo(textInfos.POSITION_CARET)
+                cFocus = caretInfo._get_focusableNVDAObjectAtStart()
+                mylog(f'_lastCaretMoveWasFocus = {selfself._lastCaretMoveWasFocus}')
+                mylog(f'roles: {obj.role} {focus.role} {cFocus.role}')
+                if obj.IA2UniqueID == focus.IA2UniqueID:
+                    break
+                else:
+                    mylog(f'mismatch! {obj.IA2UniqueID}  {focus.IA2UniqueID}')
+                    t1 = obj.makeTextInfo(textInfos.POSITION_ALL).text
+                    t2 = focus.makeTextInfo(textInfos.POSITION_ALL).text
+                    #mylog(f'obj = "{t1}"')
+                    #mylog(f'focus = "{t2}"')
+                    
+                time.sleep(10/1000) # sleep a bit to make sure that this object has properly focused
+                api.processPendingEvents(processEventQueue=True)
         else:
             obj=selfself.currentNVDAObject
         if obj.role != controlTypes.ROLE_EDITABLETEXT:
@@ -793,6 +813,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     focus = api.getFocusObject()
                     roles.append(focus.role)
                     if focus.role in [
+                        controlTypes.ROLE_PANE,
                         controlTypes.ROLE_FRAME,
                         controlTypes.ROLE_DOCUMENT,
                     ]:
@@ -840,6 +861,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         mylog(f"text='{text}'")
                         if len(text) == 0:
                             break
+                  # Step 3.3 Send Control+Shift+Down, so that NVDA at least sees the first line of each edit box
+                    for i in range(5):
+                        kbdControlShiftDown.send()
                 finally:
                   # Step 3.3. Sleep for a bit more just to make sure things have propagated.
                   # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
