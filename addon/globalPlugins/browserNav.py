@@ -16,7 +16,10 @@ import api
 import browseMode
 import controlTypes
 import config
+import core
 import ctypes
+import cursorManager
+import documentBase
 import globalPluginHandler
 import gui
 import inputCore
@@ -35,10 +38,12 @@ import time
 import tones
 import types
 import ui
+from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
+
 import winUser
 import wx
 
-debug = False
+debug = True
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -440,9 +445,124 @@ def unblockAllKeys():
     blockKeysUntil = 0
     beeper.stop()
 
+def getHorizontalOffset(textInfo):
+    obj = textInfo.NVDAObjectAtStart
+    x = obj.location[0]
+    for i in range(1000):
+        obj = obj.parent
+        if obj is None:
+            return x
+        if obj.role == controlTypes.ROLE_DOCUMENT:
+            return x - obj.location[0]
+    raise Exception('Infinitely many parents!')
+
+lastTone = 0
+lastTextInfo = None
+beeper = Beeper()
+def sonifyTextInfo(textInfo, oldTextInfo=None, includeCrackle=False):
+    if textInfo is None:
+        return
+
+    # Call asynchronously not to cause any lag
+    #executeAsynchronously(sonifyTextInfoImpl(textInfo, includeCrackle))
+    try:
+        return sonifyTextInfoImpl(textInfo, oldTextInfo, includeCrackle).__next__()
+    except StopIteration:
+        pass
+def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
+    asyncWay = False
+    w = scriptHandler.isScriptWaiting
+    
+    global lastTone#, lastTextInfo
+    textInfo = textInfo.copy()
+    api.processPendingEvents(processEventQueue=False)
+    if w():
+        return
+    else:
+        if asyncWay:
+            yield 0
+    #textInfo.collapse()
+    textInfo.expand(textInfos.UNIT_PARAGRAPH)
+    api.processPendingEvents(processEventQueue=False)
+    if w():
+        return
+    else:
+        if asyncWay:
+            yield 0
+    try:
+        x = getHorizontalOffset(textInfo)
+    except:
+        return
+    api.processPendingEvents(processEventQueue=False)
+    if w():
+        return
+    else:
+        if asyncWay:
+            yield 0
+
+    #core.callLater(0.5, ui.message, f'offset {x}')
+    octave_pixels = 100
+    base_freq = speech.IDT_BASE_FREQUENCY
+    y = base_freq * (2 ** (x/500))
+    if y != lastTone:
+        tones.beep(y, 50)
+    #mylog(dir(textInfo))
+    #mylog(str(textInfo._getParagraphOffsets(textInfo._startOffset)))
+    if (
+        #False and
+        includeCrackle and 
+        isinstance(textInfo, Gecko_ia2_TextInfo)
+        and isinstance(lastTextInfo, Gecko_ia2_TextInfo)
+        and lastTextInfo is not None
+        and lastTextInfo.obj == textInfo.obj
+    ):
+        t1, t2 = textInfo, lastTextInfo
+        if textInfo.compareEndPoints(lastTextInfo, 'startToStart') > 0:
+            t1,t2 = t2,t1
+        #mylog(f'')
+        span = t1.copy()
+        span.setEndPoint(t2, 'endToEnd')
+        #paragraphs = span.unitCount(textInfos.UNIT_LINE)
+        #paragraphs = len(list(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)))
+        #paragraphs = len("\n".join(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)).split('\n'))
+        if span._endOffset - span._startOffset > 100000:
+            paragraphs = 50
+        else:
+            paragraphs = len(list(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)))
+            paragraphs = max(0, paragraphs - 2)
+        #paragraphs = len(span.text.split('\n'))
+        #mylog(f'textInfo="{textInfo.text}"')
+        #mylog(f'lastTextInfo="{lastTextInfo.text}"')
+        #mylog(f'"{span.text}"')
+        #mylog(f'paragraphs={paragraphs}')
+        beeper.simpleCrackle(paragraphs, volume=20)
 
 
+    lastTone = y
+    #lastTextInfo = textInfo
 
+originalCaretMovementScriptHelper = None
+originalQuickNavScript = None
+originalTableScriptHelper = None
+def preCaretMovementScriptHelper(self, gesture,unit, *args, **kwargs):
+    #tones.beep(500, 50)
+    oldSelection = self.selection
+    result = originalCaretMovementScriptHelper(self, gesture, unit, *args, **kwargs)
+    if unit not in {textInfos.UNIT_CHARACTER, textInfos.UNIT_WORD}:
+        sonifyTextInfo(self.selection)
+    return result
+
+def preQuickNavScript(self, *args, **kwargs):
+    oldSelection = self.selection
+    result = originalQuickNavScript(self, *args, **kwargs)
+    sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
+    return result
+
+def preTableScriptHelper(self, *args, **kwargs):
+    oldSelection = self.selection
+    result = originalTableScriptHelper(self, *args, **kwargs)
+    sonifyTextInfo(self.selection)
+    return result
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     scriptCategory = _("BrowserNav")
     beeper = Beeper()
@@ -452,9 +572,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.createMenu()
         self.injectBrowseModeKeystrokes()
         self.lastJupyterText = ""
-        global originalExecuteGesture
+        global originalExecuteGesture, originalCaretMovementScriptHelper, originalQuickNavScript, originalTableScriptHelper
         originalExecuteGesture = inputCore.InputManager.executeGesture
         inputCore.InputManager.executeGesture = preExecuteGesture
+        originalCaretMovementScriptHelper = cursorManager.CursorManager._caretMovementScriptHelper
+        cursorManager.CursorManager._caretMovementScriptHelper = preCaretMovementScriptHelper
+        originalQuickNavScript = browseMode.BrowseModeTreeInterceptor._quickNavScript
+        browseMode.BrowseModeTreeInterceptor._quickNavScript = preQuickNavScript
+        originalTableScriptHelper = documentBase.DocumentWithTableNavigation._tableMovementScriptHelper
+        documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = preTableScriptHelper
 
 
     def createMenu(self):
@@ -466,58 +592,62 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def terminate(self):
         prefMenu = gui.mainFrame.sysTrayIcon.preferencesMenu
         prefMenu.Remove(self.prefsMenuItem)
+        cursorManager.CursorManager._caretMovementScriptHelper = originalCaretMovementScriptHelper
+        inputCore.InputManager.executeGesture = originalExecuteGesture
+        browseMode.BrowseModeTreeInterceptor._quickNavScript = originalQuickNavScript
+        documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = originalTableScriptHelper
 
-    def script_moveToNextSibling(self, gesture):
+    def script_moveToNextSibling(self, gesture, selfself):
         mode = getMode()
         # Translators: error message if next sibling couldn't be found
         errorMessage = _("No next paragraph with the same {mode} in the document").format(
             mode=BROWSE_MODES[mode])
-        self.moveInBrowser(1, errorMessage, operator.eq)
+        self.moveInBrowser(1, errorMessage, operator.eq, selfself)
 
-    def script_moveToPreviousSibling(self, gesture):
+    def script_moveToPreviousSibling(self, gesture, selfself):
         mode = getMode()
         # Translators: error message if previous sibling couldn't be found
         errorMessage = _("No previous paragraph with the same {mode} in the document").format(
             mode=BROWSE_MODES[mode])
-        self.moveInBrowser(-1, errorMessage, operator.eq)
+        self.moveInBrowser(-1, errorMessage, operator.eq, selfself)
 
 
-    def script_moveToParent(self, gesture):
+    def script_moveToParent(self, gesture, selfself):
         mode = getMode()
         op = PARENT_OPERATORS[mode]
         # Translators: error message if parent could not be found
         errorMessage = _("No previous paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
-        self.moveInBrowser(-1, errorMessage, op)
+        self.moveInBrowser(-1, errorMessage, op, selfself)
 
-    def script_moveToNextParent(self, gesture):
+    def script_moveToNextParent(self, gesture, selfself):
         mode = getMode()
         op = PARENT_OPERATORS[mode]
         # Translators: error message if parent could not be found
         errorMessage = _("No next paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
-        self.moveInBrowser(1, errorMessage, op)
+        self.moveInBrowser(1, errorMessage, op, selfself)
 
 
-    def script_moveToChild(self, gesture):
+    def script_moveToChild(self, gesture, selfself):
         mode = getMode()
         op = CHILD_OPERATORS[mode]
         # Translators: error message if child could not be found
         errorMessage = _("No next paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
-        self.moveInBrowser(1, errorMessage, op)
+        self.moveInBrowser(1, errorMessage, op, selfself)
 
-    def script_moveToPreviousChild(self, gesture):
+    def script_moveToPreviousChild(self, gesture, selfself):
         mode = getMode()
         op = CHILD_OPERATORS[mode]
         # Translators: error message if child could not be found
         errorMessage = _("No previous paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
             qualifier=OPERATOR_STRINGS[op])
-        self.moveInBrowser(-1, errorMessage, op)
+        self.moveInBrowser(-1, errorMessage, op, selfself)
 
     def script_rotor(self, gesture):
         mode = getMode()
@@ -576,7 +706,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             result.append(formatting.get("italic", None))
         return tuple(result)
 
-    def moveInBrowser(self, increment, errorMessage, op):
+    def moveInBrowser(self, increment, errorMessage, op, selfself):
         (
             extractFormattingFunc,
             extractIndentFunc,
@@ -607,6 +737,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     textInfo.updateCaret()
                     self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                     speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                    selfself.selection = textInfo
                     return
             distance += 1
 
@@ -617,7 +748,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if getConfig("noNextTextMessage"):
             ui.message(message)
 
-    def findMark(self, direction, regexp, errorMessage):
+    def findMark(self, direction, regexp, errorMessage, selfself):
         r = re.compile(regexp)
         focus = api.getFocusObject().treeInterceptor
         textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
@@ -643,6 +774,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
                 textInfo.collapse()
                 focus._set_selection(textInfo)
+                selfself.selection = textInfo
                 return
 
     def findByRole(self, direction, roles, errorMessage):
@@ -857,7 +989,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                   # Step 3.3. Sleep for a bit more just to make sure things have propagated.
                   # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
                   # or it will paste the original contents of clipboard.
-                    yield 100
+                    yield 200
                     self.endInjectingKeystrokes()
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
@@ -951,7 +1083,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         scriptFuncName = "script_" + funcName
         if script is None:
             gpFunc = getattr(gp, scriptFuncName)
-            script = lambda self, gesture: gpFunc(gesture)
+            script = lambda selfself, gesture: gpFunc(gesture, selfself)
         script.__name__ = scriptFuncName
         script.category = "BrowserNav"
         if doc is not None:
@@ -998,12 +1130,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:j",
             "nextMark",
-            script=lambda selfself, gesture: self.findMark(1, getConfig("marks"), "No next browser mark. To configure browser marks, go to BrowserNav settings."),
+            script=lambda selfself, gesture: self.findMark(1, getConfig("marks"), "No next browser mark. To configure browser marks, go to BrowserNav settings.", selfself=selfself),
             doc="Jump to next browser mark.")
         self.injectBrowseModeKeystroke(
             "kb:Shift+j",
             "previousMark",
-            script=lambda selfself, gesture: self.findMark(-1, getConfig("marks"), _("No previous browser mark. To configure browser marks, go to BrowserNav settings.")),
+            script=lambda selfself, gesture: self.findMark(-1, getConfig("marks"), _("No previous browser mark. To configure browser marks, go to BrowserNav settings."), selfself=selfself),
             doc="Jump to previous browser mark.")
         if False:
             self.injectBrowseModeKeystroke(
@@ -1016,6 +1148,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 "previousParagraph",
                 script=lambda selfself, gesture: self.script_moveByParagraph_back(gesture),
                 doc="Jump to previous paragraph")
+      # Tabs
         # Example page with tabs:
         # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
         self.injectBrowseModeKeystroke(
@@ -1035,7 +1168,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 errorMessage=_("No previous tab")),
             doc="Jump to previous tab")
 
-        #Dialog
+      #Dialog
         dialogTypes = [controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
         self.injectBrowseModeKeystroke(
             "kb:P",
@@ -1053,7 +1186,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 roles=dialogTypes,
                 errorMessage=_("No previous dialog")),
             doc="Jump to previous dialog")
-
+      # Menus
         menuTypes = [
             controlTypes.ROLE_MENU,
             controlTypes.ROLE_MENUBAR,
@@ -1080,6 +1213,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 roles=menuTypes,
                 errorMessage=_("No previous menu")),
             doc="Jump to previous menu")
+            
+      # Tree views, tool bars
         self.injectBrowseModeKeystroke(
             "kb:0",
             "nextTreeView",
@@ -1112,7 +1247,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 role=controlTypes.ROLE_TOOLBAR,
                 errorMessage=_("No previous tool bar")),
             doc="Jump to previous tool bar")
-        # Edit Jupyter
+      # Edit Jupyter
         self.injectBrowseModeKeystroke(
             "kb:NVDA+E",
             "editJupyter",
