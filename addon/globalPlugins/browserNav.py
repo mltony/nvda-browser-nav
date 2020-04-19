@@ -25,6 +25,7 @@ import gui
 import inputCore
 import keyboardHandler
 from logHandler import log
+import math
 import nvwave
 import NVDAHelper
 import operator
@@ -43,7 +44,7 @@ from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import winUser
 import wx
 
-debug = True
+debug = False
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -60,6 +61,7 @@ def myAssert(condition):
 def initConfiguration():
     confspec = {
         "crackleVolume" : "integer( default=25, min=0, max=100)",
+        "beepVolume" : "integer( default=60, min=0, max=100)",
         "noNextTextChimeVolume" : "integer( default=50, min=0, max=100)",
         "noNextTextMessage" : "boolean( default=True)",
         "browserMode" : "integer( default=0, min=0, max=2)",
@@ -105,6 +107,16 @@ class SettingsDialog(gui.SettingsDialog):
         sizer.Add(slider)
         settingsSizer.Add(sizer)
         self.crackleVolumeSlider = slider
+      # beep volume slider
+        sizer=wx.BoxSizer(wx.HORIZONTAL)
+        # Translators: volume of beeping  slider
+        label=wx.StaticText(self,wx.ID_ANY,label=_("Beeping volume"))
+        slider=wx.Slider(self, wx.NewId(), minValue=0,maxValue=100)
+        slider.SetValue(getConfig("beepVolume"))
+        sizer.Add(label)
+        sizer.Add(slider)
+        settingsSizer.Add(sizer)
+        self.beepVolumeSlider = slider
 
       # noNextTextChimeVolumeSlider
         sizer=wx.BoxSizer(wx.HORIZONTAL)
@@ -149,6 +161,7 @@ class SettingsDialog(gui.SettingsDialog):
 
     def onOk(self, evt):
         config.conf["browsernav"]["crackleVolume"] = self.crackleVolumeSlider.Value
+        config.conf["browsernav"]["beepVolume"] = self.beepVolumeSlider.Value
         config.conf["browsernav"]["noNextTextChimeVolume"] = self.noNextTextChimeVolumeSlider.Value
         config.conf["browsernav"]["noNextTextMessage"] = self.noNextTextMessageCheckbox.Value
         config.conf["browsernav"]["useFontFamily"] = self.useFontFamilyCheckBox.Value
@@ -227,7 +240,8 @@ class Beeper:
     BEEP_LEN = 10 # millis
     PAUSE_LEN = 5 # millis
     MAX_CRACKLE_LEN = 400 # millis
-    MAX_BEEP_COUNT = MAX_CRACKLE_LEN // (BEEP_LEN + PAUSE_LEN)
+    #MAX_BEEP_COUNT = MAX_CRACKLE_LEN // (BEEP_LEN + PAUSE_LEN)
+    MAX_BEEP_COUNT = 60 # Corresponds to about 200 paragraphs with the log formula
 
     def __init__(self):
         self.player = nvwave.WavePlayer(
@@ -240,15 +254,23 @@ class Beeper:
 
 
 
-    def fancyCrackle(self, levels, volume):
-        levels = self.uniformSample(levels, self.MAX_BEEP_COUNT )
+    def fancyCrackle(self, levels, volume, initialDelay=0):
+        l = len(levels)
+        coef = 30
+        l = coef * math.log(
+            1 + l/coef
+        )
+        l = int(round(l))
+        levels = self.uniformSample(levels, min(l, self.MAX_BEEP_COUNT ))
         beepLen = self.BEEP_LEN
         pauseLen = self.PAUSE_LEN
+        initialDelaySize = 0 if initialDelay == 0 else NVDAHelper.generateBeep(None,self.BASE_FREQ,initialDelay,0, 0)
         pauseBufSize = NVDAHelper.generateBeep(None,self.BASE_FREQ,pauseLen,0, 0)
         beepBufSizes = [NVDAHelper.generateBeep(None,self.getPitch(l), beepLen, volume, volume) for l in levels]
-        bufSize = sum(beepBufSizes) + len(levels) * pauseBufSize
+        bufSize = initialDelaySize + sum(beepBufSizes) + len(levels) * pauseBufSize
         buf = ctypes.create_string_buffer(bufSize)
         bufPtr = 0
+        bufPtr += initialDelaySize
         for l in levels:
             bufPtr += NVDAHelper.generateBeep(
                 ctypes.cast(ctypes.byref(buf, bufPtr), ctypes.POINTER(ctypes.c_char)),
@@ -257,8 +279,8 @@ class Beeper:
         self.player.stop()
         self.player.feed(buf.raw)
 
-    def simpleCrackle(self, n, volume):
-        return self.fancyCrackle([0] * n, volume)
+    def simpleCrackle(self, n, volume, initialDelay=0):
+        return self.fancyCrackle([0] * n, volume, initialDelay=initialDelay)
 
 
     NOTES = "A,B,H,C,C#,D,D#,E,F,F#,G,G#".split(",")
@@ -456,90 +478,87 @@ def getHorizontalOffset(textInfo):
             return x - obj.location[0]
     raise Exception('Infinitely many parents!')
 
+def getFontSize(textInfo, formatting):
+    try:
+        size =float( formatting["font-size"].replace("pt", ""))
+        return size
+    except:
+        return 0
+
+def getFormatting(info):
+    formatField=textInfos.FormatField()
+    formatConfig=config.conf['documentFormatting']
+    for field in info.getTextWithFields(formatConfig):
+        #if isinstance(field,textInfos.FieldCommand): and isinstance(field.field,textInfos.FormatField):
+        try:
+            formatField.update(field.field)
+        except:
+            pass
+    return formatField
+
+def getBeepTone(textInfo):
+    mode = getConfig("browserMode")
+    if mode == 0:
+        offset = getHorizontalOffset(textInfo)
+        octave_pixels = 500
+        base_freq = speech.IDT_BASE_FREQUENCY
+        tone = base_freq * (2 ** (offset/octave_pixels))
+        return tone
+    elif mode in [1,2]:
+        size = getFontSize(textInfo, getFormatting(textInfo))
+        # Larger fonts should map onto lower tones, so computing inverse here
+        tone = 3000/size
+        return tone
+    else:
+        raise Exception(f'Unknown mode {mode}')
 lastTone = 0
 lastTextInfo = None
 beeper = Beeper()
 def sonifyTextInfo(textInfo, oldTextInfo=None, includeCrackle=False):
     if textInfo is None:
         return
-
-    # Call asynchronously not to cause any lag
-    #executeAsynchronously(sonifyTextInfoImpl(textInfo, includeCrackle))
-    try:
-        return sonifyTextInfoImpl(textInfo, oldTextInfo, includeCrackle).__next__()
-    except StopIteration:
-        pass
+    return sonifyTextInfoImpl(textInfo, oldTextInfo, includeCrackle)
 def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
-    asyncWay = False
-    w = scriptHandler.isScriptWaiting
-    
-    global lastTone#, lastTextInfo
+    w = lambda: api.processPendingEvents(processEventQueue=False) or scriptHandler.isScriptWaiting()
+
+    global lastTone
     textInfo = textInfo.copy()
-    api.processPendingEvents(processEventQueue=False)
-    if w():
-        return
-    else:
-        if asyncWay:
-            yield 0
-    #textInfo.collapse()
+
+    if w():return
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
-    api.processPendingEvents(processEventQueue=False)
-    if w():
-        return
-    else:
-        if asyncWay:
-            yield 0
+    if w():return
     try:
-        x = getHorizontalOffset(textInfo)
+        tone = getBeepTone(textInfo)
     except:
         return
-    api.processPendingEvents(processEventQueue=False)
-    if w():
-        return
-    else:
-        if asyncWay:
-            yield 0
-
-    #core.callLater(0.5, ui.message, f'offset {x}')
-    octave_pixels = 100
-    base_freq = speech.IDT_BASE_FREQUENCY
-    y = base_freq * (2 ** (x/500))
-    if y != lastTone:
-        tones.beep(y, 50)
-    #mylog(dir(textInfo))
-    #mylog(str(textInfo._getParagraphOffsets(textInfo._startOffset)))
+    if w():return
+    beepVolume=getConfig("beepVolume")
+    if tone != lastTone:
+        tones.beep(tone, 50, left=beepVolume, right=beepVolume)
     if (
-        #False and
-        includeCrackle and 
-        isinstance(textInfo, Gecko_ia2_TextInfo)
-        and isinstance(lastTextInfo, Gecko_ia2_TextInfo)
+        includeCrackle
         and lastTextInfo is not None
+        and getConfig("crackleVolume") > 0
+        and isinstance(textInfo, Gecko_ia2_TextInfo)
+        and isinstance(lastTextInfo, Gecko_ia2_TextInfo)
         and lastTextInfo.obj == textInfo.obj
     ):
         t1, t2 = textInfo, lastTextInfo
         if textInfo.compareEndPoints(lastTextInfo, 'startToStart') > 0:
             t1,t2 = t2,t1
-        #mylog(f'')
+        if w():return
         span = t1.copy()
         span.setEndPoint(t2, 'endToEnd')
-        #paragraphs = span.unitCount(textInfos.UNIT_LINE)
-        #paragraphs = len(list(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)))
-        #paragraphs = len("\n".join(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)).split('\n'))
         if span._endOffset - span._startOffset > 100000:
             paragraphs = 50
         else:
             paragraphs = len(list(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)))
             paragraphs = max(0, paragraphs - 2)
-        #paragraphs = len(span.text.split('\n'))
-        #mylog(f'textInfo="{textInfo.text}"')
-        #mylog(f'lastTextInfo="{lastTextInfo.text}"')
-        #mylog(f'"{span.text}"')
-        #mylog(f'paragraphs={paragraphs}')
-        beeper.simpleCrackle(paragraphs, volume=20)
+        initialDelay = 0 if beepVolume==0 else 50
+        beeper.simpleCrackle(paragraphs, volume=getConfig("crackleVolume"), initialDelay=initialDelay)
 
 
-    lastTone = y
-    #lastTextInfo = textInfo
+    lastTone = tone
 
 originalCaretMovementScriptHelper = None
 originalQuickNavScript = None
@@ -649,19 +668,13 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             qualifier=OPERATOR_STRINGS[op])
         self.moveInBrowser(-1, errorMessage, op, selfself)
 
-    def script_rotor(self, gesture):
+    def script_rotor(self, gesture, selfself):
         mode = getMode()
         mode = (mode + 1) % len(BROWSE_MODES)
         setConfig("browserMode", mode)
         ui.message("BrowserNav navigates by " + BROWSE_MODES[mode])
 
     def generateBrowseModeExtractors(self):
-        def getFontSize(textInfo, formatting):
-            try:
-                size =float( formatting["font-size"].replace("pt", ""))
-                return size
-            except:
-                return 0
         mode = getConfig("browserMode")
         if mode == 0:
             # horizontal offset
@@ -669,7 +682,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             extractIndentFunc = lambda textInfo,x: textInfo.NVDAObjectAtStart.location[0]
             extractStyleFunc = lambda x,y: None
         elif mode in [1,2]:
-            extractFormattingFunc = lambda textInfo: self.getFormatting(textInfo)
+            extractFormattingFunc = lambda textInfo: getFormatting(textInfo)
             extractIndentFunc = getFontSize
             if mode == 1:
                 # Font size only
@@ -682,16 +695,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             extractIndentFunc,
             extractStyleFunc
         )
-    def getFormatting(self, info):
-        formatField=textInfos.FormatField()
-        formatConfig=config.conf['documentFormatting']
-        for field in info.getTextWithFields(formatConfig):
-            #if isinstance(field,textInfos.FieldCommand): and isinstance(field.field,textInfos.FormatField):
-            try:
-                formatField.update(field.field)
-            except:
-                pass
-        return formatField
 
     def formattingToStyle(self, formatting):
         result = []
@@ -1213,7 +1216,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 roles=menuTypes,
                 errorMessage=_("No previous menu")),
             doc="Jump to previous menu")
-            
+
       # Tree views, tool bars
         self.injectBrowseModeKeystroke(
             "kb:0",
