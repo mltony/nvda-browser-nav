@@ -241,7 +241,7 @@ class Beeper:
     PAUSE_LEN = 5 # millis
     MAX_CRACKLE_LEN = 400 # millis
     #MAX_BEEP_COUNT = MAX_CRACKLE_LEN // (BEEP_LEN + PAUSE_LEN)
-    MAX_BEEP_COUNT = 60 # Corresponds to about 200 paragraphs with the log formula
+    MAX_BEEP_COUNT = 40 # Corresponds to about 500 paragraphs with the log formula
 
     def __init__(self):
         self.player = nvwave.WavePlayer(
@@ -256,7 +256,7 @@ class Beeper:
 
     def fancyCrackle(self, levels, volume, initialDelay=0):
         l = len(levels)
-        coef = 30
+        coef = 10
         l = coef * math.log(
             1 + l/coef
         )
@@ -519,19 +519,20 @@ def sonifyTextInfo(textInfo, oldTextInfo=None, includeCrackle=False):
         return
     return sonifyTextInfoImpl(textInfo, oldTextInfo, includeCrackle)
 def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
-    w = lambda: api.processPendingEvents(processEventQueue=False) or scriptHandler.isScriptWaiting()
+    #w = lambda: api.processPendingEvents(processEventQueue=False) or scriptHandler.isScriptWaiting()
+    w = lambda: scriptHandler.isScriptWaiting()
 
     global lastTone
     textInfo = textInfo.copy()
 
-    if w():return
+    #if w():return
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
-    if w():return
+    #if w():return
     try:
         tone = getBeepTone(textInfo)
     except:
         return
-    if w():return
+    #if w():return
     beepVolume=getConfig("beepVolume")
     if tone != lastTone:
         tones.beep(tone, 50, left=beepVolume, right=beepVolume)
@@ -543,10 +544,11 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
         and isinstance(lastTextInfo, Gecko_ia2_TextInfo)
         and lastTextInfo.obj == textInfo.obj
     ):
+        if w():return
         t1, t2 = textInfo, lastTextInfo
         if textInfo.compareEndPoints(lastTextInfo, 'startToStart') > 0:
             t1,t2 = t2,t1
-        if w():return
+        
         span = t1.copy()
         span.setEndPoint(t2, 'endToEnd')
         if span._endOffset - span._startOffset > 100000:
@@ -737,9 +739,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             style = extractStyleFunc(textInfo, formatting)
             if style == origStyle:
                 if op(indent, origIndent):
-                    textInfo.updateCaret()
                     self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                     speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                    textInfo.collapse()
+                    textInfo.updateCaret()
                     selfself.selection = textInfo
                     return
             distance += 1
