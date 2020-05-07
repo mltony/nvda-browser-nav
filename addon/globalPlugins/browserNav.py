@@ -521,21 +521,20 @@ def sonifyTextInfo(textInfo, oldTextInfo=None, includeCrackle=False):
 def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
     #w = lambda: api.processPendingEvents(processEventQueue=False) or scriptHandler.isScriptWaiting()
     w = lambda: scriptHandler.isScriptWaiting()
+    if w():return
 
     global lastTone
     textInfo = textInfo.copy()
-
-    #if w():return
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
-    #if w():return
     try:
         tone = getBeepTone(textInfo)
     except:
         return
-    #if w():return
     beepVolume=getConfig("beepVolume")
     if tone != lastTone:
         tones.beep(tone, 50, left=beepVolume, right=beepVolume)
+    lastTone = tone
+
     if (
         includeCrackle
         and lastTextInfo is not None
@@ -545,22 +544,29 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
         and lastTextInfo.obj == textInfo.obj
     ):
         if w():return
+        lastTextInfo = lastTextInfo.copy()
+        lastTextInfo.expand(textInfos.UNIT_PARAGRAPH)
         t1, t2 = textInfo, lastTextInfo
+        if textInfo.compareEndPoints(lastTextInfo, 'startToStart') == 0:
+            return
         if textInfo.compareEndPoints(lastTextInfo, 'startToStart') > 0:
             t1,t2 = t2,t1
-        
-        span = t1.copy()
-        span.setEndPoint(t2, 'endToEnd')
-        if span._endOffset - span._startOffset > 100000:
-            paragraphs = 50
+        if False:
+            # Old method, more precise, but seems to be causing a deadlock within NVDA with very low frequency - once every couple of days, so very difficult to debug
+            span = t1.copy()
+            span.setEndPoint(t2, 'endToEnd')
+            if span._endOffset - span._startOffset > 100000:
+                paragraphs = 50
+            else:
+                paragraphs = len(list(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)))
         else:
-            paragraphs = len(list(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)))
-            paragraphs = max(0, paragraphs - 2)
+            # new simplified way:
+            paragraphs = (t2._endOffset - t1._startOffset) // 10
+        paragraphs = max(0, paragraphs - 2)
         initialDelay = 0 if beepVolume==0 else 50
         beeper.simpleCrackle(paragraphs, volume=getConfig("crackleVolume"), initialDelay=initialDelay)
 
 
-    lastTone = tone
 
 originalCaretMovementScriptHelper = None
 originalQuickNavScript = None
