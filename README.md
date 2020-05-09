@@ -13,7 +13,9 @@ BrowserNav can be used to navigate by  horizontal offset from the left edge of t
 * When navigating by font size, you can easily find paragraphs written in the same font size, or smaller/greater font size.
 * You can also navigate by font size with the constraint of same font style.
 
-BrowserNav works in any browser supported by NVDA.
+BrowserNav rotor is used to switch between these options. Depending on the setting of this rotor, BrowserNav will indicate with beeps either horizontal offset or font size of currently selected item. In addition, BrowserNav will crackle on QuickNav commands to indicate how much text has been skipped over (this feature is only available in Google Chrome and Firefox).
+
+BrowserNav works in any browser supported by NVDA. Although some features may not be available in all browsers.
 
 ## Keystrokes:
 
@@ -51,6 +53,7 @@ Notes:
 * Do not change the state of the browser, e.g. do not switch tabs and do not focus other elements within the tab while edit text window is open. Doing so will prevent BrowserNav from correctly updating text in the edit box.
 * Make sure to release Control, Shift or Alt modifiers quickly affter pressing Control+Enter, Shift+Enter, or Alt+Enter. Holding them for over a second will cause problems.
 * This feature is currently experimental. Please expect only about 90-95% success rate.
+* It has been thoroughly tested with Google Chrome and Firefox. It might work in other browsers, but there's a higher chance of issues, such as information loss.
 
 ## Source code
 Source code is available at <http://github.com/mltony/nvda-indent-nav>.
