@@ -854,7 +854,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         fg=winUser.getForegroundWindow()
         if not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
             selfself._focusLastFocusableObject()
-            obj = selfself._lastFocusableObj
+            try:
+                obj = selfself._lastFocusableObj
+            except AttributeError:
+                obj = selfself.currentFocusableNVDAObject
             timeout = time.time() + 2
             # Wait until the element we'd like to focus is actually focused
             while True:
