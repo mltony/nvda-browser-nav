@@ -521,19 +521,21 @@ def sonifyTextInfo(textInfo, oldTextInfo=None, includeCrackle=False):
 def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
     #w = lambda: api.processPendingEvents(processEventQueue=False) or scriptHandler.isScriptWaiting()
     w = lambda: scriptHandler.isScriptWaiting()
-    if w():return
-
-    global lastTone
-    textInfo = textInfo.copy()
-    textInfo.expand(textInfos.UNIT_PARAGRAPH)
-    try:
-        tone = getBeepTone(textInfo)
-    except:
-        return
     beepVolume=getConfig("beepVolume")
-    if tone != lastTone:
-        tones.beep(tone, 50, left=beepVolume, right=beepVolume)
-    lastTone = tone
+    if beepVolume > 0:
+        if w():return
+
+        global lastTone
+        textInfo = textInfo.copy()
+        textInfo.expand(textInfos.UNIT_PARAGRAPH)
+        try:
+            tone = getBeepTone(textInfo)
+        except:
+            return
+        
+        if tone != lastTone:
+            tones.beep(tone, 50, left=beepVolume, right=beepVolume)
+        lastTone = tone
 
     if (
         includeCrackle
