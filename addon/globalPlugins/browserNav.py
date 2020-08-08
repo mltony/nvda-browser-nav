@@ -466,6 +466,14 @@ def unblockAllKeys():
     global blockKeysUntil
     blockKeysUntil = 0
     beeper.stop()
+    
+def getSimpleHorizontalOffset(textInfo):    
+    try:
+        obj = textInfo.NVDAObjectAtStart
+        x = obj.location[0]
+        return x
+    except:
+        return None
 
 def getHorizontalOffset(textInfo):
     obj = textInfo.NVDAObjectAtStart
@@ -689,7 +697,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if mode == 0:
             # horizontal offset
             extractFormattingFunc = lambda x: None
-            extractIndentFunc = lambda textInfo,x: textInfo.NVDAObjectAtStart.location[0]
+            extractIndentFunc = lambda textInfo,x: getSimpleHorizontalOffset(textInfo)
             extractStyleFunc = lambda x,y: None
         elif mode in [1,2]:
             extractFormattingFunc = lambda textInfo: getFormatting(textInfo)
