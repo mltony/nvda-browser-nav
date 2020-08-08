@@ -526,8 +526,8 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
         if w():return
 
         global lastTone
-        textInfo = textInfo.copy()
-        textInfo.expand(textInfos.UNIT_PARAGRAPH)
+        #textInfo = textInfo.copy()
+        #textInfo.expand(textInfos.UNIT_PARAGRAPH)
         try:
             tone = getBeepTone(textInfo)
         except:
