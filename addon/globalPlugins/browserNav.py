@@ -344,7 +344,7 @@ class EditTextDialog(wx.Dialog):
         mainSizer = wx.BoxSizer(wx.VERTICAL)
         sHelper = gui.guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
 
-        self.textCtrl = wx.TextCtrl(self, style=wx.TE_MULTILINE)
+        self.textCtrl = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_DONTWRAP)
         self.textCtrl.Bind(wx.EVT_CHAR, self.onChar)
         self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
         sHelper.addItem(self.textCtrl)
@@ -413,8 +413,9 @@ class EditTextDialog(wx.Dialog):
         elif event.GetKeyCode() == wx.WXK_HOME:
             if not any([control, shift, alt]):
                 curPos = self.textCtrl.GetInsertionPoint()
-                lineNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")) - 1
-                colNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")[-1])
+                #lineNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")) - 1
+                #colNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")[-1])
+                _, colNum,lineNum = self.textCtrl.PositionToXY(self.textCtrl.GetInsertionPoint())
                 lineText = self.textCtrl.GetLineText(lineNum)
                 m = re.search("^\s*", lineText)
                 if not m:
@@ -424,7 +425,8 @@ class EditTextDialog(wx.Dialog):
                     newColNum = 0
                 else:
                     newColNum = indent
-                self.textCtrl.SetInsertionPoint(curPos - colNum + newColNum)
+                newPos = self.textCtrl.XYToPosition(newColNum, lineNum)
+                self.textCtrl.SetInsertionPoint(newPos)
             else:
                 event.Skip()
         else:
