@@ -188,16 +188,62 @@ OPERATOR_STRINGS = {
     operator.lt: _("smaller"),
     operator.gt: _("greater"),
 }
-
+# Just some random unicode character that is not likely to appear anywhere.
+# This character is used for semi-accessible jupyter edit box automation.
 controlCharacter = "➉" # U+2789, Dingbat circled sans-serif digit ten
-kbdControlC = keyboardHandler.KeyboardInputGesture.fromName("Control+c")
-kbdControlV = keyboardHandler.KeyboardInputGesture.fromName("Control+v")
-kbdControlA = keyboardHandler.KeyboardInputGesture.fromName("Control+a")
-kbdControlHome = keyboardHandler.KeyboardInputGesture.fromName("Control+Home")
-kbdControlShiftDown = keyboardHandler.KeyboardInputGesture.fromName("Control+Shift+DownArrow")
-kbdControlEnd = keyboardHandler.KeyboardInputGesture.fromName("Control+End")
-kbdBackquote = keyboardHandler.KeyboardInputGesture.fromName("`")
-kbdDelete = keyboardHandler.KeyboardInputGesture.fromName("Delete")
+
+# This function is a fixed version of fromNameEnglish function.
+# As of v2020.3 it doesn't work correctly for gestures containing letters when the default locale on the computer is set to non-Latin, such as Russian.
+import vkCodes
+en_us_input_Hkl = 1033 + (1033 << 16)
+def fromNameEnglish(name):
+    """Create an instance given a key name.
+    @param name: The key name.
+    @type name: str
+    @return: A gesture for the specified key.
+    @rtype: L{KeyboardInputGesture}
+    """
+    keyNames = name.split("+")
+    keys = []
+    for keyName in keyNames:
+        if keyName == "plus":
+            # A key name can't include "+" except as a separator.
+            keyName = "+"
+        if keyName == keyboardHandler.VK_WIN:
+            vk = winUser.VK_LWIN
+            ext = False
+        elif keyName.lower() == keyboardHandler.VK_NVDA.lower():
+            vk, ext = keyboardHandler.getNVDAModifierKeys()[0]
+        elif len(keyName) == 1:
+            ext = False
+            requiredMods, vk = winUser.VkKeyScanEx(keyName, en_us_input_Hkl)
+            if requiredMods & 1:
+                keys.append((winUser.VK_SHIFT, False))
+            if requiredMods & 2:
+                keys.append((winUser.VK_CONTROL, False))
+            if requiredMods & 4:
+                keys.append((winUser.VK_MENU, False))
+            # Not sure whether we need to support the Hankaku modifier (& 8).
+        else:
+            vk, ext = vkCodes.byName[keyName.lower()]
+            if ext is None:
+                ext = False
+        keys.append((vk, ext))
+
+    if not keys:
+        raise ValueError
+
+    return keyboardHandler.KeyboardInputGesture(keys[:-1], vk, 0, ext)
+
+
+kbdControlC = fromNameEnglish("Control+c")
+kbdControlV = fromNameEnglish("Control+v")
+kbdControlA = fromNameEnglish("Control+a")
+kbdControlHome = fromNameEnglish("Control+Home")
+kbdControlShiftDown = fromNameEnglish("Control+Shift+DownArrow")
+kbdControlEnd = fromNameEnglish("Control+End")
+kbdBackquote = fromNameEnglish("`")
+kbdDelete = fromNameEnglish("Delete")
 
 allModifiers = [
     winUser.VK_LCONTROL, winUser.VK_RCONTROL,
@@ -386,7 +432,7 @@ class EditTextDialog(wx.Dialog):
                     if modifiers[i]
                 ]
                 keystrokeName = "+".join(modifierTokens + ["Enter"])
-                self.keystroke = keyboardHandler.KeyboardInputGesture.fromName(keystrokeName)
+                self.keystroke = fromNameEnglish(keystrokeName)
                 self.text = self.textCtrl.GetValue()
                 self.EndModal(wx.ID_OK)
                 wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, self.keystroke))
