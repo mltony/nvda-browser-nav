@@ -23,6 +23,7 @@ import documentBase
 import globalPluginHandler
 import gui
 import inputCore
+import itertools
 import keyboardHandler
 from logHandler import log
 import math
@@ -57,7 +58,26 @@ def myAssert(condition):
     if not condition:
         raise RuntimeError("Assertion failed")
 
+def pairUpOld(iterator):
+    second = "Hello world!"
+    while second is not None:
+        try:
+            first = iterator.__next__()
+        except StopIteration:
+            return
+        try:
+            second = iterator.__next__()
+        except StopIteration:
+            second = None
+        yield first, second
 
+def pairUp(l):
+    for i in range(0, len(l), 2):
+        try:
+            yield (l[i], l[i+1])
+        except IndexError:
+            yield (l[i], None)
+            return
 def initConfiguration():
     confspec = {
         "crackleVolume" : "integer( default=25, min=0, max=100)",
@@ -514,8 +534,8 @@ def unblockAllKeys():
     global blockKeysUntil
     blockKeysUntil = 0
     beeper.stop()
-    
-def getSimpleHorizontalOffset(textInfo):    
+
+def getSimpleHorizontalOffset(textInfo):
     try:
         obj = textInfo.NVDAObjectAtStart
         x = obj.location[0]
@@ -588,7 +608,7 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
             tone = getBeepTone(textInfo)
         except:
             return
-        
+
         if tone != lastTone:
             tones.beep(tone, 50, left=beepVolume, right=beepVolume)
         lastTone = tone
@@ -868,6 +888,158 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 textInfo.collapse()
                 focus._set_selection(textInfo)
                 return
+
+    #blacklistKeys = {"_startOfNode", "_endOfNode"}
+    whitelistKeys = "color,font-family,font-size,bold,italic,strikethrough,underline".split(",")
+    def compareFormatFields(self, f1, f2):
+        if False:
+          for key in set(f1.keys()).union(set(f2.keys())).difference(self.blacklistKeys):
+            try:
+                if f1[key] != f2[key]:
+                    mylog(f"Inequality during comparison; key={key} f1={f1[key]} f2={f2[key]}")
+                    return False
+            except KeyError:
+                mylog(f"KeyError during comparison; key={key} f1={key in f1} f2={key in f2}")
+                return False
+        for key in self.whitelistKeys:
+            if key not in f1 and key not in f2:
+                continue
+            try:
+                if f1[key] != f2[key]:
+                    return False
+            except KeyError:
+                mylog(f"KeyError during comparison; key={key} f1={key in f1} f2={key in f2}")
+                return False
+                
+        return True
+
+    def findFormatChange(self, selfself, direction, errorMessage):
+        mylog(f"findFormatChange direction={direction}")
+        caretInfo = selfself.makeTextInfo(textInfos.POSITION_CARET)
+        caretInfo.collapse()
+        paragraphInfo = caretInfo.copy()
+        paragraphInfo.expand(textInfos.UNIT_PARAGRAPH)
+        textInfo = paragraphInfo.copy()
+        paragraphInfo.collapse()
+        textInfo.setEndPoint(caretInfo, 'startToStart' if direction > 0 else "endToEnd")
+        formatConfig=config.conf['documentFormatting']
+        formatInfo = caretInfo.copy()
+        formatInfo.move(textInfos.UNIT_CHARACTER, 1, endPoint="end")
+        fields = formatInfo.getTextWithFields(formatConfig)
+        fields = [field
+            for field in fields
+            if (
+                isinstance(field, textInfos.FieldCommand)
+                and field.command == 'formatChange'
+            )
+        ]
+        if len(fields) == 0:
+            raise Exception("No formatting information available at the cursor!")
+        originalFormat = fields[0]
+        mylog(f"originalFormat={originalFormat}")
+        while True:
+            fields = textInfo.getTextWithFields(formatConfig)
+            fields = [field
+                for field in fields
+                if (
+                    isinstance(field, textInfos.FieldCommand)
+                    and field.command == 'formatChange'
+                )
+                or isinstance(field, str)
+            ]
+            if len(fields) == 0:
+                # This happens if curssor at the beginning of paragraph and we're moving back. Well, just go directly to the previous paragraph, nothing to do in this one.
+                pass
+            else:
+                if not  isinstance(fields[0], textInfos.FieldCommand):
+                    raise Exception("No formatting information found at cursor!")
+                if not isinstance(fields[-1], str):
+                    raise Exception("Formatting information found in the end - unexpected!")
+                if direction < 0:
+                    # First we swap the order of each format-string pair
+                    # Second we invert the whole list
+                    mylog("Inverting for backward search")
+                    mylog(f"fields={fields}")
+                    newFields = []
+                    for (p1, p2) in pairUp([
+                        (k, list(g))
+                        for (k, g) in itertools.groupby(fields, key=type)
+                    ]):
+                        mylog(f"p2={p2}")
+                        (k1, g1) = p1
+                        g1 = list(g1)
+                        mylog(f"p1={p1}")
+                        mylog(f"g1={g1}")
+                        if   k1 != textInfos.FieldCommand:
+                            raise Exception("Corrupted order of format fields!")
+                        if p2 is not None:
+                            mylog("p2 is not None")
+                            (k2, g2) = p2
+                            if k2 != str:
+                                raise Exception("Corrupted order of format fields!")
+                            newFields.extend(list(g2)[::-1])
+                            mylog("After extending g2")
+                            mylog(str(newFields))
+                        newFields.extend(list(g1)[::-1])
+                        mylog("After extending g1")
+                        mylog(str(newFields))
+
+                    mylog("Before inversion")
+                    mylog("\n".join(map(str, fields)))
+                    fields = newFields[::-1]
+                    mylog("After inversion")
+                    mylog("\n".join(map(str, fields)))
+                    mylog("###")
+
+                adjustment = 0
+                beginAdjustment = endAdjustment = None
+                for field in fields:
+                    if isinstance(field, textInfos.FieldCommand):
+                        mylog(f"Field: {field}")
+                        #if field != originalFormat:
+                        if not self.compareFormatFields(field.field, originalFormat.field):
+                            #Bingo! But we still need to keep going to find the end of that piece with different formatting
+                            beginAdjustment = adjustment
+                            mylog(f"beginAdjustment={beginAdjustment}")
+                    elif isinstance(field, str):
+                        mylog(f"'{field}'")
+                        oldAdjustment = adjustment
+                        adjustment += len(field)
+                        mylog(f"old={oldAdjustment} adjustment={adjustment}")
+                        if beginAdjustment is not None:
+                            # Now really bingo!
+                            endAdjustment = adjustment
+                            mylog(f"endAdjustment={endAdjustment}")
+                            break
+                    else:
+                        raise Exception("Impossible!")
+                if beginAdjustment is not None:
+                    # Found format change in this paragraph
+                    if endAdjustment is None:
+                        raise Exception("Found the beginning of format change, but failed to find the end!")
+                    caretInfo.move(textInfos.UNIT_CHARACTER, direction * beginAdjustment)
+                    caretInfo.move(textInfos.UNIT_CHARACTER, direction * (endAdjustment - beginAdjustment), endPoint="end" if direction > 0 else "start")
+                    caretInfo.updateCaret()
+                    selfself.selection = caretInfo
+                    speech.speakTextInfo(caretInfo, reason=controlTypes.REASON_CARET)
+                    return
+            if True:
+                # Now move to the next paragraph
+                mylog("nextParagraph!")
+                if direction < 0:
+                    # If moving back, then position caret at the beginning of the following paragraph, since we'll be computing adjustment from the end
+                    caretInfo = paragraphInfo.copy()
+                result = paragraphInfo.move(textInfos.UNIT_PARAGRAPH, direction)
+                if result == 0:
+                    self.endOfDocument(_("No next format change!"))
+                    return
+                textInfo = paragraphInfo.copy()
+                textInfo.expand(textInfos.UNIT_PARAGRAPH)
+                mylog(f"paragraph: {textInfo.text}")
+                if direction > 0:
+                    caretInfo = paragraphInfo.copy()
+
+
 
     def findByControlField(self, direction, role, errorMessage):
         def getUniqueId(info):
@@ -1320,6 +1492,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 role=controlTypes.ROLE_TOOLBAR,
                 errorMessage=_("No previous tool bar")),
             doc="Jump to previous tool bar")
+      #Format change
+        self.injectBrowseModeKeystroke(
+            "kb:`",
+            "nextFormatChange",
+            script=lambda selfself, gesture: self.findFormatChange(
+                selfself,
+                direction=1,
+                errorMessage=_("No next format change")),
+            doc="Jump to next format change")
+        self.injectBrowseModeKeystroke(
+            "kb:Shift+`",
+            "previousFormatChange",
+            script=lambda selfself, gesture: self.findFormatChange(
+                selfself,
+                direction=-1,
+                errorMessage=_("No previous format change")),
+            doc="Jump to previous format change")
       # Edit Jupyter
         self.injectBrowseModeKeystroke(
             "kb:NVDA+E",
