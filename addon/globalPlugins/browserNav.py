@@ -866,8 +866,20 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 focus._set_selection(textInfo)
                 selfself.selection = textInfo
                 return
+                
+    def isRolePresent(self, textInfo, roles):
+        formatConfig=config.conf['documentFormatting']
+        fields = textInfo.getTextWithFields(formatConfig)
+        for field in fields:
+            try:
+                role = field.field['role']
+            except:
+                continue
+            if role in roles:
+                return True
+        return False
 
-    def findByRole(self, direction, roles, errorMessage):
+    def findByRole(self, direction, roles, errorMessage, newMethod=False):
         focus = api.getFocusObject().treeInterceptor
         textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
         textInfo.expand(textInfos.UNIT_PARAGRAPH)
@@ -880,8 +892,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 self.endOfDocument(errorMessage)
                 return
             textInfo.expand(textInfos.UNIT_PARAGRAPH)
-            obj = textInfo.NVDAObjectAtStart
-            if obj is not None and obj.role in roles:
+            if not newMethod:
+                obj = textInfo.NVDAObjectAtStart
+                testResult =  obj is not None and obj.role in roles
+            else:
+                testResult = self.isRolePresent(textInfo, roles)
+            if testResult:
                 textInfo.updateCaret()
                 self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                 speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
@@ -1401,8 +1417,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "nextTab",
             script=lambda selfself, gesture: self.findByRole(
                 direction=1,
-                roles=[controlTypes.ROLE_TAB],
-                errorMessage=_("No next tab")),
+                roles={controlTypes.ROLE_TAB, controlTypes.ROLE_TABCONTROL},
+                errorMessage=_("No next tab"),
+                newMethod=True,
+            ),
             doc="Jump to next tab")
         self.injectBrowseModeKeystroke(
             "kb:Shift+Y",
@@ -1410,7 +1428,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             script=lambda selfself, gesture: self.findByRole(
                 direction=-1,
                 roles=[controlTypes.ROLE_TAB],
-                errorMessage=_("No previous tab")),
+                errorMessage=_("No previous tab"),
+                newMethod=True,
+            ),
             doc="Jump to previous tab")
 
       #Dialog
