@@ -866,7 +866,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 focus._set_selection(textInfo)
                 selfself.selection = textInfo
                 return
-                
+
     def isRolePresent(self, textInfo, roles):
         formatConfig=config.conf['documentFormatting']
         fields = textInfo.getTextWithFields(formatConfig)
@@ -905,6 +905,23 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 focus._set_selection(textInfo)
                 return
 
+    def scrollToAll(self, direction, message):
+        ui.message(message)
+        focus = api.getFocusObject().treeInterceptor
+        textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
+        textInfo.expand(textInfos.UNIT_PARAGRAPH)
+        textInfo.collapse()
+        distance = 0
+        while True:
+            distance += 1
+            #textInfo.collapse()
+            result = textInfo.move(textInfos.UNIT_PARAGRAPH, direction)
+            if result == 0:
+                ui.message(_("Done."))
+                return
+            #textInfo.expand(textInfos.UNIT_PARAGRAPH)
+            textInfo.NVDAObjectAtStart.scrollIntoView()
+
     #blacklistKeys = {"_startOfNode", "_endOfNode"}
     whitelistKeys = "color,font-family,font-size,bold,italic,strikethrough,underline".split(",")
     def compareFormatFields(self, f1, f2):
@@ -926,7 +943,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             except KeyError:
                 mylog(f"KeyError during comparison; key={key} f1={key in f1} f2={key in f2}")
                 return False
-                
+
         return True
 
     def findFormatChange(self, selfself, direction, errorMessage):
@@ -1529,6 +1546,22 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=-1,
                 errorMessage=_("No previous format change")),
             doc="Jump to previous format change")
+      # Scroll all:
+        self.injectBrowseModeKeystroke(
+            "kb:\\",
+            "scrollAllForward",
+            script=lambda selfself, gesture: self.scrollToAll(
+                direction=1,
+                message=_("Scrolling forward. This may load more elements on the page.")),
+            doc="Scroll to all possible elements forward")
+        self.injectBrowseModeKeystroke(
+            "kb:Shift+\\",
+            "scrollAllBackward",
+            script=lambda selfself, gesture: self.scrollToAll(
+                direction=-1,
+                message=_("Scrolling backward. This may load more elements on the page.")),
+            doc="Scroll to all possible elements backward")
+            
       # Edit Jupyter
         self.injectBrowseModeKeystroke(
             "kb:NVDA+E",

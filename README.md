@@ -29,6 +29,8 @@ BrowserNav works in any browser supported by NVDA. Although some features may no
 * Y or Shift+Y: Jump to next or previous tab.
 * P or Shift+P: Jump to next or previous dialog.
 * Z or Shift+Z: Jump to next or previous menu.
+* \` orShift+\` (backquote or tilde): Jump to next or previous format change.
+* \\ or Shift+\\ (backslash): Scroll up or down to reveal each page element; can be useful in dynamic web pages to load all the elements; also can be useful in infinite scroll webpages to load the next chunk.
 * 0 or Shift+0: Jump to next or previous tree view.
 * 9 or Shift+9: Jump to next or previous tool bar.
 * NVDA+E: edit semi-accessible edit boxes - see next section
