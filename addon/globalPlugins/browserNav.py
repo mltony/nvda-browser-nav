@@ -58,6 +58,13 @@ def myAssert(condition):
     if not condition:
         raise RuntimeError("Assertion failed")
 
+try:
+    REASON_CARET = controlTypes.REASON_CARET
+except AttributeError:
+    REASON_CARET = controlTypes.OutputReason.CARET
+
+
+
 def pairUpOld(iterator):
     second = "Hello world!"
     while second is not None:
@@ -824,7 +831,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             if style == origStyle:
                 if op(indent, origIndent):
                     self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-                    speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                    speech.speakTextInfo(textInfo, reason=REASON_CARET)
                     textInfo.collapse()
                     textInfo.updateCaret()
                     selfself.selection = textInfo
@@ -861,7 +868,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 textInfo.setEndPoint(end, "endToEnd")
                 textInfo.updateCaret()
                 self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-                speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                speech.speakTextInfo(textInfo, reason=REASON_CARET)
                 textInfo.collapse()
                 focus._set_selection(textInfo)
                 selfself.selection = textInfo
@@ -900,7 +907,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             if testResult:
                 textInfo.updateCaret()
                 self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-                speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                speech.speakTextInfo(textInfo, reason=REASON_CARET)
                 textInfo.collapse()
                 focus._set_selection(textInfo)
                 return
@@ -1054,7 +1061,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     caretInfo.move(textInfos.UNIT_CHARACTER, direction * (endAdjustment - beginAdjustment), endPoint="end" if direction > 0 else "start")
                     caretInfo.updateCaret()
                     selfself.selection = caretInfo
-                    speech.speakTextInfo(caretInfo, reason=controlTypes.REASON_CARET)
+                    speech.speakTextInfo(caretInfo, reason=REASON_CARET)
                     return
             if True:
                 # Now move to the next paragraph
@@ -1103,7 +1110,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             if newId is not None and (newId != originalId):
                 textInfo.updateCaret()
                 self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-                speech.speakTextInfo(textInfo, reason=controlTypes.REASON_CARET)
+                speech.speakTextInfo(textInfo, reason=REASON_CARET)
                 textInfo.collapse()
                 focus._set_selection(textInfo)
                 return
@@ -1561,7 +1568,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=-1,
                 message=_("Scrolling backward. This may load more elements on the page.")),
             doc="Scroll to all possible elements backward")
-            
+
       # Edit Jupyter
         self.injectBrowseModeKeystroke(
             "kb:NVDA+E",
