@@ -1,15 +1,12 @@
 #A part of the BrowserNav addon for NVDA
-#Copyright (C) 2017-2019 Tony Malykh
+#Copyright (C) 2017-2021 Tony Malykh
 #This file is covered by the GNU General Public License.
 #See the file LICENSE  for more details.
 
 # This addon allows to navigate documents by indentation or offset level.
 # In browsers you can navigate by object location on the screen.
-# In editable text fields you can navigate by the indentation level.
-# This is useful for editing source code.
 # Author: Tony Malykh <anton.malykh@gmail.com>
 # https://github.com/mltony/nvda-indent-nav/
-# Original author: Sean Mealin <spmealin@gmail.com>
 
 import addonHandler
 import api
@@ -191,13 +188,13 @@ class SettingsDialog(gui.SettingsDialog):
       # BrowserMarks regexp text edit
         self.marksEdit = gui.guiHelper.LabeledControlHelper(self, _("Browser marks regexp"), wx.TextCtrl).control
         self.marksEdit.Value = getConfig("marks")
-        
+
       # Skipping over empty paragraphs
         # Translators: Checkbox that controls whether we should skip over empty paragraphs
         label = _("Skip over empty paragraphs (unless in form fields)")
         self.skipEmptyParagraphsCheckbox = sHelper.addItem(wx.CheckBox(self, label=label))
         self.skipEmptyParagraphsCheckbox.Value = getConfig("skipEmptyParagraphs")
-        
+
         # Translators: Checkbox that controls whether we should skip over empty lines
         label = _("Skip over empty lines (unless in form fields)")
         self.skipEmptyLinesCheckbox = sHelper.addItem(wx.CheckBox(self, label=label))
@@ -710,7 +707,7 @@ def adjustVolume(bb, volume):
             x >>= 8
             bb[i + 1] = x & 0xFF
         return bytes(bb)
-        
+
 spcFile=None
 spcPlayer=None
 spcBuf = None
@@ -797,13 +794,13 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
         (
             (
                 getConfig("skipEmptyParagraphs")
-                and unit == textInfos.UNIT_PARAGRAPH 
+                and unit == textInfos.UNIT_PARAGRAPH
             ) or  (
                 getConfig("skipEmptyLines")
-                and unit == textInfos.UNIT_LINE 
+                and unit == textInfos.UNIT_LINE
             )
         )
-        and direction is not None 
+        and direction is not None
         and posConstant==textInfos.POSITION_SELECTION
         and not isinstance(self,textInfos.DocumentWithPageTurns)
         and not scriptHandler.willSayAllResume(gesture)
@@ -835,7 +832,7 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
             if not speech.isBlank(expandText):
                 break
             skipped = True
-            
+
         selection = info.copy()
         info.expand(unit)
         speech.speakTextInfo(info, unit=unit, reason=REASON_CARET)
@@ -1549,6 +1546,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         result = d.Show()
         gui.mainFrame.postPopup()
 
+    def script_toggleOption(self, gesture, selfself, option, messages):
+        setConfig(option, not getConfig(option))
+        message = messages[int(getConfig(option))]
+        ui.message(message)
+
     def injectBrowseModeKeystroke(self, keystrokes, funcName, script=None, doc=None):
         gp = self
         cls = browseMode.BrowseModeTreeInterceptor
@@ -1767,3 +1769,30 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "copyJupyterText",
             script=lambda selfself, gesture: self.script_copyJupyterText(gesture, selfself),
             doc="Copy the last text from semi-accessible edit box to clipboard.")
+      # Toggle skip mode
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Control+/",
+            "toggleSkipEmptyParagraphs",
+            script=lambda selfself, gesture: self.script_toggleOption(
+                gesture, 
+                selfself,
+                "skipEmptyParagraphs",
+                [
+                    _("Not skipping over empty paragraphs and paragraphs matching skip regex "),
+                    _("Skipping over empty paragraphs and paragraphs matching skip regex "),
+                ]
+            ),
+            doc="Toggle skipping over empty paragraphs and paragraphs matching skip regex")
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+/",
+            "toggleSkipEmptyLines",
+            script=lambda selfself, gesture: self.script_toggleOption(
+                gesture, 
+                selfself,
+                "skipEmptyLines",
+                [
+                    _("Not skipping over empty lines and lines matching skip regex "),
+                    _("Skipping over empty lines and lines matching skip regex "),
+                ]
+            ),
+            doc="Toggle skipping over empty lines and lines matching skip regex")
