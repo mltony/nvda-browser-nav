@@ -251,7 +251,7 @@ OPERATOR_STRINGS = {
 # This character is used for semi-accessible jupyter edit box automation.
 controlCharacter = "➉" # U+2789, Dingbat circled sans-serif digit ten
 
-# This function is a fixed version of fromNameEnglish function.
+# This function is a fixed version of fromName function.
 # As of v2020.3 it doesn't work correctly for gestures containing letters when the default locale on the computer is set to non-Latin, such as Russian.
 import vkCodes
 en_us_input_Hkl = 1033 + (1033 << 16)
@@ -294,15 +294,25 @@ def fromNameEnglish(name):
 
     return keyboardHandler.KeyboardInputGesture(keys[:-1], vk, 0, ext)
 
+def fromNameSmart(name):
+    try:
+        return keyboardHandler.KeyboardInputGesture.fromName(name)
+    except:
+        log.error(f"Couldn't resolve {name} keystroke using system default locale.", exc_info=True)
+    try:
+        return fromNameEnglish(name)
+    except:
+        log.error(f"Couldn't resolve {name} keystroke using English default locale.", exc_info=True)
+    return None
 
-kbdControlC = fromNameEnglish("Control+c")
-kbdControlV = fromNameEnglish("Control+v")
-kbdControlA = fromNameEnglish("Control+a")
-kbdControlHome = fromNameEnglish("Control+Home")
-kbdControlShiftDown = fromNameEnglish("Control+Shift+DownArrow")
-kbdControlEnd = fromNameEnglish("Control+End")
-kbdBackquote = fromNameEnglish("`")
-kbdDelete = fromNameEnglish("Delete")
+kbdControlC = fromNameSmart("Control+c")
+kbdControlV = fromNameSmart("Control+v")
+kbdControlA = fromNameSmart("Control+a")
+kbdControlHome = fromNameSmart("Control+Home")
+kbdControlShiftDown = fromNameSmart("Control+Shift+DownArrow")
+kbdControlEnd = fromNameSmart("Control+End")
+kbdBackquote = fromNameSmart("`")
+kbdDelete = fromNameSmart("Delete")
 
 allModifiers = [
     winUser.VK_LCONTROL, winUser.VK_RCONTROL,
@@ -491,7 +501,7 @@ class EditTextDialog(wx.Dialog):
                     if modifiers[i]
                 ]
                 keystrokeName = "+".join(modifierTokens + ["Enter"])
-                self.keystroke = fromNameEnglish(keystrokeName)
+                self.keystroke = fromNameSmart(keystrokeName)
                 self.text = self.textCtrl.GetValue()
                 self.EndModal(wx.ID_OK)
                 wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, self.keystroke))
