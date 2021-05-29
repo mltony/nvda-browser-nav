@@ -20,6 +20,7 @@ import core
 import ctypes
 import cursorManager
 import documentBase
+import functools
 import globalPluginHandler
 import gui
 import inputCore
@@ -30,18 +31,20 @@ import math
 import nvwave
 import NVDAHelper
 import operator
+import os
 import re
 import scriptHandler
 from scriptHandler import script
 import speech
 import struct
 import textInfos
+import threading
 import time
 import tones
 import types
 import ui
 from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
-
+import wave
 import winUser
 import wx
 
@@ -97,6 +100,9 @@ def initConfiguration():
         "useBackgroundColor" : "boolean( default=True)",
         "useBoldItalic" : "boolean( default=True)",
         "marks" : "string( default='(^upvote$|^up vote$)')",
+        "skipEmptyParagraphs" : "boolean( default=True)",
+        "skipEmptyLines" : "boolean( default=True)",
+        "skipChimeVolume" : "integer( default=25, min=0, max=100)",
     }
     config.conf.spec["browsernav"] = confspec
 
@@ -184,6 +190,27 @@ class SettingsDialog(gui.SettingsDialog):
       # BrowserMarks regexp text edit
         self.marksEdit = gui.guiHelper.LabeledControlHelper(self, _("Browser marks regexp"), wx.TextCtrl).control
         self.marksEdit.Value = getConfig("marks")
+        
+      # Skipping over empty paragraphs
+        # Translators: Checkbox that controls whether we should skip over empty paragraphs
+        label = _("Skip over empty paragraphs (unless in form fields)")
+        self.skipEmptyParagraphsCheckbox = sHelper.addItem(wx.CheckBox(self, label=label))
+        self.skipEmptyParagraphsCheckbox.Value = getConfig("skipEmptyParagraphs")
+        
+        # Translators: Checkbox that controls whether we should skip over empty lines
+        label = _("Skip over empty lines (unless in form fields)")
+        self.skipEmptyLinesCheckbox = sHelper.addItem(wx.CheckBox(self, label=label))
+        self.skipEmptyLinesCheckbox.Value = getConfig("skipEmptyLines")
+      # skipChimeVolumeSlider
+        sizer=wx.BoxSizer(wx.HORIZONTAL)
+        # Translators: volume of skip chime slider
+        label=wx.StaticText(self,wx.ID_ANY,label=_("Volume of skip paragraph chime"))
+        slider=wx.Slider(self, wx.NewId(), minValue=0,maxValue=100)
+        slider.SetValue(getConfig("skipChimeVolume"))
+        sizer.Add(label)
+        sizer.Add(slider)
+        settingsSizer.Add(sizer)
+        self.skipChimeVolumeSlider = slider
 
 
     def onOk(self, evt):
@@ -196,6 +223,9 @@ class SettingsDialog(gui.SettingsDialog):
         config.conf["browsernav"]["useBackgroundColor"] = self.useBackgroundColorCheckBox.Value
         config.conf["browsernav"]["useBoldItalic"] = self.useBoldItalicCheckBox.Value
         config.conf["browsernav"]["marks"] = self.marksEdit.Value
+        config.conf["browsernav"]["skipEmptyParagraphs"] = self.skipEmptyParagraphsCheckbox.Value
+        config.conf["browsernav"]["skipEmptyLines"] = self.skipEmptyLinesCheckbox.Value
+        config.conf["browsernav"]["skipChimeVolume"] = self.skipChimeVolumeSlider.Value
         super(SettingsDialog, self).onOk(evt)
 
 
@@ -651,6 +681,54 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
         initialDelay = 0 if beepVolume==0 else 50
         beeper.simpleCrackle(paragraphs, volume=getConfig("crackleVolume"), initialDelay=initialDelay)
 
+def getSoundsPath():
+    globalPluginPath = os.path.abspath(os.path.dirname(__file__))
+    addonPath = os.path.split(globalPluginPath)[0]
+    soundsPath = os.path.join(addonPath, "sounds")
+    return soundsPath
+
+@functools.lru_cache(maxsize=128)
+def adjustVolume(bb, volume):
+    # Assuming bb is encoded 116 bits per value!
+    n = len(bb) // 2
+    format = f"<{n}h"
+    unpacked = struct.unpack(format, bb)
+    unpacked = [int(x * volume / 100) for x in unpacked]
+    result=  struct.pack(format, *unpacked)
+    return result
+    if False:
+        bb = list(bb)
+        for i in range(0, len(bb), 2):
+            x = bb[i] + (bb[i+1] << 8)
+            x = int(x * volume / 100)
+            bb[i] = x & 0xFF
+            x >>= 8
+            bb[i + 1] = x & 0xFF
+        return bytes(bb)
+        
+spcFile=None
+spcPlayer=None
+spcBuf = None
+def skippedParagraphChime():
+    global spcFile, spcPlayer, spcBuf
+    if spcPlayer is  None:
+        spcFile = wave.open(getSoundsPath() + "\\on.wav","r")
+        spcPlayer = nvwave.WavePlayer(channels=spcFile.getnchannels(), samplesPerSec=spcFile.getframerate(),bitsPerSample=spcFile.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+        spcFile.rewind()
+        spcFile.setpos(100 *         spcFile.getframerate() // 1000)
+        spcBuf = spcFile.readframes(spcFile.getnframes())
+    def playSkipParagraphChime():
+        spcPlayer.stop()
+        spcPlayer.feed(
+            adjustVolume(
+                spcBuf,
+                getConfig("skipChimeVolume")
+            )
+        )
+        spcPlayer.idle()
+    threading.Thread(target=playSkipParagraphChime).start()
+
+
 NON_SKIPPABLE_ROLES = {
     controlTypes.ROLE_CHECKBOX,
     controlTypes.ROLE_RADIOBUTTON,
@@ -711,12 +789,21 @@ originalTableScriptHelper = None
 def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
     oldSelection = self.selection
     if (
-        unit == textInfos.UNIT_PARAGRAPH 
+        (
+            (
+                getConfig("skipEmptyParagraphs")
+                and unit == textInfos.UNIT_PARAGRAPH 
+            ) or  (
+                getConfig("skipEmptyLines")
+                and unit == textInfos.UNIT_LINE 
+            )
+        )
         and direction is not None 
         and posConstant==textInfos.POSITION_SELECTION
         and not isinstance(self,textInfos.DocumentWithPageTurns)
         and not scriptHandler.willSayAllResume(gesture)
     ):
+        skipped = False
         oldInfo=self.makeTextInfo(posConstant)
         info=oldInfo.copy()
         info.collapse(end=self.isTextSelectionAnchoredAtStart)
@@ -738,6 +825,7 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
                 break
             if not speech.isBlank(expandText):
                 break
+            skipped = True
             
         selection = info.copy()
         info.expand(unit)
@@ -745,6 +833,8 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
         if not oldInfo.isCollapsed:
             speech.speakSelectionChange(oldInfo, selection)
         self.selection = selection
+        if skipped:
+            skippedParagraphChime()
     else:
         originalCaretMovementScriptHelper(self, gesture, unit, direction, posConstant, *args, **kwargs)
     if unit not in {textInfos.UNIT_CHARACTER, textInfos.UNIT_WORD}:
