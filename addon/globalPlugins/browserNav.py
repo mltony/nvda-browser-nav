@@ -103,6 +103,7 @@ def initConfiguration():
         "skipEmptyParagraphs" : "boolean( default=True)",
         "skipEmptyLines" : "boolean( default=True)",
         "skipChimeVolume" : "integer( default=25, min=0, max=100)",
+        "skipRegex" : "string( default='(^Hide or report this$)')",
     }
     config.conf.spec["browsernav"] = confspec
 
@@ -211,6 +212,9 @@ class SettingsDialog(gui.SettingsDialog):
         sizer.Add(slider)
         settingsSizer.Add(sizer)
         self.skipChimeVolumeSlider = slider
+      # Skip regexp text edit
+        self.skipRegexEdit = gui.guiHelper.LabeledControlHelper(self, _("Also skip over paragraphs that match regex:"), wx.TextCtrl).control
+        self.skipRegexEdit.Value = getConfig("skipRegex")
 
 
     def onOk(self, evt):
@@ -226,6 +230,7 @@ class SettingsDialog(gui.SettingsDialog):
         config.conf["browsernav"]["skipEmptyParagraphs"] = self.skipEmptyParagraphsCheckbox.Value
         config.conf["browsernav"]["skipEmptyLines"] = self.skipEmptyLinesCheckbox.Value
         config.conf["browsernav"]["skipChimeVolume"] = self.skipChimeVolumeSlider.Value
+        config.conf["browsernav"]["skipRegex"] = self.skipRegexEdit.Value
         super(SettingsDialog, self).onOk(evt)
 
 
@@ -803,6 +808,7 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
         and not isinstance(self,textInfos.DocumentWithPageTurns)
         and not scriptHandler.willSayAllResume(gesture)
     ):
+        skipRe = re.compile(getConfig("skipRegex"))
         skipped = False
         oldInfo=self.makeTextInfo(posConstant)
         info=oldInfo.copy()
@@ -819,6 +825,9 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
             expandInfo = info.copy()
             expandInfo.expand(unit)
             expandText = expandInfo.text
+            if skipRe.search(expandText):
+                skipped = True
+                continue
             fields=expandInfo.getTextWithFields() or []
             roles = {field.field['role'] for field in fields if hasattr(field, 'field') and field.field is not None and 'role' in field.field}
             if len(roles.intersection(NON_SKIPPABLE_ROLES)) > 0:
