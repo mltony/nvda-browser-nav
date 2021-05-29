@@ -45,7 +45,7 @@ from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import winUser
 import wx
 
-debug = False
+debug = True
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -651,18 +651,104 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
         initialDelay = 0 if beepVolume==0 else 50
         beeper.simpleCrackle(paragraphs, volume=getConfig("crackleVolume"), initialDelay=initialDelay)
 
-
+NON_SKIPPABLE_ROLES = {
+    controlTypes.ROLE_CHECKBOX,
+    controlTypes.ROLE_RADIOBUTTON,
+    controlTypes.ROLE_EDITABLETEXT,
+    controlTypes.ROLE_BUTTON,
+    controlTypes.ROLE_MENUBAR,
+    controlTypes.ROLE_MENUITEM,
+    controlTypes.ROLE_POPUPMENU,
+    controlTypes.ROLE_COMBOBOX,
+    controlTypes.ROLE_LIST,
+    controlTypes.ROLE_LISTITEM,
+    controlTypes.ROLE_HELPBALLOON,
+    controlTypes.ROLE_TOOLTIP,
+    controlTypes.ROLE_LINK,
+    controlTypes.ROLE_TREEVIEW,
+    controlTypes.ROLE_TREEVIEWITEM,
+    controlTypes.ROLE_TAB,
+    controlTypes.ROLE_TABCONTROL,
+    controlTypes.ROLE_SLIDER,
+    controlTypes.ROLE_PROGRESSBAR,
+    controlTypes.ROLE_SCROLLBAR,
+    controlTypes.ROLE_STATUSBAR,
+    controlTypes.ROLE_DROPDOWNBUTTON,
+    controlTypes.ROLE_FORM,
+    controlTypes.ROLE_APPLICATION,
+    controlTypes.ROLE_GROUPING,
+    controlTypes.ROLE_CHECKMENUITEM,
+    controlTypes.ROLE_DATEEDITOR,
+    controlTypes.ROLE_DIRECTORYPANE,
+    controlTypes.ROLE_RADIOMENUITEM,
+    controlTypes.ROLE_EDITBAR,
+    controlTypes.ROLE_TERMINAL,
+    controlTypes.ROLE_RICHEDIT,
+    controlTypes.ROLE_RULER,
+    controlTypes.ROLE_TEXTFRAME,
+    controlTypes.ROLE_TOGGLEBUTTON,
+    controlTypes.ROLE_CARET,
+    controlTypes.ROLE_DROPLIST,
+    controlTypes.ROLE_SPLITBUTTON,
+    controlTypes.ROLE_MENUBUTTON,
+    controlTypes.ROLE_DROPDOWNBUTTONGRID,
+    controlTypes.ROLE_MATH,
+    controlTypes.ROLE_HOTKEYFIELD,
+    controlTypes.ROLE_INDICATOR,
+    controlTypes.ROLE_SPINBUTTON,
+    controlTypes.ROLE_SOUND,
+    controlTypes.ROLE_TREEVIEWBUTTON,
+    controlTypes.ROLE_IPADDRESS,
+    controlTypes.ROLE_FILECHOOSER,
+    controlTypes.ROLE_MENU,
+    controlTypes.ROLE_PASSWORDEDIT,
+    controlTypes.ROLE_FONTCHOOSER,
+}
 
 originalCaretMovementScriptHelper = None
 originalQuickNavScript = None
 originalTableScriptHelper = None
-def preCaretMovementScriptHelper(self, gesture,unit, *args, **kwargs):
-    #tones.beep(500, 50)
+def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
     oldSelection = self.selection
-    result = originalCaretMovementScriptHelper(self, gesture, unit, *args, **kwargs)
+    if (
+        unit == textInfos.UNIT_PARAGRAPH 
+        and direction is not None 
+        and posConstant==textInfos.POSITION_SELECTION
+        and not isinstance(self,textInfos.DocumentWithPageTurns)
+        and not scriptHandler.willSayAllResume(gesture)
+    ):
+        oldInfo=self.makeTextInfo(posConstant)
+        info=oldInfo.copy()
+        info.collapse(end=self.isTextSelectionAnchoredAtStart)
+        if self.isTextSelectionAnchoredAtStart and not oldInfo.isCollapsed:
+            info.move(textInfos.UNIT_CHARACTER,-1)
+        info.expand(unit)
+        text = info.text
+        info.collapse()
+        for i in range(10):
+            result = info.move(unit,direction)
+            if result == 0:
+                break
+            expandInfo = info.copy()
+            expandInfo.expand(unit)
+            expandText = expandInfo.text
+            fields=expandInfo.getTextWithFields() or []
+            roles = {field.field['role'] for field in fields if hasattr(field, 'field') and field.field is not None and 'role' in field.field}
+            if len(roles.intersection(NON_SKIPPABLE_ROLES)) > 0:
+                break
+            if not speech.isBlank(expandText):
+                break
+            
+        selection = info.copy()
+        info.expand(unit)
+        speech.speakTextInfo(info, unit=unit, reason=REASON_CARET)
+        if not oldInfo.isCollapsed:
+            speech.speakSelectionChange(oldInfo, selection)
+        self.selection = selection
+    else:
+        originalCaretMovementScriptHelper(self, gesture, unit, direction, posConstant, *args, **kwargs)
     if unit not in {textInfos.UNIT_CHARACTER, textInfos.UNIT_WORD}:
         sonifyTextInfo(self.selection)
-    return result
 
 def preQuickNavScript(self, *args, **kwargs):
     oldSelection = self.selection
@@ -1267,9 +1353,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         text = textInfo.text
                         if len(text) == 0:
                             break
-                  # Step 3.3 Send Control+Shift+Down, so that NVDA at least sees the first line of each edit box
-                    for i in range(5):
-                        kbdControlShiftDown.send()
                 finally:
                   # Step 3.3. Sleep for a bit more just to make sure things have propagated.
                   # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
@@ -1279,6 +1362,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
                     keystroke.send()
+              # Step 5 Send Control+Shift+Down, so that NVDA at least sees the first line of each edit box
+                # This is disabled, since selecting lines causes weird behavior in some edit boxes
+                #for i in range(5):
+                #    kbdControlShiftDown.send()
+
             except EditBoxUpdateError as e:
                 tones.player.stop()
                 jupyterUpdateInProgress = False
