@@ -1,5 +1,5 @@
 # BrowserNav addon for NVDA
-This add-on provides NVDA users powerful navigation commands in browser mode.
+This add-on provides NVDA users powerful navigation commands in browser mode. It works in web browsers, as well as any other applications that support NVDA browse mode, such as Word documents and email clients.
 For example, with BrowserNav you can find vertically aligned paragraphs, that is paragraphs with the same horizontal offset. This can be used to read hierarchical trees of comments or malformed HTML tables.
 You can also find paragraphs written in the same font size or style.
 BrowserNav also provides new QuickNav commands: P for next paragraph and Y for next tab.
@@ -7,7 +7,7 @@ BrowserNav also provides new QuickNav commands: P for next paragraph and Y for n
 * Current stable version: [BrowserNav](https://github.com/mltony/nvda-browser-nav/releases/latest/download/browsernav.nvda-addon)
 * Last Python 2 version (compatible with NVDA 2019.2 and prior): [BrowserNav v1.1](https://github.com/mltony/nvda-browser-nav/releases/download/v1.1/BrowserNav-1.1.nvda-addon)
 
-## Usage in browsers
+## Usage in browsers and other programs that support browse mode
 BrowserNav can be used to navigate by  horizontal offset from the left edge of the screen, by font size, or by font style. 
 * When navigating by horizontal offset, you can easily find paragraphs that are vertically aligned on the page. IN particular, you can press NVDA+Alt+DownArrow or UpArrow to jump to the next or previous paragraph that has the same offset. For example, this can be useful when browsing hierarchical trees of comments (e.g. on reddit.com) to jump between  first level comments and skipping all the higher level comments.
 * When navigating by font size, you can easily find paragraphs written in the same font size, or smaller/greater font size.
@@ -15,7 +15,7 @@ BrowserNav can be used to navigate by  horizontal offset from the left edge of t
 
 BrowserNav rotor is used to switch between these options. Depending on the setting of this rotor, BrowserNav will indicate with beeps either horizontal offset or font size of currently selected item. In addition, BrowserNav will crackle on QuickNav commands to indicate how much text has been skipped over (this feature is only available in Google Chrome and Firefox).
 
-BrowserNav works in any browser supported by NVDA. Although some features may not be available in all browsers.
+BrowserNav works in any browser supported by NVDA. Although some features may not be available in all browsers. BrowserNav also works in  other applications that support NVDA browse mode, such as Word documents and email clients.
 
 ## Keystrokes:
 
@@ -26,6 +26,7 @@ BrowserNav works in any browser supported by NVDA. Although some features may no
 * NVDA+Alt+PageUp or NVDA+Control+Alt+RightArrow: Jump to previous paragraph with greater offset or smaller font size (previous child paragraph).
 * NVDA+O: Switch rotor setting between horizontal offset, font size, font size with font style.
 * J or Shift+J: Jump to next or previous browser mark. Browser marks are keywords that you search on web pages often and can be configured in BrowserNav settings.
+* NVDA+/ and NVDA+Control+/: Toggle skipping of empty lines/paragraphs and lines/paragraphs matching skip regex.
 * Y or Shift+Y: Jump to next or previous tab.
 * P or Shift+P: Jump to next or previous dialog.
 * Z or Shift+Z: Jump to next or previous menu.
@@ -33,6 +34,7 @@ BrowserNav works in any browser supported by NVDA. Although some features may no
 * \\ or Shift+\\ (backslash): Scroll up or down to reveal each page element; can be useful in dynamic web pages to load all the elements; also can be useful in infinite scroll webpages to load the next chunk.
 * 0 or Shift+0: Jump to next or previous tree view.
 * 9 or Shift+9: Jump to next or previous tool bar.
+* NVDA+Shift+LeftArrow: Go back to previous location of cursor within current document.
 * NVDA+E: edit semi-accessible edit boxes - see next section
 
 ## Editing semi-accessible edit boxes
