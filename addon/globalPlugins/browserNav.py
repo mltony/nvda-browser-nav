@@ -46,7 +46,7 @@ import weakref
 import winUser
 import wx
 
-debug = True
+debug = False
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -776,7 +776,6 @@ NON_SKIPPABLE_ROLES = {
     controlTypes.ROLE_TERMINAL,
     controlTypes.ROLE_RICHEDIT,
     controlTypes.ROLE_RULER,
-    controlTypes.ROLE_TEXTFRAME,
     controlTypes.ROLE_TOGGLEBUTTON,
     controlTypes.ROLE_CARET,
     controlTypes.ROLE_DROPLIST,
@@ -840,8 +839,13 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
             fields=expandInfo.getTextWithFields() or []
             roles = {field.field['role'] for field in fields if hasattr(field, 'field') and field.field is not None and 'role' in field.field}
             if len(roles.intersection(NON_SKIPPABLE_ROLES)) > 0:
+                mylog("Roles don't match!")
+                inter = roles.intersection(NON_SKIPPABLE_ROLES)
+                s = ",".join([controlTypes.roleLabels[r] for r in inter])
+                mylog(s)
                 break
             if not speech.isBlank(expandText):
+                mylog("Speech is not blank!")
                 break
             skipped = True
 
