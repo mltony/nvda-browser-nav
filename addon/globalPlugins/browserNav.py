@@ -42,6 +42,7 @@ import types
 import ui
 from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import wave
+import weakref
 import winUser
 import wx
 
@@ -798,6 +799,7 @@ NON_SKIPPABLE_ROLES = {
 originalCaretMovementScriptHelper = None
 originalQuickNavScript = None
 originalTableScriptHelper = None
+original_set_selection = None
 def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
     oldSelection = self.selection
     if (
@@ -867,6 +869,40 @@ def preTableScriptHelper(self, *args, **kwargs):
     result = originalTableScriptHelper(self, *args, **kwargs)
     sonifyTextInfo(self.selection)
     return result
+
+selectionHistory = weakref.WeakKeyDictionary()
+def pre_set_selection(self, info):
+    if self not in selectionHistory:
+        selectionHistory[self] = SelectionHistory()
+    sh = selectionHistory[self]
+    sh.append(info)
+    return original_set_selection(self, info)
+
+class SelectionHistory:
+    def __init__(self):
+        self.entries = []
+        self.ptr = -1
+
+    def append(self, info):
+        try:
+            del self.entries[self.ptr + 1:]
+        except IndexError:
+            pass
+        info = info.copy()
+        info.expand(textInfos.UNIT_PARAGRAPH)
+        self.entries.append(info)
+        self.ptr = len(self.entries)
+        
+    def goBack(self, info):
+        info = info.copy()
+        info.expand(textInfos.UNIT_PARAGRAPH)
+        while self.ptr > 0:
+            self.ptr -= 1
+            if not info.isOverlapping(self.entries[self.ptr]):
+                return self.entries[self.ptr]
+        raise IndexError()
+
+
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     scriptCategory = _("BrowserNav")
     beeper = Beeper()
@@ -876,7 +912,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.createMenu()
         self.injectBrowseModeKeystrokes()
         self.lastJupyterText = ""
-        global originalExecuteGesture, originalCaretMovementScriptHelper, originalQuickNavScript, originalTableScriptHelper
+        global originalExecuteGesture, originalCaretMovementScriptHelper, originalQuickNavScript, originalTableScriptHelper, original_set_selection
         originalExecuteGesture = inputCore.InputManager.executeGesture
         inputCore.InputManager.executeGesture = preExecuteGesture
         originalCaretMovementScriptHelper = cursorManager.CursorManager._caretMovementScriptHelper
@@ -885,6 +921,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeTreeInterceptor._quickNavScript = preQuickNavScript
         originalTableScriptHelper = documentBase.DocumentWithTableNavigation._tableMovementScriptHelper
         documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = preTableScriptHelper
+        original_set_selection = cursorManager.CursorManager._set_selection
+        cursorManager.CursorManager._set_selection = pre_set_selection
 
 
     def createMenu(self):
@@ -900,6 +938,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         inputCore.InputManager.executeGesture = originalExecuteGesture
         browseMode.BrowseModeTreeInterceptor._quickNavScript = originalQuickNavScript
         documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = originalTableScriptHelper
+        cursorManager.CursorManager._set_selection = original_set_selection
 
     def script_moveToNextSibling(self, gesture, selfself):
         mode = getMode()
@@ -1561,6 +1600,22 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         message = messages[int(getConfig(option))]
         ui.message(message)
 
+    def script_goBack(self, gesture, selfself):
+        try:
+            sh = selectionHistory[selfself]
+        except KeyError:
+            self.endOfDocument(_("No cursor history available"))
+            return
+        try:
+            info = sh.goBack(selfself.selection)
+        except  IndexError:
+            self.endOfDocument(_("Cannot go back any more"))
+            return
+        expandInfo = info.copy()
+        expandInfo.expand(textInfos.UNIT_PARAGRAPH)
+        speech.speakTextInfo(expandInfo, unit=textInfos.UNIT_PARAGRAPH, reason=REASON_CARET)
+        original_set_selection(selfself, info)
+
     def injectBrowseModeKeystroke(self, keystrokes, funcName, script=None, doc=None):
         gp = self
         cls = browseMode.BrowseModeTreeInterceptor
@@ -1784,7 +1839,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "kb:NVDA+Control+/",
             "toggleSkipEmptyParagraphs",
             script=lambda selfself, gesture: self.script_toggleOption(
-                gesture, 
+                gesture,
                 selfself,
                 "skipEmptyParagraphs",
                 [
@@ -1797,7 +1852,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "kb:NVDA+/",
             "toggleSkipEmptyLines",
             script=lambda selfself, gesture: self.script_toggleOption(
-                gesture, 
+                gesture,
                 selfself,
                 "skipEmptyLines",
                 [
@@ -1806,3 +1861,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 ]
             ),
             doc="Toggle skipping over empty lines and lines matching skip regex")
+      # Go back in browse mode
+        self.injectBrowseModeKeystroke(
+            "kb:NVDA+Shift+LeftArrow",
+            "goBack",
+            script=lambda selfself, gesture: self.script_goBack(
+                gesture,
+                selfself,
+            ),
+            doc="Experimental: go back to the previous location of cursor in current document")
