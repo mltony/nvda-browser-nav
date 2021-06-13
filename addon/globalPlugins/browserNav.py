@@ -874,12 +874,24 @@ def preTableScriptHelper(self, *args, **kwargs):
     sonifyTextInfo(self.selection)
     return result
 
-selectionHistory = weakref.WeakKeyDictionary()
+selectionHistory = {}
+selectionHistoryLock = threading.Lock()
+def purgeSelectionHistory():
+    # Purge expired entries
+    global selectionHistory
+    selectionHistory = {
+        k:v
+        for k,v in selectionHistory.items()
+        if k() is not None
+    }
 def pre_set_selection(self, info):
-    if self not in selectionHistory:
-        selectionHistory[self] = SelectionHistory()
-    sh = selectionHistory[self]
-    sh.append(info)
+    key = weakref.ref(self)
+    with selectionHistoryLock:
+        purgeSelectionHistory()
+        if key not in selectionHistory:
+            selectionHistory[key] = SelectionHistory()
+        sh = selectionHistory[key]
+        sh.append(info)
     return original_set_selection(self, info)
 
 class SelectionHistory:
@@ -1606,7 +1618,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def script_goBack(self, gesture, selfself):
         try:
-            sh = selectionHistory[selfself]
+            key = weakref.ref(selfself)
+            with selectionHistoryLock:
+                sh = selectionHistory[key]
         except KeyError:
             self.endOfDocument(_("No cursor history available"))
             return
