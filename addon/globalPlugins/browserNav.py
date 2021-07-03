@@ -885,13 +885,12 @@ def purgeSelectionHistory():
         if k() is not None
     }
 def pre_set_selection(self, info):
-    key = weakref.ref(self)
-    with selectionHistoryLock:
-        purgeSelectionHistory()
-        if key not in selectionHistory:
-            selectionHistory[key] = SelectionHistory()
-        sh = selectionHistory[key]
-        sh.append(info)
+    try:
+        sh = self.selectionHistory
+    except AttributeError:
+        sh = SelectionHistory()
+        self.selectionHistory = sh
+    sh.append(info)
     return original_set_selection(self, info)
 
 class SelectionHistory:
@@ -1618,10 +1617,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def script_goBack(self, gesture, selfself):
         try:
-            key = weakref.ref(selfself)
-            with selectionHistoryLock:
-                sh = selectionHistory[key]
-        except KeyError:
+            sh = selfself.selectionHistory
+        except AttributeError:
             self.endOfDocument(_("No cursor history available"))
             return
         try:
