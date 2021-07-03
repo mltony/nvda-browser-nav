@@ -596,13 +596,8 @@ def getSimpleHorizontalOffset(textInfo):
 def getHorizontalOffset(textInfo):
     obj = textInfo.NVDAObjectAtStart
     x = obj.location[0]
-    for i in range(1000):
-        obj = obj.parent
-        if obj is None:
-            return x
-        if obj.role == controlTypes.ROLE_DOCUMENT:
-            return x - obj.location[0]
-    raise Exception('Infinitely many parents!')
+    return x
+
 
 def getFontSize(textInfo, formatting):
     try:
