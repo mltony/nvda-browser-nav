@@ -645,15 +645,12 @@ def sonifyTextInfo(textInfo, oldTextInfo=None, includeCrackle=False):
         return
     return sonifyTextInfoImpl(textInfo, oldTextInfo, includeCrackle)
 def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
-    #w = lambda: api.processPendingEvents(processEventQueue=False) or scriptHandler.isScriptWaiting()
     w = lambda: scriptHandler.isScriptWaiting()
     beepVolume=getConfig("beepVolume")
     if beepVolume > 0:
         if w():return
 
         global lastTone
-        #textInfo = textInfo.copy()
-        #textInfo.expand(textInfos.UNIT_PARAGRAPH)
         try:
             tone = getBeepTone(textInfo)
         except:
@@ -709,15 +706,6 @@ def adjustVolume(bb, volume):
     unpacked = [int(x * volume / 100) for x in unpacked]
     result=  struct.pack(format, *unpacked)
     return result
-    if False:
-        bb = list(bb)
-        for i in range(0, len(bb), 2):
-            x = bb[i] + (bb[i+1] << 8)
-            x = int(x * volume / 100)
-            bb[i] = x & 0xFF
-            x >>= 8
-            bb[i + 1] = x & 0xFF
-        return bytes(bb)
 
 spcFile=None
 spcPlayer=None
