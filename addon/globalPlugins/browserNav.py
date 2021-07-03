@@ -650,6 +650,8 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
             tone = getBeepTone(textInfo)
         except:
             return
+        tone = max(tone, 10)
+        tone = min(tone, 20000)
 
         if tone != lastTone:
             tones.beep(tone, 50, left=beepVolume, right=beepVolume)
