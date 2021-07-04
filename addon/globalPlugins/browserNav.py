@@ -310,10 +310,16 @@ kbdControlC = fromNameSmart("Control+c")
 kbdControlV = fromNameSmart("Control+v")
 kbdControlA = fromNameSmart("Control+a")
 kbdControlHome = fromNameSmart("Control+Home")
+kbdControlShiftHome = fromNameSmart("Control+Shift+Home")
 kbdControlShiftDown = fromNameSmart("Control+Shift+DownArrow")
+kbdShiftRight = fromNameSmart("Shift+RightArrow")
 kbdControlEnd = fromNameSmart("Control+End")
 kbdBackquote = fromNameSmart("`")
 kbdDelete = fromNameSmart("Delete")
+kbdLeft = fromNameSmart("LeftArrow")
+kbdRight = fromNameSmart("RightArrow")
+kbdUp = fromNameSmart("UpArrow")
+kbdDown = fromNameSmart("DownArrow")
 
 allModifiers = [
     winUser.VK_LCONTROL, winUser.VK_RCONTROL,
@@ -450,7 +456,7 @@ class Beeper:
         self.player.stop()
 
 class EditTextDialog(wx.Dialog):
-    def __init__(self, parent, text, onTextComplete):
+    def __init__(self, parent, text, cursorLine, cursorColumn, onTextComplete):
         self.tabValue = "    "
         # Translators: Title of calibration dialog
         title_string = _("Edit text")
@@ -467,6 +473,10 @@ class EditTextDialog(wx.Dialog):
         self.textCtrl.SetValue(text)
         self.SetFocus()
         self.Maximize(True)
+        pos = self.textCtrl.XYToPosition(cursorColumn, cursorLine)
+        self.textCtrl.SetInsertionPoint(pos)
+        # There seems to be a bug in wxPython textCtrl, when cursor is not set to the right line. To workaround calling it again in 1 ms.
+        core.callLater(1, self.textCtrl.SetInsertionPoint, pos)
 
     def onChar(self, event):
         control = event.ControlDown()
@@ -504,8 +514,12 @@ class EditTextDialog(wx.Dialog):
                 keystrokeName = "+".join(modifierTokens + ["Enter"])
                 self.keystroke = fromNameSmart(keystrokeName)
                 self.text = self.textCtrl.GetValue()
+                curPos = self.textCtrl.GetInsertionPoint()
+                xy = self.textCtrl.PositionToXY(curPos)
+                columnNum = xy[0]
+                lineNum = xy[1]
                 self.EndModal(wx.ID_OK)
-                wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, self.keystroke))
+                wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, lineNum, columnNum, self.keystroke))
         elif event.GetKeyCode() == wx.WXK_TAB:
             if alt or control:
                 event.Skip()
@@ -553,8 +567,12 @@ class EditTextDialog(wx.Dialog):
         keyCode = event.GetKeyCode()
         if keyCode == wx.WXK_ESCAPE:
             self.text = self.textCtrl.GetValue()
+            curPos = self.textCtrl.GetInsertionPoint()
+            xy = self.textCtrl.PositionToXY(curPos)
+            columnNum = xy[0]
+            lineNum = xy[1]
             self.EndModal(wx.ID_CANCEL)
-            wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, None))
+            wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, lineNum, columnNum, None))
         event.Skip()
 
 jupyterUpdateInProgress = False
@@ -892,7 +910,7 @@ class SelectionHistory:
         info.expand(textInfos.UNIT_PARAGRAPH)
         self.entries.append(info)
         self.ptr = len(self.entries)
-        
+
     def goBack(self, info):
         info = info.copy()
         info.expand(textInfos.UNIT_PARAGRAPH)
@@ -1377,32 +1395,21 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         uniqueID = obj.IA2UniqueID
         self.startInjectingKeystrokes()
         try:
+            kbdLeft.send()
+            kbdRight.send()
+            kbdControlShiftHome.send()
+            preText = self.getSelection()
+            kbdControlA.send()
+            text = self.getSelection()
             kbdControlHome.send()
-            kbdBackquote.send()
-            try:
-                kbdControlA.send()
-                text = self.getSelection()
-                if False:
-                    # This alternative method doesn't work for large cells: apparently the selection is just "-" if your cell is too large :(
-                    timeout = time.time() + 3
-                    while True:
-                        if time.time() > timeout:
-                            raise EditBoxUpdateError(_("Time out while waiting for selection to appear."))
-                        api.processPendingEvents(processEventQueue=False)
-                        textInfo = obj.makeTextInfo(textInfos.POSITION_SELECTION)
-                        text = textInfo.text
-                        if len(text) != 0:
-                            break
-                        time.sleep(10/1000)
-            finally:
-                kbdControlHome.send()
-                kbdDelete.send()
         finally:
             self.endInjectingKeystrokes()
-        if (len(text) == 0) or (text[0] != '`'):
-            ui.message("Failed to copy text from semi-accessible edit-box")
+        if (len(text) == 0) or len(preText) == 0:
+            ui.message("Failed to copy text from semi-accessible edit-box. Please make sure edit box is not empty.")
             return
-        text = text[1:]
+        preLines = preText.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        cursorLine = len(preLines) - 1
+        cursorColumn = len(preLines[-1])
         def getFocusObjectVerified():
                 focus = api.getFocusObject()
                 if focus.role != controlTypes.ROLE_EDITABLETEXT:
@@ -1412,7 +1419,32 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         raise EditBoxUpdateError(_("Browser state has changed. Different element on the page is now focused."))
                 return focus
 
-        def updateText(result, text, keystroke):
+        def makeVkInput(vkCodes):
+            result = []
+            if not isinstance(vkCodes, list):
+                vkCodes = [vkCodes]
+            for vk in vkCodes:
+                input = winUser.Input(type=winUser.INPUT_KEYBOARD)
+                input.ii.ki.wVk = vk
+                result.append(input)
+            for vk in reversed(vkCodes):
+                input = winUser.Input(type=winUser.INPUT_KEYBOARD)
+                input.ii.ki.wVk = vk
+                input.ii.ki.dwFlags = winUser.KEYEVENTF_KEYUP
+                result.append(input)
+            return result
+            
+        def goToPosition(lineNum, columnNum):
+            # This function is too slow for line numbers > 1000.
+            # This is probably due to slow performance of Python's marshalling complex arguments to native Windows DLL
+            # This is a good candidate to rewrite in a native code and supply in a tiny DLL file
+            inputs = []
+            inputs.extend(makeVkInput(winUser.VK_DOWN) * lineNum)
+            inputs.extend(makeVkInput(winUser.VK_RIGHT) * columnNum)
+            with keyboardHandler.ignoreInjection():
+                winUser.SendInput(inputs)
+
+        def updateText(result, text, cursorLine, cursorColumn, keystroke):
             global jupyterUpdateInProgress
             jupyterUpdateInProgress = True
             self.lastJupyterText = text
@@ -1472,32 +1504,33 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 self.startInjectingKeystrokes()
                 try:
                     self.copyToClip(text)
-                  # Step 3.1: Send Control+A and wait for the selection to appear
-                    kbdControlHome.send()
-                    # Sending backquote character to ensure that the edit box is not empty
-                    kbdBackquote.send()
+                    shortTextMode = len(text) >= 5
+                  # Step 3.1. Select all and paste
                     kbdControlA.send()
-                    while True:
-                        yield 1
-                        focus = getFocusObjectVerified()
-                        if time.time() > timeout:
-                            raise EditBoxUpdateError(_("Timed out during Control+A stage"))
-                        textInfo = focus.makeTextInfo(textInfos.POSITION_SELECTION)
-                        text = textInfo.text
-                        if len(text) > 0:
-                            break
-                  # Step 3.2 Send Control+V and wait for the selection to disappear
                     kbdControlV.send()
+                  # Step 3.2. Select first character and copy to clip and wait to assure that edit box has processed the previous paste
+                    if shortTextMode:
+                        kbdControlHome.send()
+                        kbdShiftRight.send()
+                        kbdControlC.send()
+                  # Step 3.3: Position cursor to synchronize with edit text window cursor
                     kbdControlHome.send()
-                    while True:
-                        yield 1
-                        focus = getFocusObjectVerified()
-                        if time.time() > timeout:
-                            raise EditBoxUpdateError(_("Timed out during Control+V stage"))
-                        textInfo = focus.makeTextInfo(textInfos.POSITION_SELECTION)
-                        text = textInfo.text
-                        if len(text) == 0:
-                            break
+                    goToPosition(cursorLine, cursorColumn)
+                  # Step 3.4: Wait for clipbord to be updated to make sure we can flush clipboard
+                    if shortTextMode:
+                        while True:
+                            yield 1
+                            if time.time() > timeout:
+                                raise EditBoxUpdateError(_("Timed out during single-character control+C stage"))
+                            try:
+                                newText = api.getClipData()
+                            except PermissionError:
+                                continue
+                            if text != newText:
+                                break
+                    else:
+                        # For very short texts just sleep a bit longer
+                        yield 100
                 finally:
                   # Step 3.3. Sleep for a bit more just to make sure things have propagated.
                   # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
@@ -1507,13 +1540,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
                     keystroke.send()
-              # Step 5 Send Control+Shift+Down, so that NVDA at least sees the first line of each edit box
-                # This is disabled, since selecting lines causes weird behavior in some edit boxes
-                #for i in range(5):
-                #    kbdControlShiftDown.send()
 
             except EditBoxUpdateError as e:
                 tones.player.stop()
+                unblockAllKeys()
                 jupyterUpdateInProgress = False
                 self.copyToClip(text)
                 message = ("BrowserNav failed to update edit box.")
@@ -1525,8 +1555,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 jupyterUpdateInProgress = False
 
         self.popupEditTextDialog(
-            text,
-            lambda result, text, keystroke: executeAsynchronously(updateText(result, text, keystroke))
+            text, cursorLine, cursorColumn,
+            lambda result, text, cursorLine, cursorColumn, keystroke: executeAsynchronously(updateText(result, text, cursorLine, cursorColumn, keystroke))
         )
 
     def script_copyJupyterText(self, gesture, selfself):
@@ -1589,9 +1619,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             wx.Yield()
             time.sleep(10/1000)
 
-    def popupEditTextDialog(self, text, onTextComplete):
+    def popupEditTextDialog(self, text, cursorLine, cursorColumn, onTextComplete):
         gui.mainFrame.prePopup()
-        d = EditTextDialog(gui.mainFrame, text, onTextComplete)
+        d = EditTextDialog(gui.mainFrame, text, cursorLine, cursorColumn, onTextComplete)
         result = d.Show()
         gui.mainFrame.postPopup()
 
