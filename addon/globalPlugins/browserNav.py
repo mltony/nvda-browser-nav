@@ -45,8 +45,9 @@ import wave
 import weakref
 import winUser
 import wx
+from wx.stc import StyledTextCtrl
 
-debug = False
+debug = True
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -454,7 +455,37 @@ class Beeper:
         return result
     def stop(self):
         self.player.stop()
-
+class GoToLineDialog(wx.Dialog):
+    def __init__(self, parent, lineNum):
+        # Translators: Title of Go To Line dialog
+        title_string = _("Go to line")
+        super(GoToLineDialog, self).__init__(parent, title=title_string)
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        sHelper = gui.guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+        #sHelper = gui.guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
+        self.lineNumEdit = gui.guiHelper.LabeledControlHelper(self, _("Go to line:"), wx.TextCtrl).control
+        self.lineNumEdit.Value = str(lineNum)
+        sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
+        self.Bind(wx.EVT_BUTTON, self.onOk, id=wx.ID_OK)
+        self.lineNumEdit.SetFocus()
+        self.lineNumEdit.SetSelection(-1,-1)
+        
+    def onOk(self, evt):
+        strVal = self.lineNumEdit.Value
+        try:
+            result = int(strVal)
+            if result <= 0:
+                raise ValueError()
+            self.result = result
+        except ValueError:
+            gui.messageBox(_("Line number must be a positive integer!"),
+                _("Wrong line number"),
+                style=wx.OK |  wx.CENTER | wx.ICON_ERROR
+            )
+            self.lineNumEdit.SetFocus()
+            self.lineNumEdit.SetSelection(-1,-1)
+            return
+        self.EndModal(wx.ID_OK)
 class EditTextDialog(wx.Dialog):
     def __init__(self, parent, text, cursorLine, cursorColumn, onTextComplete):
         self.tabValue = "    "
@@ -467,6 +498,9 @@ class EditTextDialog(wx.Dialog):
         sHelper = gui.guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
 
         self.textCtrl = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_DONTWRAP)
+        # We have to use plain text ctrl and implement some functionality.
+        # I wish I could use StyledTextCtrl, but as of July 2021 it doesn't appear to be accessible with NVDA, even though it is based on Scintilla.
+        #self.textCtrl = StyledTextCtrl(self, style=wx.TE_MULTILINE|wx.TE_DONTWRAP)
         self.textCtrl.Bind(wx.EVT_CHAR, self.onChar)
         self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
         sHelper.addItem(self.textCtrl)
@@ -477,12 +511,26 @@ class EditTextDialog(wx.Dialog):
         self.textCtrl.SetInsertionPoint(pos)
         # There seems to be a bug in wxPython textCtrl, when cursor is not set to the right line. To workaround calling it again in 1 ms.
         core.callLater(1, self.textCtrl.SetInsertionPoint, pos)
+        
+        
+    def onGoTo(self, event):
+        curPos = self.textCtrl.GetInsertionPoint()
+        dummy, columnNum, lineNum = self.textCtrl.PositionToXY(curPos)
+        d = GoToLineDialog(self, lineNum + 1)
+        result = d.ShowModal()
+        if result == wx.ID_OK:
+            lineNum = d.result - 1
+            pos = self.textCtrl.XYToPosition(0, lineNum)
+            self.textCtrl.SetInsertionPoint(pos)
+
+    
 
     def onChar(self, event):
         control = event.ControlDown()
         shift = event.ShiftDown()
         alt = event.AltDown()
-        keyCode = event.GetKeyCode()
+        keyCode = event.GetKeyCode ()
+        mylog(f"vk={keyCode} a{alt} c{control} s{shift}")
         if event.GetKeyCode() in [10, 13]:
             # 13 means Enter
             # 10 means Control+Enter
@@ -559,6 +607,12 @@ class EditTextDialog(wx.Dialog):
                 self.textCtrl.SetInsertionPoint(newPos)
             else:
                 event.Skip()
+        elif  event.GetKeyCode() == 7:
+            # Control+G
+            self.onGoTo(event)
+        elif  event.GetKeyCode() == 6:
+            # Control+F
+            tones.beep(500, 50)
         else:
             event.Skip()
 
