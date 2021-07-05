@@ -469,7 +469,7 @@ class GoToLineDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self.onOk, id=wx.ID_OK)
         self.lineNumEdit.SetFocus()
         self.lineNumEdit.SetSelection(-1,-1)
-        
+
     def onOk(self, evt):
         strVal = self.lineNumEdit.Value
         try:
@@ -486,6 +486,36 @@ class GoToLineDialog(wx.Dialog):
             self.lineNumEdit.SetSelection(-1,-1)
             return
         self.EndModal(wx.ID_OK)
+
+lastRegexSearch = ""
+class RegexSearchDialog(wx.Dialog):
+    def __init__(self, parent):
+        title_string = _("Regex search")
+        super(RegexSearchDialog, self).__init__(parent, title=title_string)
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        sHelper = gui.guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+        self.strEdit = gui.guiHelper.LabeledControlHelper(self, _("Go to line:"), wx.TextCtrl).control
+        self.strEdit.Value = lastRegexSearch
+        sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
+        self.Bind(wx.EVT_BUTTON, self.onOk, id=wx.ID_OK)
+        self.strEdit.SetFocus()
+
+    def onOk(self, evt):
+        strVal = self.strEdit.Value
+        try:
+            r = re.compile(strVal)
+        except re.error:
+            gui.messageBox(_("Invalid regular expression"),
+                _("Wrong regex"),
+                style=wx.OK |  wx.CENTER | wx.ICON_ERROR
+            )
+            self.strEdit.SetFocus()
+            return
+        self.EndModal(wx.ID_OK)
+        global lastRegexSearch
+        lastRegexSearch = strVal
+
+
 class EditTextDialog(wx.Dialog):
     def __init__(self, parent, text, cursorLine, cursorColumn, onTextComplete):
         self.tabValue = "    "
@@ -511,8 +541,8 @@ class EditTextDialog(wx.Dialog):
         self.textCtrl.SetInsertionPoint(pos)
         # There seems to be a bug in wxPython textCtrl, when cursor is not set to the right line. To workaround calling it again in 1 ms.
         core.callLater(1, self.textCtrl.SetInsertionPoint, pos)
-        
-        
+
+
     def onGoTo(self, event):
         curPos = self.textCtrl.GetInsertionPoint()
         dummy, columnNum, lineNum = self.textCtrl.PositionToXY(curPos)
@@ -523,7 +553,33 @@ class EditTextDialog(wx.Dialog):
             pos = self.textCtrl.XYToPosition(0, lineNum)
             self.textCtrl.SetInsertionPoint(pos)
 
-    
+    def onFind(self, event):
+        d = RegexSearchDialog(self)
+        result = d.ShowModal()
+        if result == wx.ID_OK:
+            self.doFind(1)
+
+    def doFind(self, direction):
+        cursorPos = self.textCtrl.GetInsertionPoint()
+        allText = self.textCtrl.GetRange(0, -1)
+        preText = self.textCtrl.GetRange( 0, cursorPos)
+        allText = allText.replace("\r\n", "\n").replace("\r", "\n")
+        preText = preText.replace("\r\n", "\n").replace("\r", "\n")
+        r = re.compile(lastRegexSearch, re.IGNORECASE)
+        matches = list(re.finditer(r, allText))
+        if direction > 0:
+            matches = [m for m in matches if m.start(0) > len(preText)]
+        else:
+            matches = [m for m in matches if m.end(0) <= len(preText)]
+        if len(matches) == 0:
+            endOfDocument(_("No match!"))
+            return
+        mindex = 0 if direction > 0 else -1
+        match = matches[mindex]
+        preMatch = allText[:match.start(0)]
+        preMatchLines = preMatch.split("\n")
+        pos = self.textCtrl.XYToPosition(len(preMatchLines[-1]), len(preMatchLines) - 1)
+        self.textCtrl.SetInsertionPoint(pos)
 
     def onChar(self, event):
         control = event.ControlDown()
@@ -612,7 +668,15 @@ class EditTextDialog(wx.Dialog):
             self.onGoTo(event)
         elif  event.GetKeyCode() == 6:
             # Control+F
-            tones.beep(500, 50)
+            self.onFind(event)
+        elif event.GetKeyCode() == 342:
+            # F3 or Shift+F3
+            if not alt and not control:
+                direction = 1 if not shift else -1
+                self.doFind(direction)                
+            else:
+                event.Skip()
+            
         else:
             event.Skip()
 
@@ -707,6 +771,13 @@ def getBeepTone(textInfo):
 lastTone = 0
 lastTextInfo = None
 beeper = Beeper()
+def endOfDocument(message):
+    volume = getConfig("noNextTextChimeVolume")
+    beeper.fancyBeep("HF", 100, volume, volume)
+    if getConfig("noNextTextMessage"):
+        ui.message(message)
+
+
 def sonifyTextInfo(textInfo, oldTextInfo=None, includeCrackle=False):
     if textInfo is None:
         return
@@ -1487,7 +1558,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 input.ii.ki.dwFlags = winUser.KEYEVENTF_KEYUP
                 result.append(input)
             return result
-            
+
         def goToPosition(lineNum, columnNum):
             # This function is too slow for line numbers > 1000.
             # This is probably due to slow performance of Python's marshalling complex arguments to native Windows DLL
