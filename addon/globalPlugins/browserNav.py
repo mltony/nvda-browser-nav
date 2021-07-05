@@ -580,6 +580,13 @@ class EditTextDialog(wx.Dialog):
         preMatchLines = preMatch.split("\n")
         pos = self.textCtrl.XYToPosition(len(preMatchLines[-1]), len(preMatchLines) - 1)
         self.textCtrl.SetInsertionPoint(pos)
+        
+    def reindent(self, string, direction):
+        if direction > 0:
+            return self.tabValue + string
+        if string.startswith(self.tabValue):
+            return string[len(self.tabValue):]
+        return string.lstrip(" ")
 
     def onChar(self, event):
         control = event.ControlDown()
@@ -627,20 +634,44 @@ class EditTextDialog(wx.Dialog):
         elif event.GetKeyCode() == wx.WXK_TAB:
             if alt or control:
                 event.Skip()
-            elif not shift:
-                # Just Tab
-                self.textCtrl.WriteText(self.tabValue)
             else:
-                # Shift+Tab
-                curPos = self.textCtrl.GetInsertionPoint()
-                lineNum = len(self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() ).split("\n")) - 1
-                priorText = self.textCtrl.GetRange( 0, self.textCtrl.GetInsertionPoint() )
-                text = self.textCtrl.GetValue()
-                postText = text[len(priorText):]
-                if priorText.endswith(self.tabValue):
-                    newText = priorText[:-len(self.tabValue)] + postText
-                    self.textCtrl.SetValue(newText)
-                    self.textCtrl.SetInsertionPoint(curPos - len(self.tabValue))
+                pos1, pos2 = self.textCtrl.GetSelection()
+                if pos1 == pos2 and not shift:
+                    self.textCtrl.WriteText(self.tabValue)
+                elif pos1 == pos2 and shift:
+                    # Shift+Tab
+                    curPos = self.textCtrl.GetInsertionPoint()
+                    dummy, curCol, curLine = self.textCtrl.PositionToXY(curPos)
+                    beginLinePos = self.textCtrl.XYToPosition(0, curLine)
+                    allText = self.textCtrl.Value
+                    allText = allText.replace("\r\n", "\n").replace("\r", "\n")
+                    allLines = allText.split("\n")
+                    lineStr = allLines[curLine]
+                    preLine = lineStr[:curCol]
+                    if preLine.endswith(self.tabValue):
+                        newCurCol = curCol - len(self.tabValue)
+                        lineStr = lineStr[:newCurCol] + lineStr[curCol:]
+                        allLines[curLine] = lineStr
+                        allText = "\n".join(allLines)
+                        self.textCtrl.Value = allText
+                        pos = self.textCtrl.XYToPosition(newCurCol, curLine)
+                        self.textCtrl.SetInsertionPoint(pos)
+                        
+                else:
+                    allText = self.textCtrl.Value
+                    allText = allText.replace("\r\n", "\n").replace("\r", "\n")
+                    allLines = allText.split("\n")
+                    dummy, col1, line1 = self.textCtrl.PositionToXY(pos1)
+                    dummy, col2, line2 = self.textCtrl.PositionToXY(pos2)
+                    if col2 == 0 and line2 > line1:
+                        line2 -= 1
+                    for index in range(line1, line2+1):
+                        allLines[index]  = self.reindent(allLines[index], -1 if  shift else 1)
+                    allText = "\n".join(allLines)
+                    self.textCtrl.Value = allText
+                    pos1 = self.textCtrl.XYToPosition(0, line1)
+                    pos2 = self.textCtrl.XYToPosition(0, line2 + 1)
+                    self.textCtrl.SetSelection(pos1, pos2)
         elif event.GetKeyCode() == 1:
             # Control+A
             self.textCtrl.SetSelection(-1,-1)
