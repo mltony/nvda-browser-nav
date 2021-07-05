@@ -20,6 +20,7 @@ import documentBase
 import functools
 import globalPluginHandler
 import gui
+from gui.settingsDialogs import SettingsPanel
 import inputCore
 import itertools
 import keyboardHandler
@@ -121,7 +122,7 @@ def setConfig(key, value):
 addonHandler.initTranslation()
 initConfiguration()
 
-class SettingsDialog(gui.SettingsDialog):
+class SettingsDialog(SettingsPanel):
     # Translators: Title for the settings dialog
     title = _("BrowserNav settings")
 
@@ -216,7 +217,7 @@ class SettingsDialog(gui.SettingsDialog):
         self.skipRegexEdit.Value = getConfig("skipRegex")
 
 
-    def onOk(self, evt):
+    def onSave(self):
         config.conf["browsernav"]["crackleVolume"] = self.crackleVolumeSlider.Value
         config.conf["browsernav"]["beepVolume"] = self.beepVolumeSlider.Value
         config.conf["browsernav"]["noNextTextChimeVolume"] = self.noNextTextChimeVolumeSlider.Value
@@ -580,7 +581,7 @@ class EditTextDialog(wx.Dialog):
         preMatchLines = preMatch.split("\n")
         pos = self.textCtrl.XYToPosition(len(preMatchLines[-1]), len(preMatchLines) - 1)
         self.textCtrl.SetInsertionPoint(pos)
-        
+
     def reindent(self, string, direction):
         if direction > 0:
             return self.tabValue + string
@@ -656,7 +657,7 @@ class EditTextDialog(wx.Dialog):
                         self.textCtrl.Value = allText
                         pos = self.textCtrl.XYToPosition(newCurCol, curLine)
                         self.textCtrl.SetInsertionPoint(pos)
-                        
+
                 else:
                     allText = self.textCtrl.Value
                     allText = allText.replace("\r\n", "\n").replace("\r", "\n")
@@ -704,10 +705,10 @@ class EditTextDialog(wx.Dialog):
             # F3 or Shift+F3
             if not alt and not control:
                 direction = 1 if not shift else -1
-                self.doFind(direction)                
+                self.doFind(direction)
             else:
                 event.Skip()
-            
+
         else:
             event.Skip()
 
@@ -1100,14 +1101,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 
     def createMenu(self):
-        def _popupMenu(evt):
-            gui.mainFrame._popupSettingsDialog(SettingsDialog)
-        self.prefsMenuItem  = gui.mainFrame.sysTrayIcon.preferencesMenu.Append(wx.ID_ANY, _("BrowserNav..."))
-        gui.mainFrame.sysTrayIcon.Bind(wx.EVT_MENU, _popupMenu, self.prefsMenuItem)
+        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(SettingsDialog)
 
     def terminate(self):
-        prefMenu = gui.mainFrame.sysTrayIcon.preferencesMenu
-        prefMenu.Remove(self.prefsMenuItem)
+        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(SettingsDialog)
         cursorManager.CursorManager._caretMovementScriptHelper = originalCaretMovementScriptHelper
         inputCore.InputManager.executeGesture = originalExecuteGesture
         browseMode.BrowseModeTreeInterceptor._quickNavScript = originalQuickNavScript
