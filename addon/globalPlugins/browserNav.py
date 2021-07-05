@@ -1170,7 +1170,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         mode = getMode()
         mode = (mode + 1) % len(BROWSE_MODES)
         setConfig("browserMode", mode)
-        ui.message("BrowserNav navigates by " + BROWSE_MODES[mode])
+        ui.message(_("BrowserNav navigates by ") + BROWSE_MODES[mode])
 
     def generateBrowseModeExtractors(self):
         mode = getConfig("browserMode")
@@ -1824,55 +1824,55 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:NVDA+Alt+DownArrow",
             "moveToNextSibling",
-            doc="Moves to next sibling in browser")
+            doc=_("Moves to next sibling in browser"))
         self.injectBrowseModeKeystroke(
             "kb:NVDA+Alt+UpArrow",
             "moveToPreviousSibling",
-            doc="Moves to previous sibling in browser")
+            doc=_("Moves to previous sibling in browser"))
         self.injectBrowseModeKeystroke(
             ["kb:NVDA+Alt+LeftArrow", "kb:NVDA+Alt+Home"],
             "moveToParent",
-            doc="Moves to next parent in browser")
+            doc=_("Moves to next parent in browser"))
         self.injectBrowseModeKeystroke(
             ["kb:NVDA+Control+Alt+LeftArrow", "kb:NVDA+Alt+End"],
             "moveToNextParent",
-            doc="Moves to next parent in browser")
+            doc=_("Moves to next parent in browser"))
         self.injectBrowseModeKeystroke(
             ["kb:NVDA+Alt+RightArrow", "kb:NVDA+Alt+PageDown"],
             "moveToChild",
-            doc="Moves to next child in browser")
+            doc=_("Moves to next child in browser"))
         self.injectBrowseModeKeystroke(
             ["kb:NVDA+Control+Alt+RightArrow", "kb:NVDA+Alt+PageUp"],
             "moveToPreviousChild",
-            doc="Moves to previous child in browser")
+            doc=_("Moves to previous child in browser"))
       #Rotor
         self.injectBrowseModeKeystroke(
             "kb:NVDA+O",
             "rotor",
-            doc="Adjusts BrowserNav rotor")
+            doc=_("Adjusts BrowserNav rotor"))
 
       # Marks
         self.injectBrowseModeKeystroke(
             "kb:j",
             "nextMark",
             script=lambda selfself, gesture: self.findMark(1, getConfig("marks"), "No next browser mark. To configure browser marks, go to BrowserNav settings.", selfself=selfself),
-            doc="Jump to next browser mark.")
+            doc=_("Jump to next browser mark."))
         self.injectBrowseModeKeystroke(
             "kb:Shift+j",
             "previousMark",
             script=lambda selfself, gesture: self.findMark(-1, getConfig("marks"), _("No previous browser mark. To configure browser marks, go to BrowserNav settings."), selfself=selfself),
-            doc="Jump to previous browser mark.")
+            doc=_("Jump to previous browser mark."))
         if False:
             self.injectBrowseModeKeystroke(
                 "",
                 "nextParagraph",
                 script=lambda selfself, gesture: self.script_moveByParagraph_forward(gesture),
-                doc="Jump to next paragraph")
+                doc=_("Jump to next paragraph"))
             self.injectBrowseModeKeystroke(
                 "",
                 "previousParagraph",
                 script=lambda selfself, gesture: self.script_moveByParagraph_back(gesture),
-                doc="Jump to previous paragraph")
+                doc=_("Jump to previous paragraph"))
       # Tabs
         # Example page with tabs:
         # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
@@ -1885,7 +1885,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 errorMessage=_("No next tab"),
                 newMethod=True,
             ),
-            doc="Jump to next tab")
+            doc=_("Jump to next tab"))
         self.injectBrowseModeKeystroke(
             "kb:Shift+Y",
             "previousTab",
@@ -1895,7 +1895,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 errorMessage=_("No previous tab"),
                 newMethod=True,
             ),
-            doc="Jump to previous tab")
+            doc=_("Jump to previous tab"))
 
       #Dialog
         dialogTypes = [controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
@@ -1906,7 +1906,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=1,
                 roles=dialogTypes,
                 errorMessage=_("No next dialog")),
-            doc="Jump to next dialog")
+            doc=_("Jump to next dialog"))
         self.injectBrowseModeKeystroke(
             "kb:Shift+P",
             "previousDialog",
@@ -1914,7 +1914,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=-1,
                 roles=dialogTypes,
                 errorMessage=_("No previous dialog")),
-            doc="Jump to previous dialog")
+            doc=_("Jump to previous dialog"))
       # Menus
         menuTypes = [
             controlTypes.ROLE_MENU,
@@ -1933,7 +1933,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=1,
                 roles=menuTypes,
                 errorMessage=_("No next menu")),
-            doc="Jump to next menu")
+            doc=_("Jump to next menu"))
         self.injectBrowseModeKeystroke(
             "kb:Shift+Z",
             "previousMenu",
@@ -1941,7 +1941,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=-1,
                 roles=menuTypes,
                 errorMessage=_("No previous menu")),
-            doc="Jump to previous menu")
+            doc=_("Jump to previous menu"))
 
       # Tree views, tool bars
         self.injectBrowseModeKeystroke(
@@ -1951,7 +1951,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=1,
                 roles=[controlTypes.ROLE_TREEVIEW],
                 errorMessage=_("No next tree view")),
-            doc="Jump to next tree view")
+            doc=_("Jump to next tree view"))
         self.injectBrowseModeKeystroke(
             "kb:Shift+0",
             "previousTreeView",
@@ -1959,7 +1959,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=-1,
                 roles=[controlTypes.ROLE_TREEVIEW],
                 errorMessage=_("No previous tree view")),
-            doc="Jump to previous tree view")
+            doc=_("Jump to previous tree view"))
         self.injectBrowseModeKeystroke(
             "kb:9",
             "nextToolBar",
@@ -1967,7 +1967,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=1,
                 role=controlTypes.ROLE_TOOLBAR,
                 errorMessage=_("No next tool bar")),
-            doc="Jump to next tool bar")
+            doc=_("Jump to next tool bar"))
         self.injectBrowseModeKeystroke(
             "kb:Shift+9",
             "previousToolBar",
@@ -1975,7 +1975,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 direction=-1,
                 role=controlTypes.ROLE_TOOLBAR,
                 errorMessage=_("No previous tool bar")),
-            doc="Jump to previous tool bar")
+            doc=_("Jump to previous tool bar"))
       #Format change
         self.injectBrowseModeKeystroke(
             "kb:`",
@@ -1984,7 +1984,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 selfself,
                 direction=1,
                 errorMessage=_("No next format change")),
-            doc="Jump to next format change")
+            doc=_("Jump to next format change"))
         self.injectBrowseModeKeystroke(
             "kb:Shift+`",
             "previousFormatChange",
@@ -1992,7 +1992,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 selfself,
                 direction=-1,
                 errorMessage=_("No previous format change")),
-            doc="Jump to previous format change")
+            doc=_("Jump to previous format change"))
       # Scroll all:
         self.injectBrowseModeKeystroke(
             "kb:\\",
@@ -2000,26 +2000,26 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             script=lambda selfself, gesture: self.scrollToAll(
                 direction=1,
                 message=_("Scrolling forward. This may load more elements on the page.")),
-            doc="Scroll to all possible elements forward")
+            doc=_("Scroll to all possible elements forward"))
         self.injectBrowseModeKeystroke(
             "kb:Shift+\\",
             "scrollAllBackward",
             script=lambda selfself, gesture: self.scrollToAll(
                 direction=-1,
                 message=_("Scrolling backward. This may load more elements on the page.")),
-            doc="Scroll to all possible elements backward")
+            doc=_("Scroll to all possible elements backward"))
 
       # Edit Jupyter
         self.injectBrowseModeKeystroke(
             "kb:NVDA+E",
             "editJupyter",
             script=lambda selfself, gesture: self.script_editJupyter(gesture, selfself),
-            doc="Edit semi-accessible edit box.")
+            doc=_("Edit semi-accessible edit box."))
         self.injectBrowseModeKeystroke(
             "kb:NVDA+Control+E",
             "copyJupyterText",
             script=lambda selfself, gesture: self.script_copyJupyterText(gesture, selfself),
-            doc="Copy the last text from semi-accessible edit box to clipboard.")
+            doc=_("Copy the last text from semi-accessible edit box to clipboard."))
       # Toggle skip mode
         self.injectBrowseModeKeystroke(
             "kb:NVDA+Control+/",
@@ -2033,7 +2033,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     _("Skipping over empty paragraphs and paragraphs matching skip regex "),
                 ]
             ),
-            doc="Toggle skipping over empty paragraphs and paragraphs matching skip regex")
+            doc=_("Toggle skipping over empty paragraphs and paragraphs matching skip regex"))
         self.injectBrowseModeKeystroke(
             "kb:NVDA+/",
             "toggleSkipEmptyLines",
@@ -2046,7 +2046,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     _("Skipping over empty lines and lines matching skip regex "),
                 ]
             ),
-            doc="Toggle skipping over empty lines and lines matching skip regex")
+            doc=_("Toggle skipping over empty lines and lines matching skip regex"))
       # Go back in browse mode
         self.injectBrowseModeKeystroke(
             "kb:NVDA+Shift+LeftArrow",
@@ -2055,4 +2055,4 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 gesture,
                 selfself,
             ),
-            doc="Experimental: go back to the previous location of cursor in current document")
+            doc=_("Experimental: go back to the previous location of cursor in current document"))
