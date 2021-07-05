@@ -47,7 +47,7 @@ import winUser
 import wx
 from wx.stc import StyledTextCtrl
 
-debug = True
+debug = False
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
