@@ -5,9 +5,10 @@
 
 import  dataclasses
 from enum import Enum
+import globalVars
 import gui
 from gui.settingsDialogs import SettingsPanel
-import pathlib
+import os
 import wx
 
 class RuleCategory(Enum):
@@ -43,9 +44,9 @@ class PatternMatch(Enum):
     REGEX = 3
 
 patterMatchNames = {
-    PatternMatch.EXACT: _('Exact paragraph match')
-    PatternMatch.SUBSTRING: _('Substring paragraph match')
-    PatternMatch.REGEX: _('Regex paragraph match')
+    PatternMatch.EXACT: _('Exact paragraph match'),
+    PatternMatch.SUBSTRING: _('Substring paragraph match'),
+    PatternMatch.REGEX: _('Regex paragraph match'),
 }
 
 @dataclasses.dataclass
@@ -56,7 +57,7 @@ class Rule:
     domain: str
     urlMatch: URLMatch
     pattern: str
-    patternMatch: PatterMatch
+    patternMatch: PatternMatch
 
     def postLoad(self):
         self.category = RuleCategory(self.category)
@@ -64,7 +65,7 @@ class Rule:
         self.patternMatch = PatternMatch(self.patternMatch)
         return self
 
-    getDisplayName(self):
+    def getDisplayName(self):
         if self.name is not None and len(self.name) > 0:
             return self.name
         return self.pattern
@@ -73,10 +74,10 @@ rules = []
 rulesFileName = os.path.join(globalVars.appArgs.configPath, "browserNavRules.json")
 
 defaultRulesFileName = os.path.join(
-    pathlib.Path(__file__).parent.resolve(),
+    os.path.dirname(os.path.realpath(__file__)),
     "browserNavRules.json"
 )
-def loadRules
+def loadRules():
     global rules
     try:
         rulesConfig = open(rulesFileName, "r").read()

@@ -30,6 +30,7 @@ import nvwave
 import NVDAHelper
 import operator
 import os
+from . import quickSearch
 import re
 import scriptHandler
 from scriptHandler import script
@@ -627,9 +628,7 @@ class EditTextDialog(wx.Dialog):
                 self.keystroke = fromNameSmart(keystrokeName)
                 self.text = self.textCtrl.GetValue()
                 curPos = self.textCtrl.GetInsertionPoint()
-                xy = self.textCtrl.PositionToXY(curPos)
-                columnNum = xy[0]
-                lineNum = xy[1]
+                dummy, columnNum, lineNum = self.textCtrl.PositionToXY(curPos)
                 self.EndModal(wx.ID_OK)
                 wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, lineNum, columnNum, self.keystroke))
         elif event.GetKeyCode() == wx.WXK_TAB:
@@ -718,9 +717,7 @@ class EditTextDialog(wx.Dialog):
         if keyCode == wx.WXK_ESCAPE:
             self.text = self.textCtrl.GetValue()
             curPos = self.textCtrl.GetInsertionPoint()
-            xy = self.textCtrl.PositionToXY(curPos)
-            columnNum = xy[0]
-            lineNum = xy[1]
+            dummy, columnNum, lineNum = self.textCtrl.PositionToXY(curPos)
             self.EndModal(wx.ID_CANCEL)
             wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, lineNum, columnNum, None))
         event.Skip()
@@ -1102,9 +1099,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def createMenu(self):
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(SettingsDialog)
+        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(quickSearch.SettingsDialog)
 
     def terminate(self):
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(SettingsDialog)
+        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(quickSearch.SettingsDialog)
         cursorManager.CursorManager._caretMovementScriptHelper = originalCaretMovementScriptHelper
         inputCore.InputManager.executeGesture = originalExecuteGesture
         browseMode.BrowseModeTreeInterceptor._quickNavScript = originalQuickNavScript
@@ -1591,6 +1590,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             # This function is too slow for line numbers > 1000.
             # This is probably due to slow performance of Python's marshalling complex arguments to native Windows DLL
             # This is a good candidate to rewrite in a native code and supply in a tiny DLL file
+            mylog(f"Pressing arrows to go to line={lineNum}, col={columnNum}")
             inputs = []
             inputs.extend(makeVkInput(winUser.VK_DOWN) * lineNum)
             inputs.extend(makeVkInput(winUser.VK_RIGHT) * columnNum)
