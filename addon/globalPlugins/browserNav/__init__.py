@@ -49,7 +49,7 @@ import winUser
 import wx
 from wx.stc import StyledTextCtrl
 
-debug = False
+debug = True
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -528,7 +528,9 @@ class EditTextDialog(wx.Dialog):
         # Translators: Title of calibration dialog
         title_string = _("Edit text")
         super(EditTextDialog, self).__init__(parent, title=title_string)
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
         self.text = text
+        self.originalText = text
         self.onTextComplete = onTextComplete
         mainSizer = wx.BoxSizer(wx.VERTICAL)
         sHelper = gui.guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
@@ -634,7 +636,8 @@ class EditTextDialog(wx.Dialog):
                 curPos = self.textCtrl.GetInsertionPoint()
                 dummy, columnNum, lineNum = self.textCtrl.PositionToXY(curPos)
                 self.EndModal(wx.ID_OK)
-                wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, lineNum, columnNum, self.keystroke))
+                hasChanged = self.text != self.originalText
+                wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, hasChanged, lineNum, columnNum, self.keystroke))
         elif event.GetKeyCode() == wx.WXK_TAB:
             if alt or control:
                 event.Skip()
@@ -723,7 +726,11 @@ class EditTextDialog(wx.Dialog):
             curPos = self.textCtrl.GetInsertionPoint()
             dummy, columnNum, lineNum = self.textCtrl.PositionToXY(curPos)
             self.EndModal(wx.ID_CANCEL)
-            wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, lineNum, columnNum, None))
+            hasChanged = self.text != self.originalText
+            import globalVars
+            globalVars.s1 = self.originalText
+            globalVars.s2 = self.text
+            wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, hasChanged, lineNum, columnNum, None))
         event.Skip()
 
 jupyterUpdateInProgress = False
@@ -1609,7 +1616,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             with keyboardHandler.ignoreInjection():
                 winUser.SendInput(inputs)
 
-        def updateText(result, text, cursorLine, cursorColumn, keystroke):
+        def updateText(result, text, hasChanged, cursorLine, cursorColumn, keystroke):
+            mylog(f"hasChanged={hasChanged}")
             global jupyterUpdateInProgress
             jupyterUpdateInProgress = True
             self.lastJupyterText = text
@@ -1668,13 +1676,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
               # Step 3: start sending keys
                 self.startInjectingKeystrokes()
                 try:
-                    self.copyToClip(text)
-                    shortTextMode = len(text) >= 5
+                    shortTextMode = len(text) < 5
                   # Step 3.1. Select all and paste
-                    kbdControlA.send()
-                    kbdControlV.send()
+                    if hasChanged:
+                        self.copyToClip(text)
+                        kbdControlA.send()
+                        kbdControlV.send()
                   # Step 3.2. Select first character and copy to clip and wait to assure that edit box has processed the previous paste
-                    if shortTextMode:
+                    if  hasChanged and not shortTextMode:
                         kbdControlHome.send()
                         kbdShiftRight.send()
                         kbdControlC.send()
@@ -1682,7 +1691,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     kbdControlHome.send()
                     goToPosition(cursorLine, cursorColumn)
                   # Step 3.4: Wait for clipbord to be updated to make sure we can flush clipboard
-                    if shortTextMode:
+                    if  hasChanged and not shortTextMode:
                         while True:
                             yield 1
                             if time.time() > timeout:
@@ -1697,11 +1706,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         # For very short texts just sleep a bit longer
                         yield 100
                 finally:
-                  # Step 3.3. Sleep for a bit more just to make sure things have propagated.
+                  # Step 3.3. Sleep for a bit more just to make sure things have propagated - in short text mode only.
                   # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
                   # or it will paste the original contents of clipboard.
-                    yield 200
-                    self.endInjectingKeystrokes()
+                    if  hasChanged and shortTextMode:
+                        core.callLater(
+                            500,
+                            self.endInjectingKeystrokes
+                        )
+                    else:
+                        self.endInjectingKeystrokes()
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
                     keystroke.send()
@@ -1721,7 +1735,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
         self.popupEditTextDialog(
             text, cursorLine, cursorColumn,
-            lambda result, text, cursorLine, cursorColumn, keystroke: executeAsynchronously(updateText(result, text, cursorLine, cursorColumn, keystroke))
+            lambda result, text, hasChanged, cursorLine, cursorColumn, keystroke: executeAsynchronously(updateText(result, text, hasChanged, cursorLine, cursorColumn, keystroke))
         )
 
     def script_copyJupyterText(self, gesture, selfself):
