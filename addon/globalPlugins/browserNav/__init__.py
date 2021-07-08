@@ -353,6 +353,10 @@ def executeAsynchronously(gen):
     else:
         wx.CallLater(value, l)
 
+class NoSelectionError(Exception):
+    def __init__(self, *args, **kwargs):
+        super(NoSelectionError, self).__init__(*args, **kwargs)
+
 class EditBoxUpdateError(Exception):
     def __init__(self, *args, **kwargs):
         super(EditBoxUpdateError, self).__init__(*args, **kwargs)
@@ -1554,6 +1558,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             kbdControlA.send()
             text = self.getSelection()
             kbdControlHome.send()
+        except NoSelectionError as e:
+            self.endInjectingKeystrokes()
+            core.callLater(
+                100,
+                speech.speak,
+                [_("Cannot copy text out of edit box. Please make sure edit box is not empty!")],
+            )
+            raise e
         finally:
             self.endInjectingKeystrokes()
         if (len(text) == 0) or len(preText) == 0:
@@ -1761,7 +1773,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 lastControlCTimestamp = time.time()
                 kbdControlC.send()
             if time.time() > timeout:
-                raise Exception("Time out while trying to copy data out of application.")
+                raise NoSelectionError("Time out while trying to copy data out of application.")
 
             try:
                 data = api.getClipData()
