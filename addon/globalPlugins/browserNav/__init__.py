@@ -873,7 +873,7 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
         beeper.simpleCrackle(paragraphs, volume=getConfig("crackleVolume"), initialDelay=initialDelay)
 
 def getSoundsPath():
-    globalPluginPath = os.path.abspath(os.path.dirname(__file__))
+    globalPluginPath = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
     addonPath = os.path.split(globalPluginPath)[0]
     soundsPath = os.path.join(addonPath, "sounds")
     return soundsPath
