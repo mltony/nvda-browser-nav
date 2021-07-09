@@ -17,6 +17,7 @@ import core
 import ctypes
 import cursorManager
 import documentBase
+import editableText
 import functools
 import globalPluginHandler
 import gui
@@ -1106,6 +1107,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = preTableScriptHelper
         original_set_selection = cursorManager.CursorManager._set_selection
         cursorManager.CursorManager._set_selection = pre_set_selection
+        editableText.EditableText.script_editInBrowserNav = lambda selfself, gesture: self.script_editJupyter(gesture, selfself)
+        editableText.EditableText._EditableText__gestures['kb:NVDA+E'] = 'editInBrowserNav'
 
 
     def createMenu(self):
@@ -1534,7 +1537,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             self.beeper.fancyBeep("AF#", length=100, left=20, right=20)
             return
         fg=winUser.getForegroundWindow()
-        if not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
+        if isinstance(selfself, editableText.EditableText):
+            obj = selfself
+        elif not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
             selfself._focusLastFocusableObject()
             try:
                 obj = selfself._lastFocusableObj
