@@ -233,7 +233,6 @@ class SettingsDialog(SettingsPanel):
         config.conf["browsernav"]["skipEmptyLines"] = self.skipEmptyLinesCheckbox.Value
         config.conf["browsernav"]["skipChimeVolume"] = self.skipChimeVolumeSlider.Value
         config.conf["browsernav"]["skipRegex"] = self.skipRegexEdit.Value
-        super(SettingsDialog, self).onOk(evt)
 
 
 def getMode():
