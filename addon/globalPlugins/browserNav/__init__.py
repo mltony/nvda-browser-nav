@@ -1751,7 +1751,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def startInjectingKeystrokes(self):
         self.restoreKeyboardState()
-        self.clipboardBackup = api.getClipData()
+        try:
+            self.clipboardBackup = api.getClipData()
+        except OSError as e:
+            core.callLater(
+                100,
+                speech.speak,
+                [_("Failed to read clipboard data. Please make sure clipboard is not empty - copy some text to clipboard.")],
+            )
+            raise e
 
     def endInjectingKeystrokes(self):
         self.copyToClip(self.clipboardBackup)
