@@ -50,7 +50,7 @@ import winUser
 import wx
 from wx.stc import StyledTextCtrl
 
-debug = True
+debug = False
 if debug:
     f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
 def mylog(s):
@@ -1574,7 +1574,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             core.callLater(
                 100,
                 speech.speak,
-                [_("Cannot copy text out of edit box. Please make sure edit box is not empty!")],
+                [_("Cannot copy text out of edit box. Please make sure edit box is not empty and not read-only!")],
             )
             raise e
         finally:
