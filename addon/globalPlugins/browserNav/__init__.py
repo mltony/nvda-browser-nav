@@ -11,6 +11,7 @@
 import addonHandler
 import api
 import browseMode
+from contextlib import ExitStack
 import controlTypes
 import config
 import core
@@ -1539,6 +1540,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if isinstance(selfself, editableText.EditableText):
             obj = selfself
         elif not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
+            # We need to temporarily disable NVDA setting "Browse Mode > Automatic focus mode for focus changes"
+            # Since we are going to focus current editable and don't want to enter focus mode.
+            originalAutoPassThrough = config.conf["virtualBuffers"]["autoPassThroughOnFocusChange"]
+            config.conf["virtualBuffers"]["autoPassThroughOnFocusChange"] = False
+            with ExitStack() as stack:
+                # return original value upon exiting this function
+                def restoreAutoPassThrough():
+                    config.conf["virtualBuffers"]["autoPassThroughOnFocusChange"] =             originalAutoPassThrough
+                stack.callback(restoreAutoPassThrough)
+            
             selfself._focusLastFocusableObject()
             try:
                 obj = selfself._lastFocusableObj
