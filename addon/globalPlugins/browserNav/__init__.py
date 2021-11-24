@@ -32,12 +32,12 @@ import nvwave
 import NVDAHelper
 import operator
 import os
-from . import quickSearch
 import re
 import scriptHandler
 from scriptHandler import script
 import speech
 import struct
+import sys
 import textInfos
 import threading
 import time
@@ -51,9 +51,12 @@ import winUser
 import wx
 from wx.stc import StyledTextCtrl
 
+from . import quickJump
+
+
 debug = False
 if debug:
-    f = open("C:\\Users\\tony\\Dropbox\\2.txt", "w")
+    f = open("C:\\Users\\tmal\\drp\\2.txt", "w")
 def mylog(s):
     if debug:
         print(str(s), file=f)
@@ -1113,11 +1116,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def createMenu(self):
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(SettingsDialog)
-        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(quickSearch.SettingsDialog)
+        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(quickJump.SettingsDialog)
 
     def terminate(self):
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(SettingsDialog)
-        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(quickSearch.SettingsDialog)
+        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(quickJump.SettingsDialog)
         cursorManager.CursorManager._caretMovementScriptHelper = originalCaretMovementScriptHelper
         inputCore.InputManager.executeGesture = originalExecuteGesture
         browseMode.BrowseModeTreeInterceptor._quickNavScript = originalQuickNavScript

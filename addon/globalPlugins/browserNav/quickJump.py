@@ -3,15 +3,32 @@
 #This file is covered by the GNU General Public License.
 #See the file LICENSE  for more details.
 
-import  dataclasses
+import api
+import copy
+import dataclasses
+from dataclasses import dataclass
+#from dataclasses_json import dataclass_json
 from enum import Enum
 import globalVars
 import gui
 from gui import guiHelper, nvdaControls
 from gui.settingsDialogs import SettingsPanel
+import json
 import os
+import re
+from typing import List
 import wx
 
+debug = True
+if debug:
+    f = open("C:\\Users\\tony\\drp\\2.txt", "w")
+    def mylog(s):
+        if debug:
+            print(str(s), file=f)
+            f.flush()
+else:
+    def mylog(s):
+        pass
 class RuleCategory(Enum):
     UNKNOWN = 0
     SEARCH = 1
@@ -31,7 +48,7 @@ class URLMatch(Enum):
     REGEX = 5
 
 urlMatchNames = {
-    URLMatch.IGNORE: _('Ignore'),
+    URLMatch.IGNORE: _('Match all sites (domain field ignored) '),
     URLMatch.DOMAIN: _('Match domain name'),
     URLMatch.SUBDOMAIN: _('Match domain and its subdomains'),
     URLMatch.SUBSTRING: _('Match substring in URL'),
@@ -50,13 +67,34 @@ patterMatchNames = {
     PatternMatch.REGEX: _('Regex paragraph match'),
 }
 
-@dataclasses.dataclass
-class Rule:
+@dataclass
+class QJSite:
+    domain: str
+    urlMatch: URLMatch
+    name: str
+    def asDict(self):
+        return {
+            'domain': self.domain,  
+            'urlMatch': self.urlMatch.value,
+            'name': self.name,
+        }
+        
+
+    def postLoad(self):
+        self.urlMatch = URLMatch(self.urlMatch)
+        return self
+
+    def getDisplayName(self):
+        if self.name is not None and len(self.name) > 0:
+            return self.name
+        return self.domain
+
+
+@dataclass
+class QJRule:
     enabled: bool
     category: RuleCategory
     name: str
-    domain: str
-    urlMatch: URLMatch
     pattern: str
     patternMatch: PatternMatch
 
@@ -71,35 +109,62 @@ class Rule:
             return self.name
         return self.pattern
 
-rules = []
-rulesFileName = os.path.join(globalVars.appArgs.configPath, "browserNavRules.json")
+@dataclass
+class QJConfig:
+    sites: List[QJSite]
+    rules: List[QJRule]
 
+    def __init__(self, d):
+        self.sites = [
+            QJSite(**item).postLoad()
+            for item in d['sites']
+        ]
+        self.rules = [
+            QJRule(**item).postLoad()
+            for item in d['rules']
+        ]
+
+    def asDict(self):
+        return {
+            'sites': [
+                site.asDict()
+                for site in self.sites
+            ],
+            'rules': [
+                dataclasses.asdict(rule)
+                for rule in self.rules
+            ],
+        }
+
+rulesFileName = os.path.join(globalVars.appArgs.configPath, "browserNavRules.json")
 defaultRulesFileName = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
     "browserNavRules.json"
 )
-def loadRules():
-    global rules
+
+def loadConfig():
     try:
         rulesConfig = open(rulesFileName, "r").read()
+        mylog(rulesFileName)
     except FileNotFoundError:
         rulesConfig = open(defaultRulesFileName, "r").read()
-    rules = [
-        Rule(**rule).postLoad()
-        for rule in json.loads(rulesConfig)['rules']
-    ]
+        mylog(defaultRulesFileName)
+    return QJConfig(json.loads(rulesConfig))
 
-def saveRules(rules):
-    rulesDicts = [
-        dataclasses.asdict(rule)
-        for rule in rules
-    ]
-    rulesJson = json.dumps({'rules': rulesDicts}, indent=4, sort_keys=True)
+
+def saveConfig():
+    global config
+    configDict = config.asDict()
+    rulesJson = json.dumps(configDict, indent=4, sort_keys=True)
     rulesFile = open(rulesFileName, "w")
     try:
         rulesFile.write(rulesJson)
     finally:
         rulesFile.close()
+
+config  = loadConfig()
+api.q=config
+
 if False:
     from dataclasses import dataclass, asdict
     from enum import Enum
@@ -524,121 +589,214 @@ class RuleDialog(wx.Dialog):
         ct = self.getType()
         [control.Enable() for control in self.typeControls[ct]]
 
+class EditSiteDialog(wx.Dialog):
+
+    def __init__(self, parent, site=None, knownSites=None):
+        title=_("Edit audio rule")
+        super(EditSiteDialog,self).__init__(parent,title=title)
+        mainSizer=wx.BoxSizer(wx.VERTICAL)
+        sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+        if site is  not None:
+            self.site = site
+        else:
+            self.site = QJSite(
+                domain='',
+                name='',
+                urlMatch=URLMatch.SUBDOMAIN,
+            )
+        self.knownSites = knownSites
+
+      # Translators: domain
+        patternLabelText = _("&URL")
+        self.patternTextCtrl=sHelper.addLabeledControl(patternLabelText, wx.TextCtrl)
+        self.patternTextCtrl.SetValue(self.site.domain)
+      # Translators:  label for type selector radio buttons
+        typeText = _("&Match type")
+        typeChoices = [urlMatchNames[i] for i in URLMatch]
+        self.typeRadioBox=sHelper.addItem(wx.RadioBox(self,label=typeText, choices=typeChoices))
+        self.typeRadioBox.SetSelection(self.site.urlMatch.value)
+
+      # Translators: label for comment edit box
+        commentLabelText = _("&Display name")
+        self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
+        self.commentTextCtrl.SetValue(self.site.name)
+      #  OK/cancel buttons
+        sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
+
+        mainSizer.Add(sHelper.sizer,border=20,flag=wx.ALL)
+        mainSizer.Fit(self)
+        self.SetSizer(mainSizer)
+        self.patternTextCtrl.SetFocus()
+        self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
+
+    def make(self):
+        urlMatch = URLMatch(self.typeRadioBox.GetSelection())
+        domain = self.patternTextCtrl.Value
+        errorMsg = None
+        if urlMatch == URLMatch.IGNORE:
+            if len(domain) > 0:
+                errorMsg = _("You must specify blank domain in order to match all sites.")
+        elif urlMatch in [URLMatch.DOMAIN, URLMatch.SUBDOMAIN]:
+            m = re.match(r'[\w.-]+(:\d+)?', domain)
+            if not m:
+                errorMsg = _("Wrong domain format. An example is: en.wikipedia.com ")
+        elif urlMatch == URLMatch.REGEX:
+            try:
+                re.compile(domain)
+            except re.error:
+                errorMsg = _("Failed to compile regular expression!")
+
+        if errorMsg is None and self.knownSites is not None:
+            for other in self.knownSites:
+                if (
+                    domain == other.domain
+                    and urlMatch == other.urlMatch
+                ):
+                    errorMsg = (
+                        _("This site is a duplicate of another existing site %s")
+                        % other.getDisplayName()
+                    )
+        if errorMsg is not None:
+            # Translators: This is an error message to let the user know that the pattern field is not valid.
+            gui.messageBox(errorMsg, _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
+            self.patternTextCtrl.SetFocus()
+            return
+        site = QJSite(
+            domain=domain,
+            urlMatch=urlMatch,
+            name=self.commentTextCtrl.Value,
+        )
+        return site
+
+
+
+    def onOk(self,evt):
+        site = self.make()
+        if site is not None:
+            self.site = site
+            evt.Skip()
+
+
 class SettingsDialog(SettingsPanel):
     title = _("BrowserNav QuickSearch and AutoSkip rules")
 
     def __init__(self, *args, **kwargs):
-        self.rules = rules[:]
         super(SettingsDialog, self).__init__(*args, **kwargs)
-        self.refresh()
-
 
     def makeSettings(self, settingsSizer):
+        global config
+        self.config = copy.deepcopy(config)
+
         sHelper = gui.guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
-      # Rules table
-        rulesText = _("&Rules")
-        self.rulesList = sHelper.addLabeledControl(
-            rulesText,
+      # Sites table
+        sitesText = _("&Sites")
+        self.sitesList = sHelper.addLabeledControl(
+            sitesText,
             nvdaControls.AutoWidthColumnListCtrl,
             autoSizeColumn=2,
             itemTextCallable=self.getItemTextForList,
             style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.LC_VIRTUAL
         )
 
-        self.rulesList.InsertColumn(0, _("Pattern"), width=self.scaleSize(150))
-        self.rulesList.InsertColumn(1, _("Status"))
-        self.rulesList.InsertColumn(2, _("Type"))
-        self.rulesList.InsertColumn(3, _("Domain"))
-        self.rulesList.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.onListItemFocused)
-        self.rulesList.ItemCount = len(self.rules)
-      # Buttons
+        self.sitesList.InsertColumn(0, _("Name"), width=self.scaleSize(150))
+        self.sitesList.InsertColumn(1, _("Domain"))
+        self.sitesList.InsertColumn(2, _("Type"))
+        self.sitesList.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.onListItemFocused)
+        self.sitesList.ItemCount = len(self.config.sites)
+        
         bHelper = sHelper.addItem(guiHelper.ButtonHelper(orientation=wx.HORIZONTAL))
-        self.toggleButton = bHelper.addButton(self, label=_("Toggle"))
-        self.toggleButton.Bind(wx.EVT_BUTTON, self.onToggleClick)
-        self.addAudioButton = bHelper.addButton(self, label=_("&Add"))
-        self.addAudioButton.Bind(wx.EVT_BUTTON, self.OnAddClick)
+      # Buttons
+        self.addButton = bHelper.addButton(self, label=_("&Add"))
+        self.addButton.Bind(wx.EVT_BUTTON, self.OnAddClick)
         self.editButton = bHelper.addButton(self, label=_("&Edit"))
         self.editButton.Bind(wx.EVT_BUTTON, self.OnEditClick)
         self.removeButton = bHelper.addButton(self, label=_("&Remove rule"))
         self.removeButton.Bind(wx.EVT_BUTTON, self.OnRemoveClick)
+        self.moveUpButton = bHelper.addButton(self, label=_("Move &up"))
+        self.moveUpButton.Bind(wx.EVT_BUTTON, lambda evt: self.OnMoveClick(evt, -1))
+        self.moveDownButton = bHelper.addButton(self, label=_("Move &down"))
+        self.moveDownButton.Bind(wx.EVT_BUTTON, lambda evt: self.OnMoveClick(evt, 1))
+        self.sortButton = bHelper.addButton(self, label=_("&Sort"))
+        self.sortButton.Bind(wx.EVT_BUTTON, self.OnSortClick)
 
     def postInit(self):
-        self.rulesList.SetFocus()
+        self.sitesList.SetFocus()
 
     def getItemTextForList(self, item, column):
-        rule = self.displayedRules[item]
+        site = self.config.sites[item]
         if column == 0:
-            return rule.getDisplayName()
-        elif column == 1:
-            return _("Enabled") if rule.enabled else _("Disabled")
+            return site.getDisplayName()
         elif column == 2:
-            return ruleCategoryNames[rule.category]
-        elif column == 3:
-            return rule.domain
+            return urlMatchNames[site.urlMatch]
+        elif column == 1:
+            return site.domain
         else:
             raise ValueError("Unknown column: %d" % column)
 
     def onListItemFocused(self, evt):
-        if self.rulesList.GetSelectedItemCount()!=1:
+        if self.sitesList.GetSelectedItemCount()!=1:
             return
-        index=self.rulesList.GetFirstSelected()
-        rule = self.displayedRules[index]
-        if rule.enabled:
-            self.toggleButton.SetLabel(_("Disable (&toggle)"))
-        else:
-            self.toggleButton.SetLabel(_("Enable (&toggle)"))
-
-    def onToggleClick(self,evt):
-        if self.rulesList.GetSelectedItemCount()!=1:
-            return
-        index=self.rulesList.GetFirstSelected()
-        self.rules[index].enabled = not self.rules[index].enabled
-        if self.rules[index].enabled:
-            msg = _("Rule enabled")
-        else:
-            msg = _("Rule disabled")
-        core.callLater(100, lambda: ui.message(msg))
-        self.onListItemFocused(None)
+        index=self.sitesList.GetFirstSelected()
+        site = self.config.sites[index]
 
     def OnAddClick(self,evt):
-        entryDialog=AudioRuleDialog(self,title=_("Add audio rule"))
+        entryDialog=EditSiteDialog(self, knownSites=self.config.sites)
         if entryDialog.ShowModal()==wx.ID_OK:
-            self.rules.append(entryDialog.rule)
-            self.rulesList.ItemCount = len(self.rules)
-            index = self.rulesList.ItemCount - 1
-            self.rulesList.Select(index)
-            self.rulesList.Focus(index)
+            self.config.sites.append(entryDialog.site)
+            self.sitesList.ItemCount = len(self.config.sites)
+            index = self.sitesList.ItemCount - 1
+            self.sitesList.Select(index)
+            self.sitesList.Focus(index)
             # We don't get a new focus event with the new index.
-            self.rulesList.sendListItemFocusedEvent(index)
-            self.rulesList.SetFocus()
+            self.sitesList.sendListItemFocusedEvent(index)
+            self.sitesList.SetFocus()
             entryDialog.Destroy()
 
     def OnEditClick(self,evt):
-        if self.rulesList.GetSelectedItemCount()!=1:
+        if self.sitesList.GetSelectedItemCount()!=1:
             return
-        editIndex=self.rulesList.GetFirstSelected()
+        editIndex=self.sitesList.GetFirstSelected()
         if editIndex<0:
             return
-        entryDialog=AudioRuleDialog(self)
-        entryDialog.editRule(self.rules[editIndex])
+        entryDialog=EditSiteDialog(
+            self,
+            site=self.config.sites[editIndex],
+            knownSites=self.config.sites
+        )
         if entryDialog.ShowModal()==wx.ID_OK:
-            self.rules[editIndex] = entryDialog.rule
-            self.rulesList.SetFocus()
+            self.config.sites[editIndex] = entryDialog.site
+            self.sitesList.SetFocus()
         entryDialog.Destroy()
-    
+
     def OnRemoveClick(self,evt):
-        index=self.rulesList.GetFirstSelected()
+        index=self.sitesList.GetFirstSelected()
         while index>=0:
-            self.rulesList.DeleteItem(index)
-            del self.rules[index]
-            index=self.rulesList.GetNextSelected(index)
-        self.rulesList.SetFocus()
-
-    def refresh(self):
-        self.displayedRules = self.rules[:]
-
+            self.sitesList.DeleteItem(index)
+            del self.config.sites[index]
+            index=self.sitesList.GetNextSelected(index)
+        self.sitesList.SetFocus()
+        
+    def OnMoveClick(self,evt, increment):
+        if self.sitesList.GetSelectedItemCount()!=1:
+            return
+        index=self.sitesList.GetFirstSelected()
+        if index<0:
+            return
+        newIndex = index + increment
+        if 0 <= newIndex < len(self.config.sites):
+            # Swap
+            tmp = self.config.sites[index]
+            self.config.sites[index] = self.config.sites[newIndex]
+            self.config.sites[newIndex] = tmp
+            self.sitesList.Select(newIndex)
+            self.sitesList.Focus(newIndex)
+        else:
+            return
+        
+    def OnSortClick(self,evt):
+        self.config.sites.sort(key=QJSite.getDisplayName)
 
     def onSave(self):
-        pass
-
-
+        global config
+        config = self.config
+        saveConfig()
