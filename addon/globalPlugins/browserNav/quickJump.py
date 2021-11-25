@@ -9,6 +9,7 @@ import dataclasses
 from dataclasses import dataclass
 #from dataclasses_json import dataclass_json
 from enum import Enum
+import functools
 import globalVars
 import gui
 from gui import guiHelper, nvdaControls
@@ -16,6 +17,7 @@ from gui.settingsDialogs import SettingsPanel
 import json
 import os
 import re
+import tones
 from typing import List
 import wx
 
@@ -56,6 +58,19 @@ urlMatchNames = {
     URLMatch.REGEX: _('Regex match of URL'),
 }
 
+class FocusMode(Enum):
+    UNCHANGED = 0
+    DONT_ENTER_FORM_MODE = 1
+    DISABLE_FOCUS = 2
+
+focusModeNames = {
+    FocusMode.UNCHANGED: _('Keep default NVDA focus behavior'),
+    FocusMode.DONT_ENTER_FORM_MODE: _('React to focus event, but prevent entering focus mode'),
+    FocusMode.DISABLE_FOCUS: _('Ignore all focus events - good for websites that misuse focus events'),
+}
+
+
+
 class PatternMatch(Enum):
     EXACT = 1
     SUBSTRING = 2
@@ -72,13 +87,21 @@ class QJSite:
     domain: str
     urlMatch: URLMatch
     name: str
+    focusMode: FocusMode
+    def __init__(self, d):
+        self.domain = d['domain']
+        self.urlMatch = URLMatch(d['urlMatch'])
+        self.name = d['name']
+        self.focusMode = FocusMode(d.get('focusMode', FocusMode.UNCHANGED))
+
     def asDict(self):
         return {
-            'domain': self.domain,  
+            'domain': self.domain,
             'urlMatch': self.urlMatch.value,
             'name': self.name,
+            'focusMode': self.focusMode.value,
         }
-        
+
 
     def postLoad(self):
         self.urlMatch = URLMatch(self.urlMatch)
@@ -88,6 +111,9 @@ class QJSite:
         if self.name is not None and len(self.name) > 0:
             return self.name
         return self.domain
+
+    def __hash__(self):
+        return id(self)
 
 
 @dataclass
@@ -116,7 +142,7 @@ class QJConfig:
 
     def __init__(self, d):
         self.sites = [
-            QJSite(**item).postLoad()
+            QJSite(item)
             for item in d['sites']
         ]
         self.rules = [
@@ -135,6 +161,9 @@ class QJConfig:
                 for rule in self.rules
             ],
         }
+
+    def __hash__(self):
+        return id(self)
 
 rulesFileName = os.path.join(globalVars.appArgs.configPath, "browserNavRules.json")
 defaultRulesFileName = os.path.join(
@@ -196,6 +225,75 @@ if False:
     print(asdict(foobar, dict_factory=custom_asdict_factory))
     # {'name': 'John', 'template': 'foobar'}
 
+@functools.lru_cache()
+def re_compile(s):
+    return re.compile(s)
+
+@functools.lru_cache()
+def isUrlMatch(url, site):
+    if site.urlMatch == URLMatch.IGNORE:
+        return True
+    elif site.urlMatch in {URLMatch.DOMAIN, URLMatch.SUBDOMAIN}:
+        m = re_compile(
+            # http://
+                r'(\w+://)?'
+            # username:password@
+                + r'([\w.,:"-]+@)?'
+            # google.com
+                + r'(?P<domain>[\w.-]+)'
+            # :80
+                +r'(:\d+)?'
+            # /rest/of/the/url#...
+                +r'.*'
+        ).match(url)
+        if not m:
+            return False
+        domain = m.group('domain').lower()
+        siteDomain = site.domain.lower()
+        if site.urlMatch == URLMatch.DOMAIN:
+            return domain == site_domain
+        elif site.urlMatch == URLMatch.SUBDOMAIN:
+            return (
+                domain == siteDomain
+                or domain.endswith("." + siteDomain)
+            )
+        else:
+            raise Exception("Impossible!")
+    elif site.urlMatch == URLMatch.SUBSTRING:
+        return site.domain.lower() in url.lower()
+    elif site.urlMatch == URLMatch.EXACT:
+        return site.domain.lower() ==  url.lower()
+    elif site.urlMatch == URLMatch.REGEX:
+        return re_compile(site.domain).match(url) is not None
+
+@functools.lru_cache()
+def findSites(url, config):
+    return [
+        site
+        for site in config.sites
+        if isUrlMatch(url, site)
+    ]
+
+@functools.lru_cache()
+def getFocusMode(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return FocusMode.UNCHANGED
+    mode = max([
+        site.focusMode.value
+        for site in sites
+    ])
+    return FocusMode(mode)
+
+original_event_gainFocus = None
+def new_event_gainFocus(self, obj, nextHandler):
+    url = self.documentConstantIdentifier
+    global config
+    focusMode = getFocusMode(url, config)
+    if focusMode == FocusMode.DISABLE_FOCUS:
+        tones.beep(500, 50)
+        return nextHandler()
+    return original_event_gainFocus(self, obj, nextHandler)
 
 class RuleDialog(wx.Dialog):
     def __init__(self, parent, title=_("Edit audio rule")):
@@ -599,11 +697,12 @@ class EditSiteDialog(wx.Dialog):
         if site is  not None:
             self.site = site
         else:
-            self.site = QJSite(
-                domain='',
-                name='',
-                urlMatch=URLMatch.SUBDOMAIN,
-            )
+            self.site = QJSite({
+                'domain':'',
+                'name':'',
+                'urlMatch':URLMatch.SUBDOMAIN.value,
+                'focusMode':FocusMode.UNCHANGED.value
+            })
         self.knownSites = knownSites
 
       # Translators: domain
@@ -620,6 +719,18 @@ class EditSiteDialog(wx.Dialog):
         commentLabelText = _("&Display name")
         self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
         self.commentTextCtrl.SetValue(self.site.name)
+      # Translators: Focus Mode comboBox
+        focusModeLabelText=_("&Focus mode")
+        self.focusModeCategory=guiHelper.LabeledControlHelper(
+            self,
+            focusModeLabelText,
+            wx.Choice,
+            choices=[
+                focusModeNames[m]
+                for m in FocusMode
+            ],
+        )
+        self.focusModeCategory.control.SetSelection(self.site.focusMode.value)
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -636,15 +747,18 @@ class EditSiteDialog(wx.Dialog):
         if urlMatch == URLMatch.IGNORE:
             if len(domain) > 0:
                 errorMsg = _("You must specify blank domain in order to match all sites.")
-        elif urlMatch in [URLMatch.DOMAIN, URLMatch.SUBDOMAIN]:
-            m = re.match(r'[\w.-]+(:\d+)?', domain)
-            if not m:
-                errorMsg = _("Wrong domain format. An example is: en.wikipedia.com ")
-        elif urlMatch == URLMatch.REGEX:
-            try:
-                re.compile(domain)
-            except re.error:
-                errorMsg = _("Failed to compile regular expression!")
+        else:
+            if len(domain) == 0:
+                errorMsg = _("You must specify non-empty string as domain")
+            elif urlMatch in [URLMatch.DOMAIN, URLMatch.SUBDOMAIN]:
+                m = re.match(r'[\w.-]+(:\d+)?', domain)
+                if not m:
+                    errorMsg = _("Wrong domain format. An example is: en.wikipedia.com ")
+            elif urlMatch == URLMatch.REGEX:
+                try:
+                    re.compile(domain)
+                except re.error:
+                    errorMsg = _("Failed to compile regular expression!")
 
         if errorMsg is None and self.knownSites is not None:
             for other in self.knownSites:
@@ -661,11 +775,14 @@ class EditSiteDialog(wx.Dialog):
             gui.messageBox(errorMsg, _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
             self.patternTextCtrl.SetFocus()
             return
-        site = QJSite(
-            domain=domain,
-            urlMatch=urlMatch,
-            name=self.commentTextCtrl.Value,
-        )
+        if urlMatch != URLMatch.REGEX:
+            domain = domain.lower()
+        site = QJSite({
+            'domain':domain,
+            'urlMatch':urlMatch,
+            'name':self.commentTextCtrl.Value,
+            'focusMode': self.focusModeCategory.control.GetSelection(),
+        })
         return site
 
 
@@ -703,7 +820,7 @@ class SettingsDialog(SettingsPanel):
         self.sitesList.InsertColumn(2, _("Type"))
         self.sitesList.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.onListItemFocused)
         self.sitesList.ItemCount = len(self.config.sites)
-        
+
         bHelper = sHelper.addItem(guiHelper.ButtonHelper(orientation=wx.HORIZONTAL))
       # Buttons
         self.addButton = bHelper.addButton(self, label=_("&Add"))
@@ -761,7 +878,7 @@ class SettingsDialog(SettingsPanel):
         entryDialog=EditSiteDialog(
             self,
             site=self.config.sites[editIndex],
-            knownSites=self.config.sites
+            knownSites=self.config.sites[:editIndex] + self.config.sites[editIndex+1:],
         )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.config.sites[editIndex] = entryDialog.site
@@ -775,7 +892,7 @@ class SettingsDialog(SettingsPanel):
             del self.config.sites[index]
             index=self.sitesList.GetNextSelected(index)
         self.sitesList.SetFocus()
-        
+
     def OnMoveClick(self,evt, increment):
         if self.sitesList.GetSelectedItemCount()!=1:
             return
@@ -792,7 +909,7 @@ class SettingsDialog(SettingsPanel):
             self.sitesList.Focus(newIndex)
         else:
             return
-        
+
     def OnSortClick(self,evt):
         self.config.sites.sort(key=QJSite.getDisplayName)
 

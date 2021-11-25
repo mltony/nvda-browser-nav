@@ -1112,6 +1112,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         cursorManager.CursorManager._set_selection = pre_set_selection
         editableText.EditableText.script_editInBrowserNav = lambda selfself, gesture: self.script_editJupyter(gesture, selfself)
         editableText.EditableText._EditableText__gestures['kb:NVDA+E'] = 'editInBrowserNav'
+        quickJump.original_event_gainFocus = browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus
+        browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.new_event_gainFocus
 
 
     def createMenu(self):
@@ -1126,6 +1128,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeTreeInterceptor._quickNavScript = originalQuickNavScript
         documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = originalTableScriptHelper
         cursorManager.CursorManager._set_selection = original_set_selection
+        browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.original_event_gainFocus
 
     def script_moveToNextSibling(self, gesture, selfself):
         mode = getMode()
