@@ -33,13 +33,18 @@ else:
     def mylog(s):
         pass
 class RuleCategory(Enum):
-    UNKNOWN = 0
-    SEARCH = 1
-    HIDE = 2
+    QUICK_JUMP = 1
+    QUICK_JUMP_2 = 2
+    QUICK_JUMP_3 = 3
+    SKIP_CLUTTER = 4
+    AUTO_PRESS = 5
 
 ruleCategoryNames = {
-    RuleCategory.SEARCH: _('QuickSearch'),
-    RuleCategory.HIDE: _('AutoHide'),
+    RuleCategory.QUICK_JUMP: _('QuickJump - assigned to J by default'),
+    RuleCategory.QUICK_JUMP_2: _('QuickJump2'),
+    RuleCategory.QUICK_JUMP_3: _('QuickJump3'),
+    RuleCategory.SKIP_CLUTTER: _('SkipClutter - will automatically skip this paragraph or line when navigating via Control+Up/Down or Up/Down keystrokes; must match the whole paragraph. or '),
+    RuleCategory.AUTO_PRESS: _('AutoPress'),
 }
 
 class URLMatch(Enum):
@@ -84,16 +89,56 @@ patterMatchNames = {
 }
 
 @dataclass
+class QJRule:
+    enabled: bool
+    category: RuleCategory
+    name: str
+    pattern: str
+    patternMatch: PatternMatch
+
+    def __init__(self, d):
+        self.enabled = d['enabled']
+        self.category = RuleCategory(URLMatch(d['category']))
+        self.name = d['name']
+        self.pattern = d['pattern']
+        self.patternMatch = PatternMatch(d['patternMatch'])
+
+    def asDict(self):
+        return {
+            'enabled': self.enabled,
+            'category': self.category.value,
+            'name': self.name,
+            'pattern': self.pattern,
+            'patternMatch': self.patternMatch.value,
+        }
+
+    def getDisplayName(self):
+        if self.name is not None and len(self.name) > 0:
+            return self.name
+        return self.pattern
+
+    def __hash__(self):
+        return id(self)
+
+
+
+@dataclass
 class QJSite:
     domain: str
     urlMatch: URLMatch
     name: str
     focusMode: FocusMode
+    rules: List[QJRule]
+
     def __init__(self, d):
         self.domain = d['domain']
         self.urlMatch = URLMatch(d['urlMatch'])
         self.name = d['name']
         self.focusMode = FocusMode(d.get('focusMode', FocusMode.UNCHANGED))
+        self.rules = [
+            QJRule(ruleDict)
+            for ruleDict in d.get('rules', [])
+        ]
 
     def asDict(self):
         return {
@@ -101,6 +146,7 @@ class QJSite:
             'urlMatch': self.urlMatch.value,
             'name': self.name,
             'focusMode': self.focusMode.value,
+            'rules': [rule.asDict() for rule in self.rules]
         }
 
 
@@ -117,31 +163,14 @@ class QJSite:
         return id(self)
 
 
-@dataclass
-class QJRule:
-    enabled: bool
-    category: RuleCategory
-    name: str
-    pattern: str
-    patternMatch: PatternMatch
 
-    def postLoad(self):
-        self.category = RuleCategory(self.category)
-        self.urlMatch = URLMatch(self.urlMatch)
-        self.patternMatch = PatternMatch(self.patternMatch)
-        return self
-
-    def getDisplayName(self):
-        if self.name is not None and len(self.name) > 0:
-            return self.name
-        return self.pattern
 
 @dataclass
 class QJConfig:
     # WARNING!
     # Please treat instances of this class as immutable
     # This class is hashable on id, so any change of global config object will lead to nasty and hard-to-debug side effects.
-    
+
     sites: List[QJSite]
     rules: List[QJRule]
 
@@ -302,7 +331,6 @@ original_event_gainFocus = None
 def new_event_gainFocus(self, obj, nextHandler):
     focusMode = getFocusMode(self.documentConstantIdentifier, config)
     if focusMode == FocusMode.DISABLE_FOCUS:
-        tones.beep(500, 50)
         return nextHandler()
     return original_event_gainFocus(self, obj, nextHandler)
 
@@ -698,10 +726,137 @@ class RuleDialog(wx.Dialog):
         ct = self.getType()
         [control.Enable() for control in self.typeControls[ct]]
 
-class EditSiteDialog(wx.Dialog):
+class RulesListDialog(
+    gui.dpiScalingHelper.DpiScalingHelperMixinWithoutInit,
+    wx.Dialog,
+):
+    def __init__(self, parent, site):
+        title=_("Edit rules for %s") % site.getDisplayName()
+        super(RulesListDialog,self).__init__(parent,title=title)
+        self.site = site
+        mainSizer=wx.BoxSizer(wx.VERTICAL)
+        sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+      # Rules table
+        rulesText = _("&Rules")
+        self.rulesList = sHelper.addLabeledControl(
+            rulesText,
+            nvdaControls.AutoWidthColumnListCtrl,
+            autoSizeColumn=2,
+            itemTextCallable=self.getItemTextForList,
+            style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.LC_VIRTUAL
+        )
 
+        self.rulesList.InsertColumn(0, _("Name"), width=self.scaleSize(150))
+        self.rulesList.InsertColumn(1, _("Pattern"))
+        self.rulesList.InsertColumn(2, _("Match type"))
+        self.rulesList.InsertColumn(3, _("Category"))
+        self.rulesList.InsertColumn(4, _("Enabled"))
+        self.rulesList.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.onListItemFocused)
+        self.rulesList.ItemCount = len(self.site.rules)
+
+        bHelper = sHelper.addItem(guiHelper.ButtonHelper(orientation=wx.HORIZONTAL))
+      # Buttons
+        self.addButton = bHelper.addButton(self, label=_("&Add"))
+        self.addButton.Bind(wx.EVT_BUTTON, self.OnAddClick)
+        self.editButton = bHelper.addButton(self, label=_("&Edit"))
+        self.editButton.Bind(wx.EVT_BUTTON, self.OnEditClick)
+        self.removeButton = bHelper.addButton(self, label=_("&Remove rule"))
+        self.removeButton.Bind(wx.EVT_BUTTON, self.OnRemoveClick)
+        self.moveUpButton = bHelper.addButton(self, label=_("Move &up"))
+        self.moveUpButton.Bind(wx.EVT_BUTTON, lambda evt: self.OnMoveClick(evt, -1))
+        self.moveDownButton = bHelper.addButton(self, label=_("Move &down"))
+        self.moveDownButton.Bind(wx.EVT_BUTTON, lambda evt: self.OnMoveClick(evt, 1))
+        self.sortButton = bHelper.addButton(self, label=_("&Sort"))
+        self.sortButton.Bind(wx.EVT_BUTTON, self.OnSortClick)
+      # OK/Cancel buttons
+        sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
+
+    def postInit(self):
+        self.rulesList.SetFocus()
+
+    def getItemTextForList(self, item, column):
+        rule = self.site.rules[item]
+        if column == 0:
+            return rule.getDisplayName()
+        elif column == 1:
+            return rule.pattern
+        elif column == 2:
+            return patterMatchNames[rule.patternMatch]
+        elif column == 3:
+            return ruleCategoryNames[rule.category]
+        elif column == 4:
+            return _('Enabled') if rule.enabled else _('Disabled')
+        else:
+            raise ValueError("Unknown column: %d" % column)
+
+    def onListItemFocused(self, evt):
+        if self.rulesList.GetSelectedItemCount()!=1:
+            return
+        index=self.rulesList.GetFirstSelected()
+        rule = self.site.rules[index]
+
+    def OnAddClick(self,evt):
+        entryDialog=EditSiteDialog(self)
+        if entryDialog.ShowModal()==wx.ID_OK:
+            self.site.rules.append(entryDialog.rule)
+            self.rulesList.ItemCount = len(self.site.rules)
+            index = self.rulesList.ItemCount - 1
+            self.rulesList.Select(index)
+            self.rulesList.Focus(index)
+            # We don't get a new focus event with the new index.
+            self.rulesList.sendListItemFocusedEvent(index)
+            self.rulesList.SetFocus()
+            entryDialog.Destroy()
+
+    def OnEditClick(self,evt):
+        if self.rulesList.GetSelectedItemCount()!=1:
+            return
+        editIndex=self.rulesList.GetFirstSelected()
+        if editIndex<0:
+            return
+        entryDialog=EditSiteDialog(
+            self,
+            site=self.site.rules[editIndex],
+        )
+        if entryDialog.ShowModal()==wx.ID_OK:
+            self.site.rules[editIndex] = entryDialog.rule
+            self.rulesList.SetFocus()
+        entryDialog.Destroy()
+
+    def OnRemoveClick(self,evt):
+        index=self.rulesList.GetFirstSelected()
+        while index>=0:
+            self.rulesList.DeleteItem(index)
+            del self.site.rules[index]
+            index=self.rulesList.GetNextSelected(index)
+        self.rulesList.SetFocus()
+
+    def OnMoveClick(self,evt, increment):
+        if self.rulesList.GetSelectedItemCount()!=1:
+            return
+        index=self.rulesList.GetFirstSelected()
+        if index<0:
+            return
+        newIndex = index + increment
+        if 0 <= newIndex < len(self.site.rules):
+            # Swap
+            tmp = self.site.rules[index]
+            self.site.rules[index] = self.site.rules[newIndex]
+            self.site.rules[newIndex] = tmp
+            self.rulesList.Select(newIndex)
+            self.rulesList.Focus(newIndex)
+        else:
+            return
+
+    def OnSortClick(self,evt):
+        self.site.rules.sort(key=QJSite.getDisplayName)
+
+    def onOk(self,evt):
+        evt.Skip()
+
+class EditSiteDialog(wx.Dialog):
     def __init__(self, parent, site=None, knownSites=None):
-        title=_("Edit audio rule")
+        title=_("Edit site configuration")
         super(EditSiteDialog,self).__init__(parent,title=title)
         mainSizer=wx.BoxSizer(wx.VERTICAL)
         sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
@@ -727,9 +882,13 @@ class EditSiteDialog(wx.Dialog):
         self.typeRadioBox.SetSelection(self.site.urlMatch.value)
 
       # Translators: label for comment edit box
-        commentLabelText = _("&Display name")
+        commentLabelText = _("&Display name (optional)")
         self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
         self.commentTextCtrl.SetValue(self.site.name)
+      # Edit Rules button
+        self.editRulesButton = sHelper.addItem (wx.Button (self, label = _("Edit R&ules")))
+        self.editRulesButton.Bind(wx.EVT_BUTTON, self.OnEditRulesClick)
+
       # Translators: Focus Mode comboBox
         focusModeLabelText=_("&Focus mode")
         self.focusModeCategory=guiHelper.LabeledControlHelper(
@@ -796,7 +955,14 @@ class EditSiteDialog(wx.Dialog):
         })
         return site
 
-
+    def OnEditRulesClick(self,evt):
+        entryDialog=RulesListDialog(
+            self,
+            site=self.site,
+        )
+        if entryDialog.ShowModal()==wx.ID_OK:
+            self.site.rules = entryDialog.site.rules
+        entryDialog.Destroy()
 
     def onOk(self,evt):
         site = self.make()
@@ -836,8 +1002,10 @@ class SettingsDialog(SettingsPanel):
       # Buttons
         self.addButton = bHelper.addButton(self, label=_("&Add"))
         self.addButton.Bind(wx.EVT_BUTTON, self.OnAddClick)
-        self.editButton = bHelper.addButton(self, label=_("&Edit"))
+        self.editButton = bHelper.addButton(self, label=_("&Edit site"))
         self.editButton.Bind(wx.EVT_BUTTON, self.OnEditClick)
+        self.editRulesButton = bHelper.addButton(self, label=_("Edit R&ules"))
+        self.editRulesButton.Bind(wx.EVT_BUTTON, self.OnEditRulesClick)
         self.removeButton = bHelper.addButton(self, label=_("&Remove rule"))
         self.removeButton.Bind(wx.EVT_BUTTON, self.OnRemoveClick)
         self.moveUpButton = bHelper.addButton(self, label=_("Move &up"))
@@ -893,6 +1061,21 @@ class SettingsDialog(SettingsPanel):
         )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.config.sites[editIndex] = entryDialog.site
+            self.sitesList.SetFocus()
+        entryDialog.Destroy()
+
+    def OnEditRulesClick(self,evt):
+        if self.sitesList.GetSelectedItemCount()!=1:
+            return
+        editIndex=self.sitesList.GetFirstSelected()
+        if editIndex<0:
+            return
+        entryDialog=RulesListDialog(
+            self,
+            site=self.config.sites[editIndex],
+        )
+        if entryDialog.ShowModal()==wx.ID_OK:
+            self.config.sites[editIndex].rules = entryDialog.site.rules
             self.sitesList.SetFocus()
         entryDialog.Destroy()
 
