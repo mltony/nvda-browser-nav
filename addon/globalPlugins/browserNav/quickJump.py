@@ -4,6 +4,7 @@
 #See the file LICENSE  for more details.
 
 import api
+from controlTypes import OutputReason
 import copy
 import dataclasses
 from dataclasses import dataclass
@@ -137,6 +138,10 @@ class QJRule:
 
 @dataclass
 class QJConfig:
+    # WARNING!
+    # Please treat instances of this class as immutable
+    # This class is hashable on id, so any change of global config object will lead to nasty and hard-to-debug side effects.
+    
     sites: List[QJSite]
     rules: List[QJRule]
 
@@ -285,11 +290,17 @@ def getFocusMode(url, config):
     ])
     return FocusMode(mode)
 
+originalShouldPassThrough = None
+def newShouldPassThrough(self, obj, reason= None):
+    focusMode = getFocusMode(self.documentConstantIdentifier, config)
+    if reason == OutputReason.FOCUS and focusMode == FocusMode.DONT_ENTER_FORM_MODE:
+        return self.passThrough
+    else:
+        return originalShouldPassThrough(self, obj, reason)
+
 original_event_gainFocus = None
 def new_event_gainFocus(self, obj, nextHandler):
-    url = self.documentConstantIdentifier
-    global config
-    focusMode = getFocusMode(url, config)
+    focusMode = getFocusMode(self.documentConstantIdentifier, config)
     if focusMode == FocusMode.DISABLE_FOCUS:
         tones.beep(500, 50)
         return nextHandler()

@@ -1114,6 +1114,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         editableText.EditableText._EditableText__gestures['kb:NVDA+E'] = 'editInBrowserNav'
         quickJump.original_event_gainFocus = browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus
         browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.new_event_gainFocus
+        quickJump.originalShouldPassThrough = browseMode.BrowseModeTreeInterceptor.shouldPassThrough
+        browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.newShouldPassThrough
 
 
     def createMenu(self):
@@ -1129,6 +1131,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = originalTableScriptHelper
         cursorManager.CursorManager._set_selection = original_set_selection
         browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.original_event_gainFocus
+        browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.originalShouldPassThrough
 
     def script_moveToNextSibling(self, gesture, selfself):
         mode = getMode()
