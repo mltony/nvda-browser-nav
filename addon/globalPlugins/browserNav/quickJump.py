@@ -4,6 +4,8 @@
 #See the file LICENSE  for more details.
 
 import api
+from collections import namedtuple, defaultdict
+import controlTypes
 from controlTypes import OutputReason
 import copy
 import dataclasses
@@ -18,9 +20,20 @@ from gui.settingsDialogs import SettingsPanel
 import json
 import os
 import re
+import textInfos
 import tones
 from typing import List
+import ui
 import wx
+
+from . beeper import *
+
+try:
+    REASON_CARET = controlTypes.REASON_CARET
+except AttributeError:
+    REASON_CARET = controlTypes.OutputReason.CARET
+
+
 
 debug = True
 if debug:
@@ -88,6 +101,85 @@ patterMatchNames = {
     PatternMatch.REGEX: _('Regex paragraph match'),
 }
 
+class ParagraphAttribute(Enum):
+    ROLE = 'role'
+    FONT_SIZE = 'font-size'
+
+@dataclass
+class QJAttributeMatch:
+    invert: bool
+    attribute: ParagraphAttribute
+    value: any
+
+    def __init__(
+        self, 
+        d=None, 
+        userString=None
+    ):
+        if d is not None:
+            self.invert = d['invert']
+            self.attribute = ParagraphAttribute(d['attribute'])
+            self.value = d['value']
+            if self.attribute == ParagraphAttribute.ROLE:
+                self.value = controlTypes.Role(self.value)
+        elif userString is not None:
+            s = userString.strip()
+            if s.startswith("!"):
+                s.invert = True
+                s = s[1:]
+            else:
+                self.invert = False
+            tokens = s.split(":")
+            if len(tokens) != 2:
+                raise ValueError(f"Invalid format of attribute! After splitting by : found {len(tokens)} tokens, but expected 2. userString='{s}'")
+            try:
+                self.attribute = ParagraphAttribute(tokens[0])
+            except ValueError as e:
+                raise ValueError(f"Invalid attribute {tokens[0]}. User string='{userString}'.", e)
+            if self.attribute == ParagraphAttribute.ROLE:
+                roleName = tokens[2].lower()
+                roles = [
+                    role
+                    for role.name in controlTypes.roleLabels.items()
+                    if name.lower() == roleName
+                ]
+                if len(roles) == 0:
+                    raise ValueError(f"Invalid role '{roleName}'.")
+                self.value = roles[0]
+            else:
+                self.value = tokens[1]
+        elif role is not None:
+            self.invert = False
+            self.attribute = ParagraphAttribute.ROLE
+            self.value = role
+        else:
+            raise Exception("Impossible!")
+
+
+    def asDict(self):
+        return {
+            'invert': self.invert,
+            'attribute': self.attribute.value,
+            'value': self.value.value if self.attribute == ParagraphAttribute.ROLE else selv.value,
+
+        }
+
+
+    def asString(self):
+        if self.attribute == ParagraphAttribute.ROLE:
+            value = controlTypes.roleLabels[self.value]
+        else:
+            value = self.value
+        invert = '!' if self.invert else ''
+        return f"{invert}{self.attribute.value}:{value}"
+
+
+
+
+
+    def __hash__(self):
+        return id(self)
+
 @dataclass
 class QJRule:
     enabled: bool
@@ -95,13 +187,18 @@ class QJRule:
     name: str
     pattern: str
     patternMatch: PatternMatch
+    attributes: List[QJAttributeMatch]
 
     def __init__(self, d):
         self.enabled = d['enabled']
-        self.category = RuleCategory(URLMatch(d['category']))
+        self.category = RuleCategory(d['category'])
         self.name = d['name']
         self.pattern = d['pattern']
         self.patternMatch = PatternMatch(d['patternMatch'])
+        self.attributes = [
+            QJAttributeMatch(attrDict)
+            for attrDict in d.get('attributes', [])
+        ]
 
     def asDict(self):
         return {
@@ -110,6 +207,10 @@ class QJRule:
             'name': self.name,
             'pattern': self.pattern,
             'patternMatch': self.patternMatch.value,
+            'attributes': [
+                attr.toDict()
+                for attr in self.attributes
+            ]
         }
 
     def getDisplayName(self):
@@ -172,27 +273,18 @@ class QJConfig:
     # This class is hashable on id, so any change of global config object will lead to nasty and hard-to-debug side effects.
 
     sites: List[QJSite]
-    rules: List[QJRule]
 
     def __init__(self, d):
         self.sites = [
-            QJSite(item)
-            for item in d['sites']
-        ]
-        self.rules = [
-            QJRule(**item).postLoad()
-            for item in d['rules']
-        ]
+                QJSite(item)
+                for item in d['sites']
+            ]
 
     def asDict(self):
         return {
             'sites': [
                 site.asDict()
                 for site in self.sites
-            ],
-            'rules': [
-                dataclasses.asdict(rule)
-                for rule in self.rules
             ],
         }
 
@@ -334,114 +426,188 @@ def new_event_gainFocus(self, obj, nextHandler):
         return nextHandler()
     return original_event_gainFocus(self, obj, nextHandler)
 
-class RuleDialog(wx.Dialog):
-    def __init__(self, parent, title=_("Edit audio rule")):
-        super(RuleDialog,self).__init__(parent,title=title)
+@functools.lru_cache()
+def getRegexForRule(rule):
+    if rule.patternMatch == PatternMatch.EXACT:
+        return f"^{re.escape(rule.pattern)}$"
+    elif rule.patternMatch == PatternMatch.SUBSTRING:
+        return re.escape(rule.pattern)
+    elif rule.patternMatch == PatternMatch.REGEX:
+        return rule.pattern
+    else:
+        raise Exception("Impossible!")
+
+NAMED_REGEX_PREFIX = "QJ_"
+RuleMatch = namedtuple('RuleMatch', ['rule', 'text', 'start', 'end'])
+@functools.lru_cache()
+def makeCompositeRegex(rules):
+    # Using named groups in regular expression to identify which rule has matched
+    re_string = "|".join([
+        f"(?P<{NAMED_REGEX_PREFIX}{i}>{getRegexForRule(rule)})"
+        for i,rule in enumerate(rules)
+    ])
+    mylog(f"re_string={re_string}")
+    return re_compile(re_string)
+
+def matchWidthCompositeRegex(rules, text):
+    m = makeCompositeRegex(rules).search(text)
+    if m is None:
+        return None
+    matchIndices = [
+        int(key[len(NAMED_REGEX_PREFIX):])
+        for key in m.groupdict().keys()
+        if key.startswith(NAMED_REGEX_PREFIX)
+    ]
+    if len(matchIndices) == 0:
+        return
+    i = matchIndices[0]
+    groupName = f"{NAMED_REGEX_PREFIX}{i}"
+    return RuleMatch(
+        rule=rules[i],
+        text=m.group(groupName),
+        start=m.start(groupName),
+        end=m.end(groupName),
+    )
+
+@functools.lru_cache()
+def findApplicableRules(config, url, category):
+    sites = findSites(url, config)
+    rules = [
+        rule
+        for site in sites
+        for rule in site.rules
+        if rule.category == category
+    ]
+    return tuple(rules)
+
+def extractAttributes(textInfo):
+    #result = defaultdict(set)
+    result = []
+    fields = textInfo.getTextWithFields()
+    for field in fields:
+        if not isinstance(field, textInfos.FieldCommand):
+            continue
+        elif field.command == 'controlStart':
+            role = field.field['role']
+            #result[ParagraphAttribute.ROLE].add(role)
+            result.append(QJAttributeMatch(role=role))
+        elif field.command == 'formatChange':
+            try:
+                #result[ParagraphAttribute.FONT_SIZE].add(field.field['font-size'])
+                result.append(QJAttributeMatch(attribute=ParagraphAttribute.FONT_SIZE, value=field.field['font-size']))
+            except KeyError:
+                pass
+        else:
+            pass
+    return result
+
+
+def quickJump(self, gesture, category, direction, errorMsg):
+    rules = findApplicableRules(config, self.documentConstantIdentifier, category)
+    if len(rules) == 0:
+        return endOfDocument(_('No rules configured for current website. Please add QuickJump rules in BrowserNav settings in NVDA settings window.'))
+    textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
+    textInfo.collapse()
+    textInfo.expand(textInfos.UNIT_PARAGRAPH)
+    distance = 0
+    while True:
+        distance += 1
+        textInfo.collapse()
+        result = textInfo.move(textInfos.UNIT_PARAGRAPH, direction)
+        if result == 0:
+            endOfDocument(errorMessage)
+            return
+        textInfo.expand(textInfos.UNIT_PARAGRAPH)
+        text = textInfo.text
+        m = matchWidthCompositeRegex(rules, text)
+        if m:
+            textInfo.collapse()
+            textInfo.move(textInfos.UNIT_CHARACTER, m.start)
+            textInfo.move(textInfos.UNIT_CHARACTER, len(m.text), endPoint='end')
+            textInfo.updateCaret()
+            beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
+            speech.speakTextInfo(textInfo, reason=REASON_CARET)
+            textInfo.collapse()
+            self._set_selection(textInfo)
+            self.selection = textInfo
+            return
+
+class EditRuleDialog(wx.Dialog):
+    def __init__(self, parent, rule=None, textInfo=None):
+        title=_("Edit browserNav rule")
+        super(EditRuleDialog,self).__init__(parent,title=title)
         mainSizer=wx.BoxSizer(wx.VERTICAL)
         sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+        if rule is  not None:
+            self.rule = rule
+        else:
+            self.rule = QJRule({
+                'enabled': True,
+                'category': RuleCategory.QUICK_JUMP,
+                'name': "",
+                'pattern': "",
+                'patternMatch': PatternMatch.SUBSTRING,
+            })
 
-      # Translators: label for pattern  edit field in add Audio Rule dialog.
+      # Translators: pattern
         patternLabelText = _("&Pattern")
         self.patternTextCtrl=sHelper.addLabeledControl(patternLabelText, wx.TextCtrl)
+        self.patternTextCtrl.SetValue(self.rule.pattern)
 
-      # Translators: label for case sensitivity  checkbox in add audio rule dialog.
-        #caseSensitiveText = _("Case &sensitive")
-        #self.caseSensitiveCheckBox=sHelper.addItem(wx.CheckBox(self,label=caseSensitiveText))
-
-      # Translators: label for rule_enabled  checkbox in add audio rule dialog.
+      # Translators: Pattern match type comboBox
+        matchModeLabelText=_("Pattern &match type:")
+        self.matchModeCategory=guiHelper.LabeledControlHelper(
+            self,
+            matchModeLabelText,
+            wx.Choice,
+            choices=[
+                patterMatchNames[m]
+                for m in PatternMatch
+            ],
+        )
+        self.matchModeCategory.control.SetSelection(list(PatternMatch).index(self.rule.patternMatch))
+      # Translators:  Category radio buttons
+        categoryText = _("&Category:")
+        self.categoryComboBox = guiHelper.LabeledControlHelper(
+            self,
+            categoryText,
+            wx.Choice,
+            choices=[ruleCategoryNames[i] for i in RuleCategory],
+        )
+        self.categoryComboBox.control.SetSelection(list(RuleCategory).index(self.rule.category))
+      # Translators: label for enabled checkbox
         enabledText = _("Rule enabled")
         self.enabledCheckBox=sHelper.addItem(wx.CheckBox(self,label=enabledText))
-        self.enabledCheckBox.SetValue(True)
-      # Translators:  label for type selector radio buttons in add audio rule dialog
-        typeText = _("&Type")
-        typeChoices = [AudioRuleDialog.TYPE_LABELS[i] for i in AudioRuleDialog.TYPE_LABELS_ORDERING]
-        self.typeRadioBox=sHelper.addItem(wx.RadioBox(self,label=typeText, choices=typeChoices))
-        self.typeRadioBox.Bind(wx.EVT_RADIOBOX,self.onType)
-        self.setType(audioRuleBuiltInWave)
-
-        self.typeControls = {
-            audioRuleBuiltInWave: [],
-            audioRuleWave: [],
-            audioRuleBeep: [],
-            audioRuleProsody: [],
-        }
-
-      # Translators: built in wav category  combo box
-        biwCategoryLabelText=_("&Category:")
-        self.biwCategory=guiHelper.LabeledControlHelper(
-            self,
-            biwCategoryLabelText,
-            wx.Choice,
-            choices=self.getBiwCategories(),
-        )
-        self.biwCategory.control.Bind(wx.EVT_CHOICE,self.onBiwCategory)
-        self.typeControls[audioRuleBuiltInWave].append(self.biwCategory.control)
-      # Translators: built in wav file combo box
-        biwListLabelText=_("&Wave:")
-        #self.biwList = sHelper.addLabeledControl(biwListLabelText, wx.Choice, choices=self.getBuiltInWaveFiles())
-        self.biwList=guiHelper.LabeledControlHelper(
-            self,
-            biwListLabelText,
-            wx.Choice,
-            choices=[],
-        )
-
-        self.biwList.control.Bind(wx.EVT_CHOICE,self.onBiw)
-        self.typeControls[audioRuleBuiltInWave].append(self.biwList.control)
-      # Translators: wav file edit box
-        self.wavName  = sHelper.addLabeledControl(_("Wav file"), wx.TextCtrl)
-        #self.wavName.Disable()
-        self.typeControls[audioRuleWave].append(self.wavName)
-
-      # Translators: This is the button to browse for wav file
-        self._browseButton = sHelper.addItem (wx.Button (self, label = _("&Browse...")))
-        self._browseButton.Bind(wx.EVT_BUTTON, self._onBrowseClick)
-        self.typeControls[audioRuleWave].append(self._browseButton)
-      # Translators: label for adjust start
-        label = _("Start adjustment in millis - positive to cut off start, negative for extra pause in the beginning.")
-        self.startAdjustmentTextCtrl=sHelper.addLabeledControl(label, wx.TextCtrl)
-        self.typeControls[audioRuleWave].append(self.startAdjustmentTextCtrl)
-        self.typeControls[audioRuleBuiltInWave].append(self.startAdjustmentTextCtrl)
-      # Translators: label for adjust end
-        label = _("End adjustment in millis - positive for early cut off, negative for extra pause in the end")
-        self.endAdjustmentTextCtrl=sHelper.addLabeledControl(label, wx.TextCtrl)
-        self.typeControls[audioRuleWave].append(self.endAdjustmentTextCtrl)
-        self.typeControls[audioRuleBuiltInWave].append(self.endAdjustmentTextCtrl)
-      # Translators: label for tone
-        toneLabelText = _("&Tone")
-        self.toneTextCtrl=sHelper.addLabeledControl(toneLabelText, wx.TextCtrl)
-        #self.toneTextCtrl.Disable()
-        self.typeControls[audioRuleBeep].append(self.toneTextCtrl)
-      # Translators: label for duration
-        durationLabelText = _("Duration in milliseconds:")
-        self.durationTextCtrl=sHelper.addLabeledControl(durationLabelText, wx.TextCtrl)
-        #self.durationTextCtrl.Disable()
-        self.typeControls[audioRuleBeep].append(self.durationTextCtrl)
-      # Translators: prosody name comboBox
-        prosodyNameLabelText=_("&Prosody name:")
-        self.prosodyNameCategory=guiHelper.LabeledControlHelper(
-            self,
-            prosodyNameLabelText,
-            wx.Choice,
-            choices=self.PROSODY_LABELS,
-        )
-        self.typeControls[audioRuleProsody].append(self.prosodyNameCategory.control)
-      # Translators: label for prosody offset
-        prosodyOffsetLabelText = _("Prosody offset:")
-        self.prosodyOffsetTextCtrl=sHelper.addLabeledControl(prosodyOffsetLabelText, wx.TextCtrl)
-        self.typeControls[audioRuleProsody].append(self.prosodyOffsetTextCtrl)
-      # Translators: label for prosody multiplier
-        prosodyMultiplierLabelText = _("Prosody multiplier:")
-        self.prosodyMultiplierTextCtrl=sHelper.addLabeledControl(prosodyMultiplierLabelText, wx.TextCtrl)
-        self.typeControls[audioRuleProsody].append(self.prosodyMultiplierTextCtrl)
+        self.enabledCheckBox.SetValue(self.rule.enabled)
 
       # Translators: label for comment edit box
-        commentLabelText = _("&Comment")
+        commentLabelText = _("&Display name (optional)")
         self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
-      # Translators: This is the button to test audio rule
-        self.testButton = sHelper.addItem (wx.Button (self, label = _("&Test, press twice for repeated sound")))
-        self.testButton.Bind(wx.EVT_BUTTON, self.onTestClick)
-
+        self.commentTextCtrl.SetValue(self.rule.name)
+      # attributes
+        labelText = _("&Attributes (space separated list):")
+        self.attributesTextCtrl=sHelper.addLabeledControl(labelText, wx.TextCtrl)
+        self.attributesTextCtrl.SetValue(" ".join([
+            attr.asString()
+            for attr in self.rule.attributes
+        ]))
+      # available attributes in current paragraph
+        labelText=_("Available attributes in current paragraph (Enter to add to current rule):")
+        self.attrChoices = [
+            attr.asString()
+            for attr in extractAttributes(textInfo)
+        ] if textInfo is not None else []
+        self.availableAttributesListBox=guiHelper.LabeledControlHelper(
+            self,
+            labelText,
+            wx.ListBox,
+            choices=self.attrChoices,
+        )
+        #self.availableAttributesListBox.control.Bind(wx.EVT_LISTBOX, self.onAvailableAttributeListChoice)
+        self.availableAttributesListBox.control.Bind(wx.EVT_CHAR, self.onChar)
+        if textInfo is None:
+            self.availableAttributesListBox.control.Disable()
+      #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
         mainSizer.Add(sHelper.sizer,border=20,flag=wx.ALL)
@@ -449,282 +615,75 @@ class RuleDialog(wx.Dialog):
         self.SetSizer(mainSizer)
         self.patternTextCtrl.SetFocus()
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
-        self.onType(None)
 
-    def getType(self):
-        typeRadioValue = self.typeRadioBox.GetSelection()
-        if typeRadioValue == wx.NOT_FOUND:
-            return audioRuleBuiltInWave
-        return AudioRuleDialog.TYPE_LABELS_ORDERING[typeRadioValue]
+    def make(self):
+        patternMatch = list(PatternMatch)[self.matchModeCategory.control.GetSelection()]
+        pattern = self.patternTextCtrl.Value
+        errorMsg = None
+        if len(pattern) == 0:
+            errorMsg = _('Pattern cannot be empty!')
+        elif patternMatch == PatternMatch.REGEX:
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                errorMsg = _('Failed to compile regular expression: %s') % str(e)
 
-    def setType(self, type):
-        self.typeRadioBox.SetSelection(AudioRuleDialog.TYPE_LABELS_ORDERING.index(type))
-
-    def getInt(self, s):
-        if len(s) == 0:
-            return None
-        return int(s)
-
-    def editRule(self, rule):
-        self.commentTextCtrl.SetValue(rule.comment)
-        self.patternTextCtrl.SetValue(rule.pattern)
-        self.setType(rule.ruleType)
-        self.wavName.SetValue(rule.wavFile)
-        self.setBiw(rule.builtInWavFile)
-        self.startAdjustmentTextCtrl.SetValue(str(rule.startAdjustment or 0))
-        self.endAdjustmentTextCtrl.SetValue(str(rule.endAdjustment or 0))
-        self.toneTextCtrl.SetValue(str(rule.tone or 500))
-        self.durationTextCtrl.SetValue(str(rule.duration or 50))
-        self.enabledCheckBox.SetValue(rule.enabled)
-        try:
-            prosodyCategoryIndex = self.PROSODY_LABELS.index(rule.prosodyName)
-        except ValueError:
-            prosodyCategoryIndex = 0
-        self.prosodyNameCategory.control.SetSelection(prosodyCategoryIndex)
-        self.prosodyOffsetTextCtrl.SetValue(str(rule.prosodyOffset or ""))
-        self.prosodyMultiplierTextCtrl.SetValue(str(rule.prosodyMultiplier or ""))
-        #self.caseSensitiveCheckBox.SetValue(rule.caseSensitive)
-        self.onType(None)
-
-    def makeRule(self):
-        if not self.patternTextCtrl.GetValue():
+        if errorMsg is not None:
             # Translators: This is an error message to let the user know that the pattern field is not valid.
-            gui.messageBox(_("A pattern is required."), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
+            gui.messageBox(errorMsg, _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
             self.patternTextCtrl.SetFocus()
             return
         try:
-            re.compile(self.patternTextCtrl.GetValue())
-        except sre_constants.error:
-            # Translators: Invalid regular expression
-            gui.messageBox(_("Invalid regular expression."), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-            self.patternTextCtrl.SetFocus()
+            attributes = [
+                QJAttributeMatch(userString=attr)
+                for attr in self.attributesTextCtrl.GetValue().strip().split()
+            ]
+        except ValueError as e:
+            errorMsg = _(f'Cannot parse attribute: {e}')
+            gui.messageBox(errorMsg, _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
+            self.attributesTextCtrl.SetFocus()
             return
 
-        if self.getType() == audioRuleWave:
-            if not self.wavName.GetValue() or not os.path.exists(self.wavName.GetValue()):
-                # Translators: wav file not found
-                gui.messageBox(_("Wav file not found."), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-                self.wavName.SetFocus()
-                return
-            try:
-                wave.open(self.wavName.GetValue(), "r").close()
-            except wave.Error:
-                # Translators: Invalid wav file
-                gui.messageBox(_("Invalid wav file."), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-                self.wavName.SetFocus()
-                return
-        try:
-            self.getInt(self.startAdjustmentTextCtrl.GetValue())
-        except ValueError:
-            # Translators: Invalid regular expression
-            gui.messageBox(_("Start adjustment must be a number."), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-            self.startAdjustmentTextCtrl.SetFocus()
-            return
-        try:
-            self.getInt(self.endAdjustmentTextCtrl.GetValue())
-        except ValueError:
-            # Translators: Invalid regular expression
-            gui.messageBox(_("End adjustment must be a number."), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-            self.endAdjustmentTextCtrl.SetFocus()
-            return
-        if self.getType() == audioRuleBeep:
-            good = False
-            try:
-                tone = self.getInt(self.toneTextCtrl.GetValue())
-                if 0 <= tone <= 50000:
-                    good = True
-            except ValueError:
-                pass
-            if not good:
-                gui.messageBox(_("tone must be an integer between 0 and 50000"), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-                self.toneTextCtrl.SetFocus()
-                return
+        rule = QJRule({
+            'enabled': self.enabledCheckBox.Value,
+            'category': list(RuleCategory)[self.categoryComboBox.control.GetSelection()],
+            'name':self.commentTextCtrl.Value,
+            'pattern': pattern,
+            'patternMatch': patternMatch.value,
+            'attributes': attributes,
+        })
+        return rule
 
-            good = False
-            try:
-                duration = self.getInt(self.durationTextCtrl.GetValue())
-                if 0 <= duration <= 60000:
-                    good = True
-            except ValueError:
-                pass
-            if not good:
-                gui.messageBox(_("duration must be an integer between 0 and 60000"), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-                self.durationTextCtrl.SetFocus()
-                return
-        prosodyOffset = None
-        prosodyMultiplier = None
-        if self.getType() == audioRuleProsody:
-            good = False
-            try:
-                if len(self.prosodyOffsetTextCtrl.GetValue()) == 0:
-                    prosodyOffset = None
-                    good = True
-                else:
-                    prosodyOffset = self.getInt(self.prosodyOffsetTextCtrl.GetValue())
-                    if -100 <= prosodyOffset <= 100:
-                        good = True
-            except ValueError:
-                pass
-            if not good:
-                gui.messageBox(_("prosody offset must be an integer between -100 and 100"), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-                self.prosodyOffsetTextCtrl.SetFocus()
-                return
-            good = False
-            try:
-                if len(self.prosodyMultiplierTextCtrl.GetValue()) == 0:
-                    prosodyMultiplier = None
-                    good = True
-                else:
-                    prosodyMultiplier = float(self.prosodyOffsetTextCtrl.GetValue())
-                    if .1 <= prosodyMultiplier <= 10:
-                        good = True
-            except ValueError:
-                pass
-            if not good:
-                gui.messageBox(_("prosody multiplier must be a float between 0.1 and 10"), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-                self.prosodyMultiplierTextCtrl.SetFocus()
-                return
-            if prosodyOffset is not None and prosodyMultiplier is not None:
-                gui.messageBox(_("You must specify either prosody offset or multiplier but not both"), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-                self.prosodyOffsetTextCtrl.SetFocus()
-                return
-            if prosodyOffset is  None and prosodyMultiplier is  None:
-                gui.messageBox(_("You must specify either prosody offset or multiplier."), _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
-                self.prosodyOffsetTextCtrl.SetFocus()
-                return
-            mylog(f"prosodyOffset={prosodyOffset}")
-            mylog(f"prosodyMultiplier={prosodyMultiplier}")
+    def OnEditRulesClick(self,evt):
+        entryDialog=RulesListDialog(
+            self,
+            site=self.site,
+        )
+        if entryDialog.ShowModal()==wx.ID_OK:
+            self.site.rules = entryDialog.site.rules
+        entryDialog.Destroy()
 
-        try:
-            return AudioRule(
-                comment=self.commentTextCtrl.GetValue(),
-                pattern=self.patternTextCtrl.GetValue(),
-                ruleType=self.getType(),
-                wavFile=self.wavName.GetValue(),
-                builtInWavFile=self.getBiw(),
-                startAdjustment=self.getInt(self.startAdjustmentTextCtrl.GetValue()) or 0,
-                endAdjustment=self.getInt(self.endAdjustmentTextCtrl.GetValue()) or 0,
-                tone=self.getInt(self.toneTextCtrl.GetValue()),
-                duration=self.getInt(self.durationTextCtrl.GetValue()),
-                enabled=bool(self.enabledCheckBox.GetValue()),
-                prosodyName=self.PROSODY_LABELS[self.prosodyNameCategory.control.GetSelection()],
-                prosodyOffset=prosodyOffset,
-                prosodyMultiplier=prosodyMultiplier,
-                #caseSensitive=bool(self.caseSensitiveCheckBox.GetValue()),
-            )
-        except Exception as e:
-            log.error("Could not add Audio Rule", e)
-            # Translators: This is an error message to let the user know that the Audio rule is not valid.
-            gui.messageBox(
-                _(f"Error creating audio rule: {e}"),
-                _("Audio rule Error"),
-                wx.OK|wx.ICON_WARNING, self
-            )
-            return
-
+    def onChar(self, event):
+        keyCode = event.GetKeyCode ()
+        if keyCode == 32: #space
+            tones.beep(500, 50)
+            index = self.availableAttributesListBox.control.Selection
+            if index >= 0:
+                item = self.attrChoices[index]
+                s = self.attributesTextCtrl.GetValue()
+                if len(s) > 0 and not s.endswith(' '):
+                    s += ' '
+                s += item
+                self.attributesTextCtrl.SetValue(s)
+                ui.message(_("Added '{item} to matched attributes edit box.'"))
+        else:
+            event.Skip()
 
     def onOk(self,evt):
-        rule = self.makeRule()
+        rule = self.make()
         if rule is not None:
             self.rule = rule
             evt.Skip()
-
-    def _onBrowseClick(self, evt):
-        p= 'c:'
-        while True:
-            # Translators: browse wav file message
-            fd = wx.FileDialog(self, message=_("Select wav file:"),
-                wildcard="*.wav",
-                defaultDir=os.path.dirname(p), style=wx.FD_OPEN
-            )
-            if not fd.ShowModal() == wx.ID_OK: break
-            p = fd.GetPath()
-            self.wavName.SetValue(p)
-            break
-
-    def onTestClick(self, evt):
-        global rulesDialogOpen
-        if time.time() - self.lastTestTime < 1:
-            # Button pressed twice within a second
-            repeat = True
-        else:
-            repeat = False
-        self.lastTestTime = time.time()
-        rulesDialogOpen = False
-        try:
-            rule = self.makeRule()
-            if rule is None:
-                return
-            preText = _("Hello")
-            postText = _("world")
-            if not repeat:
-                utterance = [preText, rule.getSpeechCommand(), postText]
-            else:
-                utterance = [preText] + [rule.getSpeechCommand()] * 3 + [postText]
-            speech.cancelSpeech()
-            speech.speak(utterance)
-        finally:
-            rulesDialogOpen = True
-
-    def getBiwCategories(self):
-        soundsPath = getSoundsPath()
-        return [o for o in os.listdir(soundsPath)
-            if os.path.isdir(os.path.join(soundsPath,o))
-        ]
-
-    def getBuiltInWaveFilesInCategory(self):
-        soundsPath = getSoundsPath()
-        category = self.getBiwCategory()
-        ext = ".wav"
-        return [o for o in os.listdir(os.path.join(soundsPath, category))
-            if not os.path.isdir(os.path.join(soundsPath,o))
-                and o.lower().endswith(ext)
-        ]
-
-    def getBuiltInWaveFiles(self):
-        soundsPath = getSoundsPath()
-        result = []
-        for dirName, subdirList, fileList in os.walk(soundsPath, topdown=True):
-            relDirName = dirName[len(soundsPath):]
-            if len(relDirName) > 0 and relDirName[0] == "\\":
-                relDirName = relDirName[1:]
-            for fileName in fileList:
-                if fileName.lower().endswith(".wav"):
-                    result.append(os.path.join(relDirName, fileName))
-        return result
-
-    def getBiw(self):
-        return os.path.join(
-            self.getBiwCategory(),
-            self.getBuiltInWaveFilesInCategory()[self.biwList.control.GetSelection()]
-        )
-
-    def setBiw(self, biw):
-        category, biwFile = os.path.split(biw)
-        categoryIndex = self.getBiwCategories().index(category)
-        self.biwCategory.control.SetSelection(categoryIndex)
-        self.onBiwCategory(None)
-        biwIndex = self.getBuiltInWaveFilesInCategory().index(biwFile)
-        self.biwList.control.SetSelection(biwIndex)
-
-    def onBiw(self, evt):
-        soundsPath = getSoundsPath()
-        biw = self.getBiw()
-        fullPath = os.path.join(soundsPath, biw)
-        nvwave.playWaveFile(fullPath)
-
-    def getBiwCategory(self):
-        return   self.getBiwCategories()[self.biwCategory.control.GetSelection()]
-
-    def onBiwCategory(self, evt):
-        soundsPath = getSoundsPath()
-        category = self.getBiwCategory()
-        self.biwList.control.SetItems(self.getBuiltInWaveFilesInCategory())
-
-    def onType(self, evt):
-        [control.Disable() for (t,controls) in self.typeControls.items() for control in controls]
-        ct = self.getType()
-        [control.Enable() for control in self.typeControls[ct]]
 
 class RulesListDialog(
     gui.dpiScalingHelper.DpiScalingHelperMixinWithoutInit,
@@ -770,8 +729,6 @@ class RulesListDialog(
         self.sortButton.Bind(wx.EVT_BUTTON, self.OnSortClick)
       # OK/Cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
-
-    def postInit(self):
         self.rulesList.SetFocus()
 
     def getItemTextForList(self, item, column):
@@ -796,7 +753,7 @@ class RulesListDialog(
         rule = self.site.rules[index]
 
     def OnAddClick(self,evt):
-        entryDialog=EditSiteDialog(self)
+        entryDialog=EditRuleDialog(self)
         if entryDialog.ShowModal()==wx.ID_OK:
             self.site.rules.append(entryDialog.rule)
             self.rulesList.ItemCount = len(self.site.rules)
@@ -814,9 +771,9 @@ class RulesListDialog(
         editIndex=self.rulesList.GetFirstSelected()
         if editIndex<0:
             return
-        entryDialog=EditSiteDialog(
+        entryDialog=EditRuleDialog(
             self,
-            site=self.site.rules[editIndex],
+            rule=self.site.rules[editIndex],
         )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.site.rules[editIndex] = entryDialog.rule
@@ -870,21 +827,24 @@ class EditSiteDialog(wx.Dialog):
                 'focusMode':FocusMode.UNCHANGED.value
             })
         self.knownSites = knownSites
-
+      # Translators: label for comment edit box
+        commentLabelText = _("&Display name (optional)")
+        self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
+        self.commentTextCtrl.SetValue(self.site.name)
       # Translators: domain
         patternLabelText = _("&URL")
         self.patternTextCtrl=sHelper.addLabeledControl(patternLabelText, wx.TextCtrl)
         self.patternTextCtrl.SetValue(self.site.domain)
       # Translators:  label for type selector radio buttons
         typeText = _("&Match type")
-        typeChoices = [urlMatchNames[i] for i in URLMatch]
-        self.typeRadioBox=sHelper.addItem(wx.RadioBox(self,label=typeText, choices=typeChoices))
-        self.typeRadioBox.SetSelection(self.site.urlMatch.value)
+        self.typeComboBox = guiHelper.LabeledControlHelper(
+            self,
+            typeText,
+            wx.Choice,
+            choices=[urlMatchNames[i] for i in URLMatch],
+        )
+        self.typeComboBox.control.SetSelection(list(URLMatch).index(self.site.urlMatch))
 
-      # Translators: label for comment edit box
-        commentLabelText = _("&Display name (optional)")
-        self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
-        self.commentTextCtrl.SetValue(self.site.name)
       # Edit Rules button
         self.editRulesButton = sHelper.addItem (wx.Button (self, label = _("Edit R&ules")))
         self.editRulesButton.Bind(wx.EVT_BUTTON, self.OnEditRulesClick)
@@ -900,7 +860,7 @@ class EditSiteDialog(wx.Dialog):
                 for m in FocusMode
             ],
         )
-        self.focusModeCategory.control.SetSelection(self.site.focusMode.value)
+        self.focusModeCategory.control.SetSelection(list(FocusMode).index(self.site.focusMode))
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -911,7 +871,7 @@ class EditSiteDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
 
     def make(self):
-        urlMatch = URLMatch(self.typeRadioBox.GetSelection())
+        urlMatch = list(URLMatch)[self.typeComboBox.control.GetSelection()]
         domain = self.patternTextCtrl.Value
         errorMsg = None
         if urlMatch == URLMatch.IGNORE:
@@ -927,8 +887,8 @@ class EditSiteDialog(wx.Dialog):
             elif urlMatch == URLMatch.REGEX:
                 try:
                     re.compile(domain)
-                except re.error:
-                    errorMsg = _("Failed to compile regular expression!")
+                except re.error as e:
+                    errorMsg = _("Failed to compile regular expression: %s") % str(e)
 
         if errorMsg is None and self.knownSites is not None:
             for other in self.knownSites:
@@ -945,13 +905,13 @@ class EditSiteDialog(wx.Dialog):
             gui.messageBox(errorMsg, _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
             self.patternTextCtrl.SetFocus()
             return
-        if urlMatch != URLMatch.REGEX:
+        if urlMatch in {URLMatch.DOMAIN, URLMatch.SUBDOMAIN}:
             domain = domain.lower()
         site = QJSite({
             'domain':domain,
             'urlMatch':urlMatch,
             'name':self.commentTextCtrl.Value,
-            'focusMode': self.focusModeCategory.control.GetSelection(),
+            'focusMode': list(FocusMode)[self.focusModeCategory.control.GetSelection()],
         })
         return site
 
