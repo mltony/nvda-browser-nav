@@ -112,8 +112,8 @@ class QJAttributeMatch:
     value: any
 
     def __init__(
-        self, 
-        d=None, 
+        self,
+        d=None,
         userString=None
     ):
         if d is not None:
@@ -308,8 +308,8 @@ def loadConfig():
 
 
 def saveConfig():
-    global config
-    configDict = config.asDict()
+    global globalConfig
+    configDict = globalConfig.asDict()
     rulesJson = json.dumps(configDict, indent=4, sort_keys=True)
     rulesFile = open(rulesFileName, "w")
     try:
@@ -317,8 +317,7 @@ def saveConfig():
     finally:
         rulesFile.close()
 
-config  = loadConfig()
-api.q=config
+globalConfig  = loadConfig()
 
 if False:
     from dataclasses import dataclass, asdict
@@ -355,26 +354,34 @@ if False:
 def re_compile(s):
     return re.compile(s)
 
+def getDomain(url):
+    m = re_compile(
+        # http://
+            r'(\w+://)?'
+        # username:password@
+            + r'([\w.,:"-]+@)?'
+        # google.com
+            + r'(?P<domain>[\w.-]+)'
+        # :80
+            +r'(:\d+)?'
+        # /rest/of/the/url#...
+            +r'.*'
+    ).match(url)
+    if not m:
+        raise ValueError(f"Domain not found in URL {url}")
+    domain = m.group('domain').lower()
+    return domain
+
+
 @functools.lru_cache()
 def isUrlMatch(url, site):
     if site.urlMatch == URLMatch.IGNORE:
         return True
     elif site.urlMatch in {URLMatch.DOMAIN, URLMatch.SUBDOMAIN}:
-        m = re_compile(
-            # http://
-                r'(\w+://)?'
-            # username:password@
-                + r'([\w.,:"-]+@)?'
-            # google.com
-                + r'(?P<domain>[\w.-]+)'
-            # :80
-                +r'(:\d+)?'
-            # /rest/of/the/url#...
-                +r'.*'
-        ).match(url)
-        if not m:
+        try:
+            domain = getDomain(url)
+        except ValueError:
             return False
-        domain = m.group('domain').lower()
         siteDomain = site.domain.lower()
         if site.urlMatch == URLMatch.DOMAIN:
             return domain == site_domain
@@ -411,9 +418,15 @@ def getFocusMode(url, config):
     ])
     return FocusMode(mode)
 
+def getUrl(self):
+    url = self.documentConstantIdentifier
+    if url is None:
+        return ""
+    return url
+
 originalShouldPassThrough = None
 def newShouldPassThrough(self, obj, reason= None):
-    focusMode = getFocusMode(self.documentConstantIdentifier, config)
+    focusMode = getFocusMode(getUrl(self), globalConfig)
     if reason == OutputReason.FOCUS and focusMode == FocusMode.DONT_ENTER_FORM_MODE:
         return self.passThrough
     else:
@@ -421,7 +434,7 @@ def newShouldPassThrough(self, obj, reason= None):
 
 original_event_gainFocus = None
 def new_event_gainFocus(self, obj, nextHandler):
-    focusMode = getFocusMode(self.documentConstantIdentifier, config)
+    focusMode = getFocusMode(getUrl(self), globalConfig)
     if focusMode == FocusMode.DISABLE_FOCUS:
         return nextHandler()
     return original_event_gainFocus(self, obj, nextHandler)
@@ -503,7 +516,7 @@ def extractAttributes(textInfo):
 
 
 def quickJump(self, gesture, category, direction, errorMsg):
-    rules = findApplicableRules(config, self.documentConstantIdentifier, category)
+    rules = findApplicableRules(globalConfig, getUrl(self), category)
     if len(rules) == 0:
         return endOfDocument(_('No rules configured for current website. Please add QuickJump rules in BrowserNav settings in NVDA settings window.'))
     textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
@@ -532,10 +545,64 @@ def quickJump(self, gesture, category, direction, errorMsg):
             self.selection = textInfo
             return
 
+
+def editOrCreateSite(self, site=None, url=None, domain=None):
+    global globalConfig
+    try:
+        index = globalConfig.sites.index(site)
+        knownSites = globalConfig.sites[:index] + globalConfig.sites[index+1:]
+    except ValueError:
+        index = None
+        knownSites = globalConfig.sites
+    entryDialog=EditSiteDialog(None, knownSites=knownSites, site=site, url=url, domain=domain)
+    if entryDialog.ShowModal()==wx.ID_OK:
+        config = copy.deepcopy(globalConfig)
+        if index is not None:
+            config.sites[index] = entryDialog.site
+        else:
+            config.sites.append(entryDialog.site)
+        globalConfig = config
+        saveConfig()
+def makeWebsiteSubmenu(self, frame):
+    url = getUrl(self)
+    sites = findSites(url, globalConfig)
+    menu = wx.Menu()
+
+    for site in sites:
+        menuStr = _("Edit existing website %s") % site.getDisplayName()
+        item = menu.Append(wx.ID_ANY, menuStr)
+        frame.Bind(
+            wx.EVT_MENU,
+            lambda evt: editOrCreateSite(self, site=site),
+            item,
+        )
+
+    try:
+        domain = getDomain(url)
+        menuStr = _("Create new website for domain %s") % domain
+        item = menu.Append(wx.ID_ANY, menuStr)
+        frame.Bind(
+            wx.EVT_MENU,
+            lambda evt: editOrCreateSite(self, domain=domain),
+            item,
+        )
+    except ValueError:
+        pass
+    menuStr = _("Create new website for exact URL %s") % url
+    item = menu.Append(wx.ID_ANY, menuStr)
+    frame.Bind(
+        wx.EVT_MENU,
+        lambda evt: editOrCreateSite(self, url=url),
+        item,
+    )
+    return menu
+
+
 class EditRuleDialog(wx.Dialog):
-    def __init__(self, parent, rule=None, textInfo=None):
+    def __init__(self, parent, rule=None, config=None, site=None, textInfo=None):
         title=_("Edit browserNav rule")
         super(EditRuleDialog,self).__init__(parent,title=title)
+        self.config=config
         mainSizer=wx.BoxSizer(wx.VERTICAL)
         sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
         if rule is  not None:
@@ -689,10 +756,11 @@ class RulesListDialog(
     gui.dpiScalingHelper.DpiScalingHelperMixinWithoutInit,
     wx.Dialog,
 ):
-    def __init__(self, parent, site):
+    def __init__(self, parent, site, config):
         title=_("Edit rules for %s") % site.getDisplayName()
         super(RulesListDialog,self).__init__(parent,title=title)
         self.site = site
+        self.config = config
         mainSizer=wx.BoxSizer(wx.VERTICAL)
         sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
       # Rules table
@@ -753,7 +821,11 @@ class RulesListDialog(
         rule = self.site.rules[index]
 
     def OnAddClick(self,evt):
-        entryDialog=EditRuleDialog(self)
+        entryDialog=EditRuleDialog(
+            self,
+            config=self.config,
+            site=self.site,
+        )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.site.rules.append(entryDialog.rule)
             self.rulesList.ItemCount = len(self.site.rules)
@@ -774,6 +846,8 @@ class RulesListDialog(
         entryDialog=EditRuleDialog(
             self,
             rule=self.site.rules[editIndex],
+            config=self.config,
+            site=self.site,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.site.rules[editIndex] = entryDialog.rule
@@ -812,7 +886,7 @@ class RulesListDialog(
         evt.Skip()
 
 class EditSiteDialog(wx.Dialog):
-    def __init__(self, parent, site=None, knownSites=None):
+    def __init__(self, parent, site=None, config=None, knownSites=None, url=None, domain=None):
         title=_("Edit site configuration")
         super(EditSiteDialog,self).__init__(parent,title=title)
         mainSizer=wx.BoxSizer(wx.VERTICAL)
@@ -821,11 +895,12 @@ class EditSiteDialog(wx.Dialog):
             self.site = site
         else:
             self.site = QJSite({
-                'domain':'',
+                'domain':domain or url or "",
                 'name':'',
-                'urlMatch':URLMatch.SUBDOMAIN.value,
+                'urlMatch':URLMatch.EXACT.value if url is not None else URLMatch.SUBDOMAIN.value,
                 'focusMode':FocusMode.UNCHANGED.value
             })
+        self.config = config
         self.knownSites = knownSites
       # Translators: label for comment edit box
         commentLabelText = _("&Display name (optional)")
@@ -919,6 +994,7 @@ class EditSiteDialog(wx.Dialog):
         entryDialog=RulesListDialog(
             self,
             site=self.site,
+            config=self.config,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.site.rules = entryDialog.site.rules
@@ -938,8 +1014,8 @@ class SettingsDialog(SettingsPanel):
         super(SettingsDialog, self).__init__(*args, **kwargs)
 
     def makeSettings(self, settingsSizer):
-        global config
-        self.config = copy.deepcopy(config)
+        global globalConfig
+        self.config = copy.deepcopy(globalConfig)
 
         sHelper = gui.guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
       # Sites table
@@ -996,7 +1072,7 @@ class SettingsDialog(SettingsPanel):
         site = self.config.sites[index]
 
     def OnAddClick(self,evt):
-        entryDialog=EditSiteDialog(self, knownSites=self.config.sites)
+        entryDialog=EditSiteDialog(self, knownSites=self.config.sites, config=self.config)
         if entryDialog.ShowModal()==wx.ID_OK:
             self.config.sites.append(entryDialog.site)
             self.sitesList.ItemCount = len(self.config.sites)
@@ -1018,6 +1094,7 @@ class SettingsDialog(SettingsPanel):
             self,
             site=self.config.sites[editIndex],
             knownSites=self.config.sites[:editIndex] + self.config.sites[editIndex+1:],
+            config=self.config,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.config.sites[editIndex] = entryDialog.site
@@ -1033,6 +1110,7 @@ class SettingsDialog(SettingsPanel):
         entryDialog=RulesListDialog(
             self,
             site=self.config.sites[editIndex],
+            config=self.config,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.config.sites[editIndex].rules = entryDialog.site.rules
@@ -1068,6 +1146,6 @@ class SettingsDialog(SettingsPanel):
         self.config.sites.sort(key=QJSite.getDisplayName)
 
     def onSave(self):
-        global config
-        config = self.config
+        global globalConfig
+        globalConfig = self.config
         saveConfig()

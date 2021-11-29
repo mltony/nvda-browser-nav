@@ -9,9 +9,12 @@ import ctypes
 import math
 import NVDAHelper
 import nvwave
+import operator
 import re
 import speech
+import struct
 import tones
+import ui
 
 from . addonConfig import *
 
