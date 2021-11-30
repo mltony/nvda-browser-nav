@@ -954,7 +954,7 @@ def pre_set_selection(self, info):
     except AttributeError:
         sh = SelectionHistory()
         self.selectionHistory = sh
-    sh.append(info)
+    #sh.append(info)
     return original_set_selection(self, info)
 
 class SelectionHistory:

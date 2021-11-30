@@ -463,18 +463,26 @@ def makeCompositeRegex(rules):
     return re_compile(re_string)
 
 def matchWidthCompositeRegex(rules, text):
+    mylog(f"matchWidthCompositeRegex")
     m = makeCompositeRegex(rules).search(text)
     if m is None:
+        mylog(f"no matches!")
         return None
     matchIndices = [
         int(key[len(NAMED_REGEX_PREFIX):])
-        for key in m.groupdict().keys()
+        for key, value in m.groupdict().items()
         if key.startswith(NAMED_REGEX_PREFIX)
+            and value is not None
     ]
+    mylog(f"matchIndices={matchIndices}")
     if len(matchIndices) == 0:
         return
     i = matchIndices[0]
+    
     groupName = f"{NAMED_REGEX_PREFIX}{i}"
+    mylog(f"i={i}")
+    mylog(f"groupName={groupName}")
+    api.q=m
     return RuleMatch(
         rule=rules[i],
         text=m.group(groupName),
@@ -528,7 +536,7 @@ def quickJump(self, gesture, category, direction, errorMsg):
         textInfo.collapse()
         result = textInfo.move(textInfos.UNIT_PARAGRAPH, direction)
         if result == 0:
-            endOfDocument(errorMessage)
+            endOfDocument(errorMsg)
             return
         textInfo.expand(textInfos.UNIT_PARAGRAPH)
         text = textInfo.text
