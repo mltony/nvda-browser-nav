@@ -1849,12 +1849,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:J",
             "quickSearchForward",
-            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.RuleCategory.QUICK_JUMP, 1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
+            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP, 1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
             doc="QuickSearch forward according to BrowserNav rules; please check browserNav configuration panel for the list of rules.")
         self.injectBrowseModeKeystroke(
             "kb:Shift+J",
             "quickSearchBack",
-            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.RuleCategory.QUICK_JUMP, -1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
+            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP, -1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
             doc="QuickSearch back according to BrowserNav rules; please check browserNav configuration panel for the list of rules.")
       # Tabs
         # Example page with tabs:

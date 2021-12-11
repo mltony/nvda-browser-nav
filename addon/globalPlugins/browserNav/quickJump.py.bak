@@ -22,7 +22,7 @@ import os
 import re
 import textInfos
 import tones
-from typing import List, Tuple
+from typing import List
 import ui
 import wx
 
@@ -111,7 +111,8 @@ class  QJImmutable:
     def __delattr__(self, *args):
         raise TypeError
 
-class QJAttribute(QJImmutable):
+class QJAttributeMatch:
+    invert: bool
     attribute: ParagraphAttribute
     value: any
 
@@ -121,11 +122,11 @@ class QJAttribute(QJImmutable):
         userString=None
     ):
         if d is not None:
-            object.__setattr__(self, 'attribute', ParagraphAttribute(d['attribute']))
-            value = d['value']
+            self.invert = d['invert']
+            self.attribute = ParagraphAttribute(d['attribute'])
+            self.value = d['value']
             if self.attribute == ParagraphAttribute.ROLE:
-                value = controlTypes.Role(self.value)
-            object.__setattr__(self, 'value', value)
+                self.value = controlTypes.Role(self.value)
         elif userString is not None:
             s = userString.strip()
             if s.startswith("!"):
@@ -137,7 +138,7 @@ class QJAttribute(QJImmutable):
             if len(tokens) != 2:
                 raise ValueError(f"Invalid format of attribute! After splitting by : found {len(tokens)} tokens, but expected 2. userString='{s}'")
             try:
-                object.__setattr__(self, 'attribute', ParagraphAttribute(tokens[0]))
+                self.attribute = ParagraphAttribute(tokens[0])
             except ValueError as e:
                 raise ValueError(f"Invalid attribute {tokens[0]}. User string='{userString}'.", e)
             if self.attribute == ParagraphAttribute.ROLE:
@@ -149,19 +150,20 @@ class QJAttribute(QJImmutable):
                 ]
                 if len(roles) == 0:
                     raise ValueError(f"Invalid role '{roleName}'.")
-                value = roles[0]
+                self.value = roles[0]
             else:
-                value = tokens[1]
-            object.__setattr__(self, 'value', value)
+                self.value = tokens[1]
         elif role is not None:
-            object.__setattr__(self, 'attribute', ParagraphAttribute.ROLE)
-            object.__setattr__(self, 'value', role)
+            self.invert = False
+            self.attribute = ParagraphAttribute.ROLE
+            self.value = role
         else:
             raise Exception("Impossible!")
 
 
     def asDict(self):
         return {
+            'invert': self.invert,
             'attribute': self.attribute.value,
             'value': self.value.value if self.attribute == ParagraphAttribute.ROLE else selv.value,
 
@@ -173,7 +175,8 @@ class QJAttribute(QJImmutable):
             value = controlTypes.roleLabels[self.value]
         else:
             value = self.value
-        return f"{self.attribute.value}:{value}"
+        invert = '!' if self.invert else ''
+        return f"{invert}{self.attribute.value}:{value}"
 
 
 
@@ -182,63 +185,25 @@ class QJAttribute(QJImmutable):
     def __hash__(self):
         return id(self)
 
-class QJAttributeMatch(QJImmutable):
-    invert: bool
-    attribute: QJAttribute
-
-    def __init__(
-        self,
-        d=None,
-        userString=None
-    ):
-        if d is not None:
-            object.__setattr__(self, 'invert', d['invert'])
-            object.__setattr__(self, 'attribute', QJAttribute(d['attribute']))
-        elif userString is not None:
-            s = userString.strip()
-            if len(s) == 0:
-                raise ValueError("Empty string!")
-            object.__setattr__(self, 'invert', s.startswith("!"))
-            if s.startswith("!"):
-                s = s[1:]
-            object.__setattr__(self, 'attribute', QJAttribute(userString=s))
-        else:
-            raise Exception("Impossible!")
-
-
-    def asDict(self):
-        return {
-            'invert': self.invert,
-            'attribute': self.attribute.asDict(),
-        }
-
-
-    def asString(self):
-        invertString = "!" if self.invert else ""
-        return f"{invertString}{self.attribute.asString()}"
-
-    def __hash__(self):
-        return id(self)
-
-
-class QJBookmark(QJImmutable):
+@dataclass
+class QJBookmark:
     enabled: bool
     category: BookmarkCategory
     name: str
     pattern: str
     patternMatch: PatternMatch
-    attributes: Tuple[QJAttributeMatch]
+    attributes: List[QJAttributeMatch]
 
     def __init__(self, d):
-        object.__setattr__(self, 'enabled', d['enabled'])
-        object.__setattr__(self, 'category', BookmarkCategory(d['category']))
-        object.__setattr__(self, 'name', d['name'])
-        object.__setattr__(self, 'pattern', d['pattern'])
-        object.__setattr__(self, 'patternMatch', PatternMatch(d['patternMatch']))
-        object.__setattr__(self, 'attributes', tuple([
+        self.enabled = d['enabled']
+        self.category = BookmarkCategory(d['category'])
+        self.name = d['name']
+        self.pattern = d['pattern']
+        self.patternMatch = PatternMatch(d['patternMatch'])
+        self.attributes = [
             QJAttributeMatch(attrDict)
-            for attrDict in d['attributes']
-        ]))
+            for attrDict in d.get('attributes', [])
+        ]
 
     def asDict(self):
         return {
@@ -263,22 +228,23 @@ class QJBookmark(QJImmutable):
 
 
 
-class QJSite(QJImmutable):
+@dataclass
+class QJSite:
     domain: str
     urlMatch: URLMatch
     name: str
     focusMode: FocusMode
-    bookmarks: Tuple[QJBookmark]
+    bookmarks: List[QJBookmark]
 
     def __init__(self, d):
-        object.__setattr__(self, 'domain', d['domain'])
-        object.__setattr__(self, 'urlMatch', URLMatch(d['urlMatch']))
-        object.__setattr__(self, 'name', d['name'])
-        object.__setattr__(self, 'focusMode', FocusMode(d['focusMode']))
-        object.__setattr__(self, 'bookmarks', tuple([
+        self.domain = d['domain']
+        self.urlMatch = URLMatch(d['urlMatch'])
+        self.name = d['name']
+        self.focusMode = FocusMode(d.get('focusMode', FocusMode.UNCHANGED))
+        self.bookmarks = [
             QJBookmark(bookmarkDict)
             for bookmarkDict in d['bookmarks']
-        ]))
+        ]
 
     def asDict(self):
         return {
@@ -301,23 +267,23 @@ class QJSite(QJImmutable):
 
     def __hash__(self):
         return id(self)
-        
-    def updateBookmarks(self, bookmarks):
-        d = self.asDict()
-        d['bookmarks'] = [
-            bookmark.asDict()
-            for bookmark in bookmarks
-        ]
-        return QJSite(d)
 
-class QJConfig(QJImmutable):
-    sites: Tuple[QJSite]
+
+
+
+@dataclass
+class QJConfig:
+    # WARNING!
+    # Please treat instances of this class as immutable
+    # This class is hashable on id, so any change of global config object will lead to nasty and hard-to-debug side effects.
+
+    sites: List[QJSite]
 
     def __init__(self, d):
-        object.__setattr__(self, 'sites', tuple([
+        self.sites = [
                 QJSite(item)
                 for item in d['sites']
-        ]))
+            ]
 
     def asDict(self):
         return {
@@ -329,14 +295,6 @@ class QJConfig(QJImmutable):
 
     def __hash__(self):
         return id(self)
-        
-    def updateSites(self, sites):
-        d = self.asDict()
-        d['sites'] = [
-            site.asDict()
-            for site in sites
-        ]
-        return QJConfig(d)
 
 rulesFileName = os.path.join(globalVars.appArgs.configPath, "browserNavRules.json")
 defaultRulesFileName = os.path.join(
@@ -611,13 +569,11 @@ def editOrCreateSite(self, site=None, url=None, domain=None):
         knownSites = globalConfig.sites
     entryDialog=EditSiteDialog(None, knownSites=knownSites, site=site, url=url, domain=domain)
     if entryDialog.ShowModal()==wx.ID_OK:
-        config = globalConfig
-        sites = list(config.sites)
+        config = copy.deepcopy(globalConfig)
         if index is not None:
-            sites[index] = entryDialog.site
+            config.sites[index] = entryDialog.site
         else:
-            sites.append(entryDialog.site)
-        config = config.updateSites(sites)
+            config.sites.append(entryDialog.site)
         globalConfig = config
         saveConfig()
 def makeWebsiteSubmenu(self, frame):
@@ -671,7 +627,6 @@ class EditBookmarkDialog(wx.Dialog):
                 'name': "",
                 'pattern': "",
                 'patternMatch': PatternMatch.SUBSTRING,
-                'attributes': [],
             })
 
       # Translators: pattern
@@ -799,7 +754,7 @@ class EditBookmarkDialog(wx.Dialog):
     def onOk(self,evt):
         bookmark = self.make()
         if bookmark is not None:
-            self.bookmark = bookmark
+            self.bookmark = rule
             evt.Skip()
 
 class BookmarksListDialog(
@@ -810,7 +765,6 @@ class BookmarksListDialog(
         title=_("Edit bookmarks for %s") % site.getDisplayName()
         super(BookmarksListDialog,self).__init__(parent,title=title)
         self.site = site
-        self.bookmarks = list(site.bookmarks)
         self.config = config
         mainSizer=wx.BoxSizer(wx.VERTICAL)
         sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
@@ -830,7 +784,7 @@ class BookmarksListDialog(
         self.rulesList.InsertColumn(3, _("Category"))
         self.rulesList.InsertColumn(4, _("Enabled"))
         self.rulesList.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.onListItemFocused)
-        self.rulesList.ItemCount = len(self.bookmarks)
+        self.rulesList.ItemCount = len(self.site.bookmarks)
 
         bHelper = sHelper.addItem(guiHelper.ButtonHelper(orientation=wx.HORIZONTAL))
       # Buttons
@@ -851,7 +805,7 @@ class BookmarksListDialog(
         self.rulesList.SetFocus()
 
     def getItemTextForList(self, item, column):
-        bookmark = self.bookmarks[item]
+        bookmark = self.site.bookmarks[item]
         if column == 0:
             return bookmark.getDisplayName()
         elif column == 1:
@@ -869,7 +823,7 @@ class BookmarksListDialog(
         if self.rulesList.GetSelectedItemCount()!=1:
             return
         index=self.rulesList.GetFirstSelected()
-        bookmark = self.bookmarks[index]
+        bookmark = self.site.bookmarks[index]
 
     def OnAddClick(self,evt):
         entryDialog=EditBookmarkDialog(
@@ -878,8 +832,8 @@ class BookmarksListDialog(
             site=self.site,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
-            self.bookmarks.append(entryDialog.bookmark)
-            self.rulesList.ItemCount = len(self.bookmarks)
+            self.site.bookmarks.append(entryDialog.bookmark)
+            self.rulesList.ItemCount = len(self.site.bookmarks)
             index = self.rulesList.ItemCount - 1
             self.rulesList.Select(index)
             self.rulesList.Focus(index)
@@ -896,12 +850,12 @@ class BookmarksListDialog(
             return
         entryDialog=EditBookmarkDialog(
             self,
-            bookmark=self.bookmarks[editIndex],
+            bookmark=self.site.bookmarks[editIndex],
             config=self.config,
             site=self.site,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
-            self.bookmarks[editIndex] = entryDialog.bookmark
+            self.site.bookmarks[editIndex] = entryDialog.bookmark
             self.rulesList.SetFocus()
         entryDialog.Destroy()
 
@@ -909,7 +863,7 @@ class BookmarksListDialog(
         index=self.rulesList.GetFirstSelected()
         while index>=0:
             self.rulesList.DeleteItem(index)
-            del self.bookmarks[index]
+            del self.site.bookmarks[index]
             index=self.rulesList.GetNextSelected(index)
         self.rulesList.SetFocus()
 
@@ -920,18 +874,18 @@ class BookmarksListDialog(
         if index<0:
             return
         newIndex = index + increment
-        if 0 <= newIndex < len(self.bookmarks):
+        if 0 <= newIndex < len(self.site.bookmarks):
             # Swap
-            tmp = self.bookmarks[index]
-            self.bookmarks[index] = self.bookmarks[newIndex]
-            self.bookmarks[newIndex] = tmp
+            tmp = self.site.bookmarks[index]
+            self.site.bookmarks[index] = self.site.bookmarks[newIndex]
+            self.site.bookmarks[newIndex] = tmp
             self.rulesList.Select(newIndex)
             self.rulesList.Focus(newIndex)
         else:
             return
 
     def OnSortClick(self,evt):
-        self.bookmarks.sort(key=QJSite.getDisplayName)
+        self.site.bookmarks.sort(key=QJSite.getDisplayName)
 
     def onOk(self,evt):
         evt.Skip()
@@ -949,8 +903,7 @@ class EditSiteDialog(wx.Dialog):
                 'domain':domain or url or "",
                 'name':'',
                 'urlMatch':URLMatch.EXACT.value if url is not None else URLMatch.SUBDOMAIN.value,
-                'focusMode':FocusMode.UNCHANGED.value,
-                'bookmarks': [],
+                'focusMode':FocusMode.UNCHANGED.value
             })
         self.config = config
         self.knownSites = knownSites
@@ -1039,10 +992,6 @@ class EditSiteDialog(wx.Dialog):
             'urlMatch':urlMatch,
             'name':self.commentTextCtrl.Value,
             'focusMode': list(FocusMode)[self.focusModeCategory.control.GetSelection()],
-            'bookmarks': [
-                b.asDict()
-                for b in self.site.bookmarks
-            ]
         })
         return site
 
@@ -1054,8 +1003,7 @@ class EditSiteDialog(wx.Dialog):
             config=self.config,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
-            self.site = self.site.updateBookmarks(entryDialog.bookmarks)
-            mylog(f"EditSiteDialog.editBookmarks2 nb={len(self.site.bookmarks)}")
+            self.site.bookmarks = entryDialog.site.bookmarks
         entryDialog.Destroy()
 
     def onOk(self,evt):
@@ -1132,8 +1080,7 @@ class SettingsDialog(SettingsPanel):
     def OnAddClick(self,evt):
         entryDialog=EditSiteDialog(self, knownSites=self.config.sites, config=self.config)
         if entryDialog.ShowModal()==wx.ID_OK:
-            sites = list(self.config.sites) + [entryDialog.site]
-            self.config = self.config.updateSites(sites)
+            self.config.sites.append(entryDialog.site)
             self.sitesList.ItemCount = len(self.config.sites)
             index = self.sitesList.ItemCount - 1
             self.sitesList.Select(index)
@@ -1156,9 +1103,7 @@ class SettingsDialog(SettingsPanel):
             config=self.config,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
-            sites = list(self.config.sites)
-            sites[editIndex] = entryDialog.site
-            self.config = self.config.updateSites(sites)
+            self.config.sites[editIndex] = entryDialog.site
             self.sitesList.SetFocus()
         entryDialog.Destroy()
 
@@ -1174,20 +1119,16 @@ class SettingsDialog(SettingsPanel):
             config=self.config,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
-            sites = list(self.config.sites)
-            sites[editIndex] = sites[editIndex].updateBookmarks(entryDialog.bookmarks)
-            self.config = self.config.updateSites(sites)
+            self.config.sites[editIndex].bookmarks = entryDialog.site.bookmarks
             self.sitesList.SetFocus()
         entryDialog.Destroy()
 
     def OnRemoveClick(self,evt):
-        sites = list(self.config.sites)
         index=self.sitesList.GetFirstSelected()
         while index>=0:
             self.sitesList.DeleteItem(index)
-            del sites[index]
+            del self.config.sites[index]
             index=self.sitesList.GetNextSelected(index)
-        self.config = self.config.updateSites(sites)
         self.sitesList.SetFocus()
 
     def OnMoveClick(self,evt, increment):
@@ -1198,21 +1139,17 @@ class SettingsDialog(SettingsPanel):
             return
         newIndex = index + increment
         if 0 <= newIndex < len(self.config.sites):
-            sites = list(self.config.sites)
             # Swap
-            tmp = sites[index]
-            sites[index] = sites[newIndex]
-            sites[newIndex] = tmp
-            self.config = self.config.updateSites(sites)
+            tmp = self.config.sites[index]
+            self.config.sites[index] = self.config.sites[newIndex]
+            self.config.sites[newIndex] = tmp
             self.sitesList.Select(newIndex)
             self.sitesList.Focus(newIndex)
         else:
             return
 
     def OnSortClick(self,evt):
-        sites = list(self.config.sites)
-        sites.sort(key=QJSite.getDisplayName)
-        self.config = self.config.updateSites(sites)
+        self.config.sites.sort(key=QJSite.getDisplayName)
 
     def onSave(self):
         global globalConfig
