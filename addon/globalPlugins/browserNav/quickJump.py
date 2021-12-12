@@ -24,6 +24,7 @@ import textInfos
 import tones
 from typing import List, Tuple
 import ui
+import weakref
 import wx
 
 from . beeper import *
@@ -45,6 +46,24 @@ if debug:
 else:
     def mylog(s):
         pass
+
+
+def weakMemoize(func):
+    cache = weakref.WeakKeyDictionary()
+
+    def memoized_func(*args):
+        arg = args[0]
+        if len(args) > 1:
+            raise Exception("Only supports single argument!")
+        value = cache.get(arg)
+        if value is not None:
+            return value
+        result = func(*args)
+        cache.update({arg: result})
+        return result
+
+    return memoized_func
+
 class BookmarkCategory(Enum):
     QUICK_JUMP = 1
     QUICK_JUMP_2 = 2
@@ -104,7 +123,7 @@ patterMatchNames = {
 class ParagraphAttribute(Enum):
     ROLE = 'role'
     FONT_SIZE = 'font-size'
-    
+
 class  QJImmutable:
     def __setattr__(self, *args):
         raise TypeError
@@ -118,6 +137,7 @@ class QJAttribute(QJImmutable):
     def __init__(
         self,
         d=None,
+        role=None,
         userString=None
     ):
         if d is not None:
@@ -176,12 +196,6 @@ class QJAttribute(QJImmutable):
         return f"{self.attribute.value}:{value}"
 
 
-
-
-
-    def __hash__(self):
-        return id(self)
-
 class QJAttributeMatch(QJImmutable):
     invert: bool
     attribute: QJAttribute
@@ -219,6 +233,12 @@ class QJAttributeMatch(QJImmutable):
 
     def __hash__(self):
         return id(self)
+        
+    def matches(self, attributes):
+        if not self.invert:
+            return self.attribute in attributes
+        else:
+            return self.attribute not in attributes
 
 
 class QJBookmark(QJImmutable):
@@ -301,7 +321,7 @@ class QJSite(QJImmutable):
 
     def __hash__(self):
         return id(self)
-        
+
     def updateBookmarks(self, bookmarks):
         d = self.asDict()
         d['bookmarks'] = [
@@ -329,7 +349,7 @@ class QJConfig(QJImmutable):
 
     def __hash__(self):
         return id(self)
-        
+
     def updateSites(self, sites):
         d = self.asDict()
         d['sites'] = [
@@ -444,7 +464,9 @@ def isUrlMatch(url, site):
     elif site.urlMatch == URLMatch.EXACT:
         return site.domain.lower() ==  url.lower()
     elif site.urlMatch == URLMatch.REGEX:
-        return re_compile(site.domain).match(url) is not None
+        return re_compile(site.domain).search(url) is not None
+    else:
+        raise Exception("Impossible!")
 
 @functools.lru_cache()
 def findSites(url, config):
@@ -464,11 +486,27 @@ def getFocusMode(url, config):
         for site in sites
     ])
     return FocusMode(mode)
+    
+@weakMemoize
+def getUrlFromObject(object):
+    while object is not None:
+        try:
+            interceptor = object.treeInterceptor
+        except AttributeError:
+            pass
+        if interceptor is not None:
+            url = interceptor.documentConstantIdentifier
+            if url is not None and len(url) > 0:
+                return url
+        object = object.simpleParent
 
+@weakMemoize
 def getUrl(self):
     url = self.documentConstantIdentifier
-    if url is None:
-        return ""
+    if url is None or len(url) == 0:
+        url = getUrlFromObject(self.currentNVDAObject)
+        if url is None or len(url) == 0:
+            return ""
     return url
 
 originalShouldPassThrough = None
@@ -525,7 +563,7 @@ def matchWidthCompositeRegex(bookmarks, text):
     if len(matchIndices) == 0:
         return
     i = matchIndices[0]
-    
+
     groupName = f"{NAMED_REGEX_PREFIX}{i}"
     mylog(f"i={i}")
     mylog(f"groupName={groupName}")
@@ -536,21 +574,37 @@ def matchWidthCompositeRegex(bookmarks, text):
         start=m.start(groupName),
         end=m.end(groupName),
     )
+def matchAllWidthCompositeRegex(bookmarks, text):
+    result = []
+    while True:
+        m = matchWidthCompositeRegex(bookmarks, text)
+        if not m:
+            return result
+        result.append(m)
+        bookmarks = [
+            b
+            for b in bookmarks
+            if b != m.bookmark
+        ]
 
 @functools.lru_cache()
-def findApplicableBookmarks(config, url, category):
+def findApplicableBookmarks(config, url, category=None):
     sites = findSites(url, config)
     bookmarks = [
         bookmark
         for site in sites
         for bookmark in site.bookmarks
-        if bookmark.category == category
+        if (
+            bookmark.category == category
+            or category is None
+        )
+        and bookmark.enabled
     ]
     return tuple(bookmarks)
 
 def extractAttributes(textInfo):
     #result = defaultdict(set)
-    result = []
+    result = set()
     fields = textInfo.getTextWithFields()
     for field in fields:
         if not isinstance(field, textInfos.FieldCommand):
@@ -558,11 +612,11 @@ def extractAttributes(textInfo):
         elif field.command == 'controlStart':
             role = field.field['role']
             #result[ParagraphAttribute.ROLE].add(role)
-            result.append(QJAttributeMatch(role=role))
+            result.add(QJAttribute(role=role))
         elif field.command == 'formatChange':
             try:
                 #result[ParagraphAttribute.FONT_SIZE].add(field.field['font-size'])
-                result.append(QJAttributeMatch(attribute=ParagraphAttribute.FONT_SIZE, value=field.field['font-size']))
+                result.add(QJAttribute(attribute=ParagraphAttribute.FONT_SIZE, value=field.field['font-size']))
             except KeyError:
                 pass
         else:
@@ -603,23 +657,26 @@ def quickJump(self, gesture, category, direction, errorMsg):
 
 def editOrCreateSite(self, site=None, url=None, domain=None):
     global globalConfig
+    config = globalConfig
     try:
-        index = globalConfig.sites.index(site)
-        knownSites = globalConfig.sites[:index] + globalConfig.sites[index+1:]
+        index = config.sites.index(site)
+        knownSites = config.sites[:index] + globalConfig.sites[index+1:]
     except ValueError:
         index = None
-        knownSites = globalConfig.sites
+        knownSites = config.sites
     entryDialog=EditSiteDialog(None, knownSites=knownSites, site=site, url=url, domain=domain)
     if entryDialog.ShowModal()==wx.ID_OK:
-        config = globalConfig
         sites = list(config.sites)
+        mylog(f"len(sites) = {len(sites)} index={index}")
         if index is not None:
             sites[index] = entryDialog.site
         else:
             sites.append(entryDialog.site)
+        mylog(f"Afterwards len(sites) = {len(sites)} new name = {entryDialog.site.getDisplayName()}")
         config = config.updateSites(sites)
         globalConfig = config
         saveConfig()
+        mylog(f"Config saved!")
 def makeWebsiteSubmenu(self, frame):
     url = getUrl(self)
     sites = findSites(url, globalConfig)
@@ -645,7 +702,7 @@ def makeWebsiteSubmenu(self, frame):
         )
     except ValueError:
         pass
-    menuStr = _("Create new website for exact URL %s") % url
+    menuStr = _("Create new website with custom URL matching options")
     item = menu.Append(wx.ID_ANY, menuStr)
     frame.Bind(
         wx.EVT_MENU,
@@ -655,11 +712,39 @@ def makeWebsiteSubmenu(self, frame):
     return menu
 
 
+def makeBookmarkSubmenu(self, frame):
+    textInfo = self.selection.copy()
+    textInfo.collapse()
+    textInfo.expand(textInfos.UNIT_PARAGRAPH)
+    text = textInfo.text
+    url = getUrl(self)
+    sites = findSites(url, globalConfig)
+    bookmarks = findApplicableBookmarks(globalConfig, url, category=None)
+    matches = matchAllWidthCompositeRegex(bookmarks, text)
+    attributes = extractAttributes(textInfo)
+    menu = wx.Menu()
+    for m in matches:
+        bookmark = m.bookmark
+        site_ = [
+            site 
+            for site in sites
+            if bookmark in sites
+        ]
+        if len(site_) != 1:
+            raise Exception("Impossible!")
+        site = site_[0]
+        attributesMatch = all([
+            am.matches(attributes)
+            for am in bookmark.attributes
+        ])
+
+
 class EditBookmarkDialog(wx.Dialog):
-    def __init__(self, parent, bookmark=None, config=None, site=None, textInfo=None):
+    def __init__(self, parent, bookmark=None, config=None, site=None, allowSiteSelection=False, textInfo=None):
         title=_("Edit browserNav bookmark")
         super(EditBookmarkDialog,self).__init__(parent,title=title)
         self.config=config
+        self.oldSite = site
         mainSizer=wx.BoxSizer(wx.VERTICAL)
         sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
         if bookmark is  not None:
@@ -700,6 +785,22 @@ class EditBookmarkDialog(wx.Dialog):
             choices=[BookmarkCategoryNames[i] for i in BookmarkCategory],
         )
         self.categoryComboBox.control.SetSelection(list(BookmarkCategory).index(self.bookmark.category))
+      # Translators: site  comboBox
+        labelText=_("&Site this bookmark belongs to:")
+        self.siteComboBox=guiHelper.LabeledControlHelper(
+            self,
+            labelText,
+            wx.Choice,
+            choices=[
+                site.getDisplayName()
+                for site in self.config.sites
+            ],
+        )
+        self.siteComboBox.control.SetSelection(
+            self.config.sites.index(self.oldSite)
+        )
+        if not allowSiteSelection:
+            self.siteComboBox.control.Disable()
       # Translators: label for enabled checkbox
         enabledText = _("Bookmark enabled")
         self.enabledCheckBox=sHelper.addItem(wx.CheckBox(self,label=enabledText))
@@ -755,7 +856,7 @@ class EditBookmarkDialog(wx.Dialog):
 
         if errorMsg is not None:
             # Translators: This is an error message to let the user know that the pattern field is not valid.
-            gui.messageBox(errorMsg, _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
+            gui.messageBox(errorMsg, _("Bookmark entry error"), wx.OK|wx.ICON_WARNING, self)
             self.patternTextCtrl.SetFocus()
             return
         try:
@@ -765,7 +866,7 @@ class EditBookmarkDialog(wx.Dialog):
             ]
         except ValueError as e:
             errorMsg = _(f'Cannot parse attribute: {e}')
-            gui.messageBox(errorMsg, _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
+            gui.messageBox(errorMsg, _("Bookmark Entry Error"), wx.OK|wx.ICON_WARNING, self)
             self.attributesTextCtrl.SetFocus()
             return
 
@@ -778,7 +879,22 @@ class EditBookmarkDialog(wx.Dialog):
             'attributes': attributes,
         })
         return bookmark
-
+        
+    def makeNewSite(self):
+        newSite = self.config.sites[self.siteComboBox.control.GetSelection()]
+        if newSite != self.oldSite:
+            result = gui.messageBox(
+                _("Warning: you are about to move this bookmark to site %s. This bookmark will disappear from the old site %s. Would you like to proceed?") % (newSite.getDisplayName(), self.oldSite.getDisplayName()), 
+                _("Bookmark Entry warning"), 
+                wx.YES|wx.NO|wx.ICON_WARNING,
+                self
+            )
+            if result == wx.YES:
+                return newSite
+            else:
+                self.siteComboBox.control.SetFocus()
+                return None
+        return newSite
 
     def onChar(self, event):
         keyCode = event.GetKeyCode ()
@@ -799,8 +915,11 @@ class EditBookmarkDialog(wx.Dialog):
     def onOk(self,evt):
         bookmark = self.make()
         if bookmark is not None:
-            self.bookmark = bookmark
-            evt.Skip()
+            newSite = self.makeNewSite()
+            if newSite is  not None:
+                self.bookmark = bookmark
+                self.newSite = newSite
+                evt.Skip()
 
 class BookmarksListDialog(
     gui.dpiScalingHelper.DpiScalingHelperMixinWithoutInit,
@@ -899,9 +1018,24 @@ class BookmarksListDialog(
             bookmark=self.bookmarks[editIndex],
             config=self.config,
             site=self.site,
+            allowSiteSelection=True,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
-            self.bookmarks[editIndex] = entryDialog.bookmark
+            if self.site != entryDialog.newSite:
+                # moving to newSite!
+                del self.bookmarks[editIndex]
+                #self.rulesList.DeleteItem(editIndex)
+                self.rulesList.ItemCount = len(self.bookmarks)
+                newSite = entryDialog.newSite
+                bookmarks = list(newSite.bookmarks)
+                bookmarks.append(entryDialog.bookmark)
+                newSite2 = newSite.updateBookmarks(bookmarks)
+                sites = list(self.config.sites)
+                index = sites.index(newSite)
+                sites[index] = newSite2
+                self.config = self.config.updateSites(sites)
+            else:
+                self.bookmarks[editIndex] = entryDialog.bookmark
             self.rulesList.SetFocus()
         entryDialog.Destroy()
 
@@ -1055,6 +1189,7 @@ class EditSiteDialog(wx.Dialog):
         )
         if entryDialog.ShowModal()==wx.ID_OK:
             self.site = self.site.updateBookmarks(entryDialog.bookmarks)
+            self.config = entryDialog.config
             mylog(f"EditSiteDialog.editBookmarks2 nb={len(self.site.bookmarks)}")
         entryDialog.Destroy()
 
@@ -1100,7 +1235,7 @@ class SettingsDialog(SettingsPanel):
         self.editButton.Bind(wx.EVT_BUTTON, self.OnEditClick)
         self.editRulesButton = bHelper.addButton(self, label=_("Edit &bookmarks"))
         self.editRulesButton.Bind(wx.EVT_BUTTON, self.OnEditRulesClick)
-        self.removeButton = bHelper.addButton(self, label=_("&Remove bookmark"))
+        self.removeButton = bHelper.addButton(self, label=_("&Remove site"))
         self.removeButton.Bind(wx.EVT_BUTTON, self.OnRemoveClick)
         self.moveUpButton = bHelper.addButton(self, label=_("Move &up"))
         self.moveUpButton.Bind(wx.EVT_BUTTON, lambda evt: self.OnMoveClick(evt, -1))
@@ -1133,6 +1268,7 @@ class SettingsDialog(SettingsPanel):
         entryDialog=EditSiteDialog(self, knownSites=self.config.sites, config=self.config)
         if entryDialog.ShowModal()==wx.ID_OK:
             sites = list(self.config.sites) + [entryDialog.site]
+            self.config = entryDialog.config
             self.config = self.config.updateSites(sites)
             self.sitesList.ItemCount = len(self.config.sites)
             index = self.sitesList.ItemCount - 1
@@ -1156,6 +1292,7 @@ class SettingsDialog(SettingsPanel):
             config=self.config,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
+            self.config = entryDialog.config
             sites = list(self.config.sites)
             sites[editIndex] = entryDialog.site
             self.config = self.config.updateSites(sites)
@@ -1174,6 +1311,7 @@ class SettingsDialog(SettingsPanel):
             config=self.config,
         )
         if entryDialog.ShowModal()==wx.ID_OK:
+            self.config = entryDialog.config
             sites = list(self.config.sites)
             sites[editIndex] = sites[editIndex].updateBookmarks(entryDialog.bookmarks)
             self.config = self.config.updateSites(sites)
