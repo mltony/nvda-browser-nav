@@ -198,7 +198,7 @@ class QJAttribute(QJImmutable):
         return f"{self.attribute.value}:{value}"
 
     def __members(self):
-        return (self.attribute, self.value)
+        return (self.attribute.value, self.value)
 
     def __eq__(self, other):
         if type(other) is type(self):
@@ -622,7 +622,7 @@ def findApplicableBookmarks(config, url, category=None):
     ]
     return tuple(bookmarks)
 
-def extractAttributes(textInfo):
+def extractAttributesSet(textInfo):
     #result = defaultdict(set)
     result = set()
     fields = textInfo.getTextWithFields()
@@ -644,6 +644,10 @@ def extractAttributes(textInfo):
                 pass
         else:
             pass
+    return result
+
+def extractAttributes(textInfo):
+    result = extractAttributesSet(textInfo)
     return sorted(list(result))
 
 def extractDefaultAttributeMatches(textInfo):
@@ -677,19 +681,27 @@ def quickJump(self, gesture, category, direction, errorMsg):
             return
         textInfo.expand(textInfos.UNIT_PARAGRAPH)
         text = textInfo.text
-        m = matchWidthCompositeRegex(bookmarks, text)
-        if m:
-            textInfo.collapse()
-            textInfo.move(textInfos.UNIT_CHARACTER, m.start)
-            textInfo.move(textInfos.UNIT_CHARACTER, len(m.text), endPoint='end')
-            textInfo.updateCaret()
-            beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-            speech.speakTextInfo(textInfo, reason=REASON_CARET)
-            textInfo.collapse()
-            self._set_selection(textInfo)
-            self.selection = textInfo
-            return
-
+        matches = matchAllWidthCompositeRegex(bookmarks, text)
+        attrs = None
+        for m in matches:
+            bookmark = m.bookmark
+            if len(bookmark.attributes) > 0:
+                if attrs is None:
+                    attrs = extractAttributesSet(textInfo)
+            if all([
+                am.matches(attrs)
+                for am in bookmark.attributes
+            ]):
+                textInfo.collapse()
+                textInfo.move(textInfos.UNIT_CHARACTER, m.start)
+                textInfo.move(textInfos.UNIT_CHARACTER, len(m.text), endPoint='end')
+                textInfo.updateCaret()
+                beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
+                speech.speakTextInfo(textInfo, reason=REASON_CARET)
+                textInfo.collapse()
+                self._set_selection(textInfo)
+                self.selection = textInfo
+                return
 
 def editOrCreateSite(self, site=None, url=None, domain=None):
     global globalConfig
