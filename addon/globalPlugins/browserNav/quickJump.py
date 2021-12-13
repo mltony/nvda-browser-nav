@@ -124,12 +124,14 @@ class ParagraphAttribute(Enum):
     ROLE = 'role'
     FONT_SIZE = 'font-size'
 
-class  QJImmutable:
+class QJImmutable:
     def __setattr__(self, *args):
         raise TypeError
     def __delattr__(self, *args):
         raise TypeError
-
+        
+        
+@functools.total_ordering
 class QJAttribute(QJImmutable):
     attribute: ParagraphAttribute
     value: any
@@ -144,15 +146,15 @@ class QJAttribute(QJImmutable):
             object.__setattr__(self, 'attribute', ParagraphAttribute(d['attribute']))
             value = d['value']
             if self.attribute == ParagraphAttribute.ROLE:
-                value = controlTypes.Role(self.value)
+                value = controlTypes.Role(value)
             object.__setattr__(self, 'value', value)
         elif userString is not None:
             s = userString.strip()
             if s.startswith("!"):
-                s.invert = True
+                object.__setattr__(self, 'invert', True)
                 s = s[1:]
             else:
-                self.invert = False
+                object.__setattr__(self, 'invert', False)
             tokens = s.split(":")
             if len(tokens) != 2:
                 raise ValueError(f"Invalid format of attribute! After splitting by : found {len(tokens)} tokens, but expected 2. userString='{s}'")
@@ -161,10 +163,10 @@ class QJAttribute(QJImmutable):
             except ValueError as e:
                 raise ValueError(f"Invalid attribute {tokens[0]}. User string='{userString}'.", e)
             if self.attribute == ParagraphAttribute.ROLE:
-                roleName = tokens[2].lower()
+                roleName = tokens[1].lower()
                 roles = [
                     role
-                    for role.name in controlTypes.roleLabels.items()
+                    for role,name in controlTypes.roleLabels.items()
                     if name.lower() == roleName
                 ]
                 if len(roles) == 0:
@@ -195,6 +197,24 @@ class QJAttribute(QJImmutable):
             value = self.value
         return f"{self.attribute.value}:{value}"
 
+    def __members(self):
+        return (self.attribute, self.value)
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.__members() == other.__members()
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.__members())
+        
+    def __lt__(self, other):
+        if type(other) is type(self):
+            return self.__members() < other.__members()
+        else:
+            return False
+    
 
 class QJAttributeMatch(QJImmutable):
     invert: bool
@@ -233,7 +253,7 @@ class QJAttributeMatch(QJImmutable):
 
     def __hash__(self):
         return id(self)
-        
+
     def matches(self, attributes):
         if not self.invert:
             return self.attribute in attributes
@@ -268,7 +288,7 @@ class QJBookmark(QJImmutable):
             'pattern': self.pattern,
             'patternMatch': self.patternMatch.value,
             'attributes': [
-                attr.toDict()
+                attr.asDict()
                 for attr in self.attributes
             ]
         }
@@ -486,7 +506,7 @@ def getFocusMode(url, config):
         for site in sites
     ])
     return FocusMode(mode)
-    
+
 @weakMemoize
 def getUrlFromObject(object):
     while object is not None:
@@ -581,11 +601,11 @@ def matchAllWidthCompositeRegex(bookmarks, text):
         if not m:
             return result
         result.append(m)
-        bookmarks = [
+        bookmarks = tuple([
             b
             for b in bookmarks
             if b != m.bookmark
-        ]
+        ])
 
 @functools.lru_cache()
 def findApplicableBookmarks(config, url, category=None):
@@ -616,13 +636,29 @@ def extractAttributes(textInfo):
         elif field.command == 'formatChange':
             try:
                 #result[ParagraphAttribute.FONT_SIZE].add(field.field['font-size'])
-                result.add(QJAttribute(attribute=ParagraphAttribute.FONT_SIZE, value=field.field['font-size']))
+                result.add(QJAttribute({
+                    'attribute': ParagraphAttribute.FONT_SIZE, 
+                    'value': field.field['font-size'],
+                }))
             except KeyError:
                 pass
         else:
             pass
-    return result
+    return sorted(list(result))
 
+def extractDefaultAttributeMatches(textInfo):
+    attrs = extractAttributes(textInfo)
+    result = [
+        QJAttributeMatch(userString=attr.asString()).asDict()
+        for attr in attrs
+        if attr.attribute == ParagraphAttribute.ROLE
+        and attr.value in {
+            controlTypes.ROLE_BUTTON,
+            controlTypes.ROLE_LINK,
+            controlTypes.ROLE_EDITABLETEXT,
+        }
+    ]
+    return result
 
 def quickJump(self, gesture, category, direction, errorMsg):
     bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
@@ -687,7 +723,7 @@ def makeWebsiteSubmenu(self, frame):
         item = menu.Append(wx.ID_ANY, menuStr)
         frame.Bind(
             wx.EVT_MENU,
-            lambda evt: editOrCreateSite(self, site=site),
+            lambda evt, site=site: editOrCreateSite(self, site=site),
             item,
         )
 
@@ -711,24 +747,107 @@ def makeWebsiteSubmenu(self, frame):
     )
     return menu
 
+def editOrCreateBookmark(self, site, bookmark=None, paragraphInfo=None, text=None):
+    global globalConfig
+    config = globalConfig
+    siteIndex = config.sites.index(site)
+    if bookmark is not None:
+        bookmarkIndex = site.bookmarks.index(bookmark)
+    else:
+        bookmarkIndex = None
+    entryDialog=EditBookmarkDialog(
+        parent=None,
+        bookmark=bookmark,
+        config=config,
+        site=site,
+        paragraphInfo=paragraphInfo,
+        allowSiteSelection=(bookmark is not None),
+        text=text,
+    )
+    if entryDialog.ShowModal()==wx.ID_OK:
+        if site != entryDialog.newSite:
+            # moving to newSite!
+            # Step 1: updating destination site by adding bookmark there
+            newSite = entryDialog.newSite
+            bookmarks = list(newSite.bookmarks)
+            bookmarks.append(entryDialog.bookmark)
+            newSite2 = newSite.updateBookmarks(bookmarks)
+            sites = list(config.sites)
+            index = sites.index(newSite)
+            sites[index] = newSite2
+            # Step 2: Removing bookmark from old site:
+            bookmarks = list(sites[siteIndex].bookmarks)
+            del bookmarks[bookmarkIndex]
+            sites[siteIndex] = sites[siteIndex].updateBookmarks(bookmarks)
+
+            config = config.updateSites(sites)
+        else:
+            # Adding or updating bookmark
+            sites = list(config.sites)
+            bookmarks = list(sites[siteIndex].bookmarks)
+            if bookmarkIndex is not None:
+                bookmarks[bookmarkIndex] = entryDialog.bookmark
+            else:
+                bookmarks.append(entryDialog.bookmark)
+            sites[siteIndex] = sites[siteIndex].updateBookmarks(bookmarks)
+
+            config = config.updateSites(sites)
+        globalConfig = config
+        saveConfig()
 
 def makeBookmarkSubmenu(self, frame):
+    menu = wx.Menu()
     textInfo = self.selection.copy()
-    textInfo.collapse()
-    textInfo.expand(textInfos.UNIT_PARAGRAPH)
-    text = textInfo.text
+    paragraphInfo = textInfo.copy()
+    paragraphInfo.collapse()
+    paragraphInfo.expand(textInfos.UNIT_PARAGRAPH)
+    if textInfo.isCollapsed:
+        withinParagraph = True
+        text = paragraphInfo.text
+    else:
+        text = textInfo.text
+        beginInfo = textInfo.copy()
+        beginInfo.collapse()
+        beginInfo.expand(textInfos.UNIT_PARAGRAPH)
+        endInfo = textInfo.copy()
+        endInfo.collapse(end=True)
+        endInfo.move(textInfos.UNIT_CHARACTER, -1)
+        endInfo.expand(textInfos.UNIT_PARAGRAPH)
+        withinParagraph = beginInfo == endInfo
+    if not withinParagraph:
+        menuStr = _("Current selection spans across multiple paragraphs.")
+        errorMsg = menuStr + "\n" + _("Bookmarks that span across paragraphs is not supported by BrowserNav. Please clear the selection or select something within a single paragraph.")
+        item = menu.Append(wx.ID_ANY, menuStr)
+        frame.Bind(
+            wx.EVT_MENU,
+            lambda evt: gui.messageBox(errorMsg, _("Bookmark Error"), wx.OK|wx.ICON_WARNING, frame),
+            item,
+        )
+        return menu
     url = getUrl(self)
     sites = findSites(url, globalConfig)
+    if len(sites) == 0:
+        menuStr = _("No sites are configured for current URL.")
+        errorMsg = menuStr + "\n" + _("Please create a new site configuration in site submenu.")
+        item = menu.Append(wx.ID_ANY, menuStr)
+        frame.Bind(
+            wx.EVT_MENU,
+            lambda evt: gui.messageBox(errorMsg, _("Bookmark Error"), wx.OK|wx.ICON_WARNING, frame),
+            item,
+        )
+        return menu
+
     bookmarks = findApplicableBookmarks(globalConfig, url, category=None)
+    #bookmarks = tuple(bookmarks)
     matches = matchAllWidthCompositeRegex(bookmarks, text)
-    attributes = extractAttributes(textInfo)
-    menu = wx.Menu()
+    attributes = extractAttributes(paragraphInfo)
+
     for m in matches:
         bookmark = m.bookmark
         site_ = [
-            site 
+            site
             for site in sites
-            if bookmark in sites
+            if bookmark in site.bookmarks
         ]
         if len(site_) != 1:
             raise Exception("Impossible!")
@@ -737,14 +856,41 @@ def makeBookmarkSubmenu(self, frame):
             am.matches(attributes)
             for am in bookmark.attributes
         ])
+        if attributesMatch:
+            menuStr = _("Edit perfect match bookmark {bookmark} of category {category} from site {site}")
+        else:
+            menuStr = _("Edit bookmark {bookmark} of category {category} that doesn't match formatting for current paragraph from site {site}")
+        menuStr = menuStr.format(
+            bookmark=bookmark.getDisplayName(),
+            category=BookmarkCategoryNames[bookmark.category],
+            site=site.getDisplayName()
+        )
+        item = menu.Append(wx.ID_ANY, menuStr)
+        frame.Bind(
+            wx.EVT_MENU,
+            lambda evt, site=site, bookmark=bookmark: editOrCreateBookmark(self, site, bookmark, paragraphInfo),
+            item,
+        )
+    for site in sites:
+        menuStr = _("Create new bookmark from current paragraph for site {site}").format(
+            site=site.getDisplayName()
+        )
+        item = menu.Append(wx.ID_ANY, menuStr)
+        frame.Bind(
+            wx.EVT_MENU,
+            lambda evt, site=site: editOrCreateBookmark(self, site, paragraphInfo=paragraphInfo, text=text),
+            item,
+        )
+    return menu
 
 
 class EditBookmarkDialog(wx.Dialog):
-    def __init__(self, parent, bookmark=None, config=None, site=None, allowSiteSelection=False, textInfo=None):
+    def __init__(self, parent, bookmark=None, config=None, site=None, allowSiteSelection=False, paragraphInfo=None, text=None):
         title=_("Edit browserNav bookmark")
         super(EditBookmarkDialog,self).__init__(parent,title=title)
         self.config=config
         self.oldSite = site
+        self.allowSiteSelection = allowSiteSelection
         mainSizer=wx.BoxSizer(wx.VERTICAL)
         sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
         if bookmark is  not None:
@@ -754,9 +900,14 @@ class EditBookmarkDialog(wx.Dialog):
                 'enabled': True,
                 'category': BookmarkCategory.QUICK_JUMP,
                 'name': "",
-                'pattern': "",
-                'patternMatch': PatternMatch.SUBSTRING,
-                'attributes': [],
+                'pattern': text if text is not None else "",
+                'patternMatch': 
+                    PatternMatch.EXACT if (
+                        paragraphInfo is not None
+                        and text is not None
+                        and text == paragraphInfo.text
+                    ) else PatternMatch.SUBSTRING,
+                'attributes': extractDefaultAttributeMatches(paragraphInfo) if paragraphInfo is not None else [],
             })
 
       # Translators: pattern
@@ -794,12 +945,13 @@ class EditBookmarkDialog(wx.Dialog):
             choices=[
                 site.getDisplayName()
                 for site in self.config.sites
-            ],
+            ] if allowSiteSelection else [],
         )
-        self.siteComboBox.control.SetSelection(
-            self.config.sites.index(self.oldSite)
-        )
-        if not allowSiteSelection:
+        if allowSiteSelection:
+            self.siteComboBox.control.SetSelection(
+                self.config.sites.index(self.oldSite)
+            )
+        else:
             self.siteComboBox.control.Disable()
       # Translators: label for enabled checkbox
         enabledText = _("Bookmark enabled")
@@ -818,11 +970,11 @@ class EditBookmarkDialog(wx.Dialog):
             for attr in self.bookmark.attributes
         ]))
       # available attributes in current paragraph
-        labelText=_("Available attributes in current paragraph (Enter to add to current bookmark):")
+        labelText=_("Available attributes in current paragraph (press space to add to current bookmark):")
         self.attrChoices = [
             attr.asString()
-            for attr in extractAttributes(textInfo)
-        ] if textInfo is not None else []
+            for attr in extractAttributes(paragraphInfo)
+        ] if paragraphInfo is not None else []
         self.availableAttributesListBox=guiHelper.LabeledControlHelper(
             self,
             labelText,
@@ -831,7 +983,7 @@ class EditBookmarkDialog(wx.Dialog):
         )
         #self.availableAttributesListBox.control.Bind(wx.EVT_LISTBOX, self.onAvailableAttributeListChoice)
         self.availableAttributesListBox.control.Bind(wx.EVT_CHAR, self.onChar)
-        if textInfo is None:
+        if paragraphInfo is None:
             self.availableAttributesListBox.control.Disable()
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
@@ -876,16 +1028,21 @@ class EditBookmarkDialog(wx.Dialog):
             'name':self.commentTextCtrl.Value,
             'pattern': pattern,
             'patternMatch': patternMatch.value,
-            'attributes': attributes,
+            'attributes': [
+                attr.asDict()
+                for attr in attributes
+            ],
         })
         return bookmark
-        
+
     def makeNewSite(self):
+        if not self.allowSiteSelection:
+            return self.oldSite
         newSite = self.config.sites[self.siteComboBox.control.GetSelection()]
         if newSite != self.oldSite:
             result = gui.messageBox(
-                _("Warning: you are about to move this bookmark to site %s. This bookmark will disappear from the old site %s. Would you like to proceed?") % (newSite.getDisplayName(), self.oldSite.getDisplayName()), 
-                _("Bookmark Entry warning"), 
+                _("Warning: you are about to move this bookmark to site %s. This bookmark will disappear from the old site %s. Would you like to proceed?") % (newSite.getDisplayName(), self.oldSite.getDisplayName()),
+                _("Bookmark Entry warning"),
                 wx.YES|wx.NO|wx.ICON_WARNING,
                 self
             )
@@ -894,7 +1051,7 @@ class EditBookmarkDialog(wx.Dialog):
             else:
                 self.siteComboBox.control.SetFocus()
                 return None
-        return newSite
+        return self.oldSite
 
     def onChar(self, event):
         keyCode = event.GetKeyCode ()
@@ -1163,7 +1320,7 @@ class EditSiteDialog(wx.Dialog):
                     )
         if errorMsg is not None:
             # Translators: This is an error message to let the user know that the pattern field is not valid.
-            gui.messageBox(errorMsg, _("Dictionary Entry Error"), wx.OK|wx.ICON_WARNING, self)
+            gui.messageBox(errorMsg, _("Site Entry Error"), wx.OK|wx.ICON_WARNING, self)
             self.patternTextCtrl.SetFocus()
             return
         if urlMatch in {URLMatch.DOMAIN, URLMatch.SUBDOMAIN}:

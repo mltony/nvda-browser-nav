@@ -992,6 +992,7 @@ def browserNavPopup(selfself,gesture):
         imp.Append(wx.ID_ANY, 'SubMenu 2')
         imp.Append(wx.ID_ANY, 'SubMenu 3')
         menu = wx.Menu()
+        menu.AppendMenu(wx.ID_ANY, '&Bookmark', quickJump.makeBookmarkSubmenu(self, frame))
         menu.AppendMenu(wx.ID_ANY, '&Website', quickJump.makeWebsiteSubmenu(self, frame))
         menu.AppendMenu(wx.ID_ANY, '&Imp', imp)
         item = menu.Append(wx.ID_ANY, 'hahaha')
