@@ -268,6 +268,8 @@ class QJBookmark(QJImmutable):
     pattern: str
     patternMatch: PatternMatch
     attributes: Tuple[QJAttributeMatch]
+    message: str
+    offset: int
 
     def __init__(self, d):
         object.__setattr__(self, 'enabled', d['enabled'])
@@ -279,6 +281,8 @@ class QJBookmark(QJImmutable):
             QJAttributeMatch(attrDict)
             for attrDict in d['attributes']
         ]))
+        object.__setattr__(self, 'message', d['message'])
+        object.__setattr__(self, 'offset', d['offset'])
 
     def asDict(self):
         return {
@@ -290,7 +294,9 @@ class QJBookmark(QJImmutable):
             'attributes': [
                 attr.asDict()
                 for attr in self.attributes
-            ]
+            ],
+            'message': self.message,
+            'offset': self.offset,
         }
 
     def getDisplayName(self):
@@ -664,6 +670,11 @@ def extractDefaultAttributeMatches(textInfo):
     ]
     return result
 
+def moveParagraph(textInfo, offset):
+    result = textInfo.move(textInfos.UNIT_PARAGRAPH, offset)
+    textInfo.expand(textInfos.UNIT_PARAGRAPH)
+    return result
+
 def quickJump(self, gesture, category, direction, errorMsg):
     bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
     if len(bookmarks) == 0:
@@ -674,17 +685,20 @@ def quickJump(self, gesture, category, direction, errorMsg):
     distance = 0
     while True:
         distance += 1
-        textInfo.collapse()
-        result = textInfo.move(textInfos.UNIT_PARAGRAPH, direction)
+        result = moveParagraph(textInfo, direction)
         if result == 0:
             endOfDocument(errorMsg)
             return
-        textInfo.expand(textInfos.UNIT_PARAGRAPH)
         text = textInfo.text
         matches = matchAllWidthCompositeRegex(bookmarks, text)
         attrs = None
         for m in matches:
             bookmark = m.bookmark
+            if bookmark.offset * direction < 0:
+                # offset is in the opposite direction to current movement direction
+                if abs(distance) <= abs(bookmark.offset):
+                    # We don't want to hit the anchor of current bookmark again
+                    continue
             if len(bookmark.attributes) > 0:
                 if attrs is None:
                     attrs = extractAttributesSet(textInfo)
@@ -692,9 +706,14 @@ def quickJump(self, gesture, category, direction, errorMsg):
                 am.matches(attrs)
                 for am in bookmark.attributes
             ]):
-                textInfo.collapse()
-                textInfo.move(textInfos.UNIT_CHARACTER, m.start)
-                textInfo.move(textInfos.UNIT_CHARACTER, len(m.text), endPoint='end')
+                if len(bookmark.message) > 0:
+                    ui.message(bookmark.message)
+                if bookmark.offset == 0:
+                    textInfo.collapse()
+                    textInfo.move(textInfos.UNIT_CHARACTER, m.start)
+                    textInfo.move(textInfos.UNIT_CHARACTER, len(m.text), endPoint='end')
+                else:
+                    moveParagraph(textInfo, bookmark.offset)
                 textInfo.updateCaret()
                 beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                 speech.speakTextInfo(textInfo, reason=REASON_CARET)
@@ -920,6 +939,8 @@ class EditBookmarkDialog(wx.Dialog):
                         and text == paragraphInfo.text
                     ) else PatternMatch.SUBSTRING,
                 'attributes': extractDefaultAttributeMatches(paragraphInfo) if paragraphInfo is not None else [],
+                'message': "",
+                'offset': 0,
             })
 
       # Translators: pattern
@@ -974,6 +995,17 @@ class EditBookmarkDialog(wx.Dialog):
         commentLabelText = _("&Display name (optional)")
         self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
         self.commentTextCtrl.SetValue(self.bookmark.name)
+      # Translators: label for Message edit box
+        labelText = _("Spoken &message when bookmark is found:")
+        self.messageTextCtrl=sHelper.addLabeledControl(labelText, wx.TextCtrl)
+        self.messageTextCtrl.SetValue(self.bookmark.message)                
+      # offset spin
+        labelText = _("Offset in paragraphs - select a value to place the cursor on following or preceding paragraph from the bookmark match:")
+        self.offsetEdit = sHelper.addLabeledControl(
+            labelText, nvdaControls.SelectOnFocusSpinCtrl,
+            min=-100, max=100,
+            initial=self.bookmark.offset
+        )
       # attributes
         labelText = _("&Attributes (space separated list):")
         self.attributesTextCtrl=sHelper.addLabeledControl(labelText, wx.TextCtrl)
@@ -981,6 +1013,7 @@ class EditBookmarkDialog(wx.Dialog):
             attr.asString()
             for attr in self.bookmark.attributes
         ]))
+
       # available attributes in current paragraph
         labelText=_("Available attributes in current paragraph (press space to add to current bookmark):")
         self.attrChoices = [
@@ -1044,6 +1077,8 @@ class EditBookmarkDialog(wx.Dialog):
                 attr.asDict()
                 for attr in attributes
             ],
+            'message': self.messageTextCtrl.Value,
+            'offset': self.offsetEdit.Value,
         })
         return bookmark
 

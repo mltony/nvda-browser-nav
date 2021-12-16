@@ -44,6 +44,7 @@ import time
 import tones
 import types
 import ui
+from . import utils
 from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import wave
 import weakref
@@ -663,18 +664,13 @@ def unblockAllKeys():
     beeper.stop()
 
 def getSimpleHorizontalOffset(textInfo):
+    return utils.getParagraphIndent(textInfo)
     try:
         obj = textInfo.NVDAObjectAtStart
         x = obj.location[0]
         return x
     except:
         return None
-
-def getHorizontalOffset(textInfo):
-    obj = textInfo.NVDAObjectAtStart
-    x = obj.location[0]
-    return x
-
 
 def getFontSize(textInfo, formatting):
     try:
@@ -697,7 +693,7 @@ def getFormatting(info):
 def getBeepTone(textInfo):
     mode = getConfig("browserMode")
     if mode == 0:
-        offset = getHorizontalOffset(textInfo)
+        offset = getSimpleHorizontalOffset(textInfo)
         octave_pixels = 500
         base_freq = speech.IDT_BASE_FREQUENCY
         tone = base_freq * (2 ** (offset/octave_pixels))
@@ -1120,12 +1116,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         setConfig("browserMode", mode)
         ui.message("BrowserNav navigates by " + BROWSE_MODES[mode])
 
-    def generateBrowseModeExtractors(self):
+    def generateBrowseModeExtractors(self, selfself):
+        textInfo = selfself.selection
+        geckoMode = isinstance(textInfo, Gecko_ia2_TextInfo)
+        if geckoMode:
+            document = utils.getIA2Document(textInfo)
         mode = getConfig("browserMode")
         if mode == 0:
             # horizontal offset
             extractFormattingFunc = lambda x: None
-            extractIndentFunc = lambda textInfo,x: getSimpleHorizontalOffset(textInfo)
+            if geckoMode:
+                extractIndentFunc = lambda textInfo,x: utils.getGeckoParagraphIndent(textInfo, document=document)
+            else:
+                extractIndentFunc= lambda textInfo,x: getSimpleHorizontalOffset(textInfo)
             extractStyleFunc = lambda x,y: None
         elif mode in [1,2]:
             extractFormattingFunc = lambda textInfo: getFormatting(textInfo)
@@ -1160,11 +1163,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             extractFormattingFunc,
             extractIndentFunc,
             extractStyleFunc
-        ) = self.generateBrowseModeExtractors()
+        ) = self.generateBrowseModeExtractors(selfself)
 
-        focus = api.getFocusObject()
-        focus = focus.treeInterceptor
-        textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
+        textInfo = selfself.selection.copy()
+        textInfo.collapse()
         textInfo.expand(textInfos.UNIT_PARAGRAPH)
         origFormatting = extractFormattingFunc(textInfo)
         origIndent = extractIndentFunc(textInfo, origFormatting)
