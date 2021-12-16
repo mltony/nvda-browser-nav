@@ -664,7 +664,6 @@ def unblockAllKeys():
     beeper.stop()
 
 def getSimpleHorizontalOffset(textInfo):
-    return utils.getParagraphIndent(textInfo)
     try:
         obj = textInfo.NVDAObjectAtStart
         x = obj.location[0]

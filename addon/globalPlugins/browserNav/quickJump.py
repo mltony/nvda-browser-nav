@@ -38,7 +38,7 @@ except AttributeError:
 
 debug = True
 if debug:
-    f = open("C:\\Users\\tony\\drp\\2.txt", "w")
+    f = open("C:\\Users\\tony\\drp\\2.txt", "w", encoding='utf-8')
     def mylog(s):
         if debug:
             print(str(s), file=f)
