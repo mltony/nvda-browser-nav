@@ -6,15 +6,19 @@
 import api
 import config
 import ctypes
+import functools
 import math
 import NVDAHelper
 import nvwave
 import operator
+import os
 import re
 import speech
 import struct
+import threading
 import tones
 import ui
+import wave
 
 from . addonConfig import *
 
@@ -126,3 +130,41 @@ def endOfDocument(message):
     beeper.fancyBeep("HF", 100, volume, volume)
     if getConfig("noNextTextMessage"):
         ui.message(message)
+def getSoundsPath():
+    globalPluginPath = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    addonPath = os.path.split(globalPluginPath)[0]
+    soundsPath = os.path.join(addonPath, "sounds")
+    return soundsPath
+
+@functools.lru_cache(maxsize=128)
+def adjustVolume(bb, volume):
+    # Assuming bb is encoded 116 bits per value!
+    n = len(bb) // 2
+    format = f"<{n}h"
+    unpacked = struct.unpack(format, bb)
+    unpacked = [int(x * volume / 100) for x in unpacked]
+    result=  struct.pack(format, *unpacked)
+    return result
+
+spcFile=None
+spcPlayer=None
+spcBuf = None
+def skippedParagraphChime():
+    global spcFile, spcPlayer, spcBuf
+    if spcPlayer is  None:
+        spcFile = wave.open(getSoundsPath() + "\\on.wav","r")
+        spcPlayer = nvwave.WavePlayer(channels=spcFile.getnchannels(), samplesPerSec=spcFile.getframerate(),bitsPerSample=spcFile.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+        spcFile.rewind()
+        spcFile.setpos(100 *         spcFile.getframerate() // 1000)
+        spcBuf = spcFile.readframes(spcFile.getnframes())
+    def playSkipParagraphChime():
+        spcPlayer.stop()
+        spcPlayer.feed(
+            adjustVolume(
+                spcBuf,
+                getConfig("skipChimeVolume")
+            )
+        )
+        spcPlayer.idle()
+    threading.Thread(target=playSkipParagraphChime).start()
+

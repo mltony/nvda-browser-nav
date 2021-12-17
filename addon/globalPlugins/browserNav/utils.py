@@ -78,6 +78,8 @@ def getGeckoParagraphIndent(textInfo, document=None):
     # NVDAObjects.IAccessible.getNVDAObjectFromEvent
     # IAccessibleHandler.accessibleObjectFromEvent
     # oleacc.AccessibleObjectFromEvent
+    # In order to optimize performance we query IAccessible document.
+    # This allows us to have a single IAccessible object and query locations of all its children without the need to create multiple objects.
     try:
         if document is None:
             document = getIA2Document(textInfo)
@@ -91,3 +93,5 @@ def getGeckoParagraphIndent(textInfo, document=None):
     except LookupError:
         tones.beep(500, 50)
         return None
+# For quick finding paragraphs, llok at:
+# VirtualBufferTextInfo._getParagraphOffsets

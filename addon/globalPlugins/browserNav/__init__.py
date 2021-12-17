@@ -762,44 +762,6 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
         initialDelay = 0 if beepVolume==0 else 50
         beeper.simpleCrackle(paragraphs, volume=getConfig("crackleVolume"), initialDelay=initialDelay)
 
-def getSoundsPath():
-    globalPluginPath = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-    addonPath = os.path.split(globalPluginPath)[0]
-    soundsPath = os.path.join(addonPath, "sounds")
-    return soundsPath
-
-@functools.lru_cache(maxsize=128)
-def adjustVolume(bb, volume):
-    # Assuming bb is encoded 116 bits per value!
-    n = len(bb) // 2
-    format = f"<{n}h"
-    unpacked = struct.unpack(format, bb)
-    unpacked = [int(x * volume / 100) for x in unpacked]
-    result=  struct.pack(format, *unpacked)
-    return result
-
-spcFile=None
-spcPlayer=None
-spcBuf = None
-def skippedParagraphChime():
-    global spcFile, spcPlayer, spcBuf
-    if spcPlayer is  None:
-        spcFile = wave.open(getSoundsPath() + "\\on.wav","r")
-        spcPlayer = nvwave.WavePlayer(channels=spcFile.getnchannels(), samplesPerSec=spcFile.getframerate(),bitsPerSample=spcFile.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
-        spcFile.rewind()
-        spcFile.setpos(100 *         spcFile.getframerate() // 1000)
-        spcBuf = spcFile.readframes(spcFile.getnframes())
-    def playSkipParagraphChime():
-        spcPlayer.stop()
-        spcPlayer.feed(
-            adjustVolume(
-                spcBuf,
-                getConfig("skipChimeVolume")
-            )
-        )
-        spcPlayer.idle()
-    threading.Thread(target=playSkipParagraphChime).start()
-
 
 NON_SKIPPABLE_ROLES = {
     controlTypes.ROLE_CHECKBOX,
@@ -875,47 +837,7 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
         and not isinstance(self,textInfos.DocumentWithPageTurns)
         and not scriptHandler.willSayAllResume(gesture)
     ):
-        skipRe = re.compile(getConfig("skipRegex"))
-        skipped = False
-        oldInfo=self.makeTextInfo(posConstant)
-        info=oldInfo.copy()
-        info.collapse(end=self.isTextSelectionAnchoredAtStart)
-        if self.isTextSelectionAnchoredAtStart and not oldInfo.isCollapsed:
-            info.move(textInfos.UNIT_CHARACTER,-1)
-        info.expand(unit)
-        text = info.text
-        info.collapse()
-        for i in range(10):
-            result = info.move(unit,direction)
-            if result == 0:
-                break
-            expandInfo = info.copy()
-            expandInfo.expand(unit)
-            expandText = expandInfo.text
-            if skipRe.search(expandText):
-                skipped = True
-                continue
-            fields=expandInfo.getTextWithFields() or []
-            roles = {field.field['role'] for field in fields if hasattr(field, 'field') and field.field is not None and 'role' in field.field}
-            if len(roles.intersection(NON_SKIPPABLE_ROLES)) > 0:
-                mylog("Roles don't match!")
-                inter = roles.intersection(NON_SKIPPABLE_ROLES)
-                s = ",".join([controlTypes.roleLabels[r] for r in inter])
-                mylog(s)
-                break
-            if not speech.isBlank(expandText):
-                mylog("Speech is not blank!")
-                break
-            skipped = True
-
-        selection = info.copy()
-        info.expand(unit)
-        speech.speakTextInfo(info, unit=unit, reason=REASON_CARET)
-        if not oldInfo.isCollapsed:
-            speech.speakSelectionChange(oldInfo, selection)
-        self.selection = selection
-        if skipped:
-            skippedParagraphChime()
+        quickJump.caretMovementWithAutoSkip(self, gesture,unit, direction,posConstant, *args, **kwargs)
     else:
         originalCaretMovementScriptHelper(self, gesture, unit, direction, posConstant, *args, **kwargs)
     if unit not in {textInfos.UNIT_CHARACTER, textInfos.UNIT_WORD}:
@@ -1852,12 +1774,17 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "kb:J",
             "quickSearchForward",
             script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP, 1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
-            doc="QuickSearch forward according to BrowserNav rules; please check browserNav configuration panel for the list of rules.")
+            doc="QuickSearch forward according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")
         self.injectBrowseModeKeystroke(
             "kb:Shift+J",
             "quickSearchBack",
             script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP, -1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
-            doc="QuickSearch back according to BrowserNav rules; please check browserNav configuration panel for the list of rules.")
+            doc="QuickSearch back according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+        self.injectBrowseModeKeystroke(
+            "kb:Alt+J",
+            "autoClick",
+            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.AUTO_CLICK),
+            doc="AutoClick  according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")            
       # Tabs
         # Example page with tabs:
         # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html

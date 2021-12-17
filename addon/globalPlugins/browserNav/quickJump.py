@@ -69,14 +69,18 @@ class BookmarkCategory(Enum):
     QUICK_JUMP_2 = 2
     QUICK_JUMP_3 = 3
     SKIP_CLUTTER = 4
-    AUTO_PRESS = 5
+    AUTO_CLICK = 5
+    AUTO_CLICK_2 = 6
+    AUTO_CLICK_3 = 7
 
 BookmarkCategoryNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump - assigned to J by default'),
     BookmarkCategory.QUICK_JUMP_2: _('QuickJump2'),
     BookmarkCategory.QUICK_JUMP_3: _('QuickJump3'),
     BookmarkCategory.SKIP_CLUTTER: _('SkipClutter - will automatically skip this paragraph or line when navigating via Control+Up/Down or Up/Down keystrokes; must match the whole paragraph. or '),
-    BookmarkCategory.AUTO_PRESS: _('AutoPress'),
+    BookmarkCategory.AUTO_CLICK: _('AutoClick'),
+    BookmarkCategory.AUTO_CLICK_2: _('AutoClick2'),
+    BookmarkCategory.AUTO_CLICK_3: _('AutoClick3'),
 }
 
 class URLMatch(Enum):
@@ -150,28 +154,20 @@ class QJAttribute(QJImmutable):
             object.__setattr__(self, 'value', value)
         elif userString is not None:
             s = userString.strip()
-            if s.startswith("!"):
-                object.__setattr__(self, 'invert', True)
-                s = s[1:]
-            else:
-                object.__setattr__(self, 'invert', False)
             tokens = s.split(":")
             if len(tokens) != 2:
                 raise ValueError(f"Invalid format of attribute! After splitting by : found {len(tokens)} tokens, but expected 2. userString='{s}'")
             try:
-                object.__setattr__(self, 'attribute', ParagraphAttribute(tokens[0]))
+                object.__setattr__(self, 'attribute', ParagraphAttribute(tokens[0].lower()))
             except ValueError as e:
                 raise ValueError(f"Invalid attribute {tokens[0]}. User string='{userString}'.", e)
             if self.attribute == ParagraphAttribute.ROLE:
                 roleName = tokens[1].lower()
-                roles = [
-                    role
-                    for role,name in controlTypes.roleLabels.items()
-                    if name.lower() == roleName
-                ]
-                if len(roles) == 0:
+                try:
+                    tones.beep(500, 500)
+                    value = controlTypes.role.Role.__getattr__(roleName.upper())
+                except AttributeError:
                     raise ValueError(f"Invalid role '{roleName}'.")
-                value = roles[0]
             else:
                 value = tokens[1]
             object.__setattr__(self, 'value', value)
@@ -192,7 +188,7 @@ class QJAttribute(QJImmutable):
 
     def asString(self):
         if self.attribute == ParagraphAttribute.ROLE:
-            value = controlTypes.roleLabels[self.value]
+            value = self.value.name
         else:
             value = self.value
         return f"{self.attribute.value}:{value}"
@@ -315,6 +311,11 @@ class QJSite(QJImmutable):
     name: str
     focusMode: FocusMode
     bookmarks: Tuple[QJBookmark]
+    autoClickOnFocus: bool
+    autoClickCategory: BookmarkCategory
+    autoClickOnFocusDelay: int
+    autoClickContinuous: bool
+    autoClickContinuousDelay: int
 
     def __init__(self, d):
         object.__setattr__(self, 'domain', d['domain'])
@@ -593,7 +594,6 @@ def matchWidthCompositeRegex(bookmarks, text):
     groupName = f"{NAMED_REGEX_PREFIX}{i}"
     mylog(f"i={i}")
     mylog(f"groupName={groupName}")
-    api.q=m
     return BookmarkMatch(
         bookmark=bookmarks[i],
         text=m.group(groupName),
@@ -612,6 +612,26 @@ def matchAllWidthCompositeRegex(bookmarks, text):
             for b in bookmarks
             if b != m.bookmark
         ])
+        
+def matchTextAndAttributes(bookmarks, textInfo, distance=None):
+    text = textInfo.text
+    matches = matchAllWidthCompositeRegex(bookmarks, text)
+    attrs = None
+    for m in matches:
+        bookmark = m.bookmark
+        if distance is not None and bookmark.offset * distance < 0:
+            # offset is in the opposite direction to current movement direction
+            if abs(distance) <= abs(bookmark.offset):
+                # We don't want to hit the anchor of current bookmark again
+                continue
+        if len(bookmark.attributes) > 0:
+            if attrs is None:
+                attrs = extractAttributesSet(textInfo)
+        if all([
+            am.matches(attrs)
+            for am in bookmark.attributes
+        ]):
+            yield m
 
 @functools.lru_cache()
 def findApplicableBookmarks(config, url, category=None):
@@ -689,38 +709,112 @@ def quickJump(self, gesture, category, direction, errorMsg):
         if result == 0:
             endOfDocument(errorMsg)
             return
-        text = textInfo.text
-        matches = matchAllWidthCompositeRegex(bookmarks, text)
-        attrs = None
-        for m in matches:
-            bookmark = m.bookmark
-            if bookmark.offset * direction < 0:
-                # offset is in the opposite direction to current movement direction
-                if abs(distance) <= abs(bookmark.offset):
-                    # We don't want to hit the anchor of current bookmark again
-                    continue
-            if len(bookmark.attributes) > 0:
-                if attrs is None:
-                    attrs = extractAttributesSet(textInfo)
-            if all([
-                am.matches(attrs)
-                for am in bookmark.attributes
-            ]):
-                if len(bookmark.message) > 0:
-                    ui.message(bookmark.message)
-                if bookmark.offset == 0:
-                    textInfo.collapse()
-                    textInfo.move(textInfos.UNIT_CHARACTER, m.start)
-                    textInfo.move(textInfos.UNIT_CHARACTER, len(m.text), endPoint='end')
-                else:
-                    moveParagraph(textInfo, bookmark.offset)
-                textInfo.updateCaret()
-                beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-                speech.speakTextInfo(textInfo, reason=REASON_CARET)
+        for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
+            bookmark = match.bookmark
+            if len(bookmark.message) > 0:
+                ui.message(bookmark.message)
+            if bookmark.offset == 0:
                 textInfo.collapse()
-                self._set_selection(textInfo)
-                self.selection = textInfo
-                return
+                textInfo.move(textInfos.UNIT_CHARACTER, match.start)
+                textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
+            else:
+                moveParagraph(textInfo, bookmark.offset)
+            textInfo.updateCaret()
+            beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
+            speech.speakTextInfo(textInfo, reason=REASON_CARET)
+            textInfo.collapse()
+            self._set_selection(textInfo)
+            self.selection = textInfo
+            return
+            
+def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
+    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
+    api.q = bookmarks
+    skipRe = re.compile(getConfig("skipRegex"))
+    skipped = False
+    oldInfo=self.makeTextInfo(posConstant)
+    info=oldInfo.copy()
+    info.collapse(end=self.isTextSelectionAnchoredAtStart)
+    if self.isTextSelectionAnchoredAtStart and not oldInfo.isCollapsed:
+        info.move(textInfos.UNIT_CHARACTER,-1)
+    info.expand(unit)
+    text = info.text
+    info.collapse()
+    for i in range(100):
+        result = info.move(unit,direction)
+        if result == 0:
+            break
+        expandInfo = info.copy()
+        expandInfo.expand(unit)
+        expandText = expandInfo.text
+        if len(list(matchTextAndAttributes(bookmarks, expandInfo))) > 0:
+            skipped = True
+            continue
+        break
+
+
+    selection = info.copy()
+    info.expand(unit)
+    speech.speakTextInfo(info, unit=unit, reason=REASON_CARET)
+    if not oldInfo.isCollapsed:
+        speech.speakSelectionChange(oldInfo, selection)
+    self.selection = selection
+    if skipped:
+        skippedParagraphChime()
+
+
+def autoClick(self, gesture, category):
+    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
+    mylog(f"Found {len(bookmarks)} bookmarks")
+    if len(bookmarks) == 0:
+        return endOfDocument(
+            _('No {category} bookmarks configured for current website. Please add {category} bookmarks in BrowserNav settings in NVDA settings window.').format(
+                category=BookmarkCategoryNames[category],
+            )
+        )
+    textInfo = self.makeTextInfo(textInfos.POSITION_ALL)
+    textInfo.collapse()
+    textInfo.expand(textInfos.UNIT_PARAGRAPH)
+    distance = 0
+    message = None
+    focusableErrorMsg = None
+    focusables = []
+    while True:
+        for match in matchTextAndAttributes(bookmarks, textInfo):
+            mylog(f"Match {distance} {textInfo.text}")
+            bookmark = match.bookmark
+            thisInfo = textInfo.copy()
+            if bookmark.offset == 0:
+                thisInfo.collapse()
+                thisInfo.move(textInfos.UNIT_CHARACTER, match.start)
+                thisInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
+            else:
+                moveParagraph(thisInfo, bookmark.offset)
+            focusable = thisInfo.focusableNVDAObjectAtStart
+            if focusable.role in {controlTypes.ROLE_DOCUMENT, controlTypes.ROLE_DIALOG}:
+                if focusableErrorMsg is None:
+                    focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
+            else:
+                focusables.append(focusable)
+                if message is None and len(bookmark.message) > 0:
+                    message = bookmark.message
+        distance += 1
+        result = moveParagraph(textInfo, 1)
+        if result == 0:
+            break
+    if len(focusables) == 0:
+        endOfDocument(focusableErrorMsg or _("No bookmarks matched!"))
+        return
+    if message is not None:
+        ui.message(message)
+    for focusable in focusables:
+        focusable.doAction()
+    if message is None:
+        ui.message(_("Clicked {n} objects.").format(
+            n=len(focusables)
+        ))
+    
+    
 
 def editOrCreateSite(self, site=None, url=None, domain=None):
     global globalConfig
@@ -731,7 +825,7 @@ def editOrCreateSite(self, site=None, url=None, domain=None):
     except ValueError:
         index = None
         knownSites = config.sites
-    entryDialog=EditSiteDialog(None, knownSites=knownSites, site=site, url=url, domain=domain)
+    entryDialog=EditSiteDialog(None, knownSites=knownSites, site=site, url=url, domain=domain, config=config)
     if entryDialog.ShowModal()==wx.ID_OK:
         sites = list(config.sites)
         mylog(f"len(sites) = {len(sites)} index={index}")
@@ -968,6 +1062,7 @@ class EditBookmarkDialog(wx.Dialog):
             wx.Choice,
             choices=[BookmarkCategoryNames[i] for i in BookmarkCategory],
         )
+        self.categoryComboBox.control.Bind(wx.EVT_CHOICE,self.onCategory)
         self.categoryComboBox.control.SetSelection(list(BookmarkCategory).index(self.bookmark.category))
       # Translators: site  comboBox
         labelText=_("&Site this bookmark belongs to:")
@@ -1038,7 +1133,9 @@ class EditBookmarkDialog(wx.Dialog):
         self.SetSizer(mainSizer)
         self.patternTextCtrl.SetFocus()
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
-
+        
+        self.onCategory(None)
+        
     def make(self):
         patternMatch = list(PatternMatch)[self.matchModeCategory.control.GetSelection()]
         pattern = self.patternTextCtrl.Value
@@ -1069,7 +1166,7 @@ class EditBookmarkDialog(wx.Dialog):
 
         bookmark = QJBookmark({
             'enabled': self.enabledCheckBox.Value,
-            'category': list(BookmarkCategory)[self.categoryComboBox.control.GetSelection()],
+            'category': self.getCategory(),
             'name':self.commentTextCtrl.Value,
             'pattern': pattern,
             'patternMatch': patternMatch.value,
@@ -1115,6 +1212,19 @@ class EditBookmarkDialog(wx.Dialog):
                 ui.message(_("Added '{item} to matched attributes edit box.'"))
         else:
             event.Skip()
+            
+    def getCategory(self):
+        return list(BookmarkCategory)[self.categoryComboBox.control.GetSelection()]
+            
+    def onCategory(self, event):
+        category = self.getCategory()
+        self.messageTextCtrl.Disable() if category in {
+            BookmarkCategory.SKIP_CLUTTER
+        } else self.messageTextCtrl.Enable()
+        self.offsetEdit.Disable() if category in {
+            BookmarkCategory.SKIP_CLUTTER
+        } else self.offsetEdit.Enable()
+        tones.beep(500, 50)
 
     def onOk(self,evt):
         bookmark = self.make()
