@@ -28,6 +28,8 @@ import weakref
 import wx
 
 from . beeper import *
+from . import utils
+
 
 try:
     REASON_CARET = controlTypes.REASON_CARET
@@ -129,12 +131,23 @@ class ParagraphAttribute(Enum):
     FONT_SIZE = 'font-size'
 
 class QJImmutable:
+    def __init__(self):
+        object.__setattr__(self, 'frozen', False)
+
+    def freeze(self):
+        self.frozen = True
+
     def __setattr__(self, *args):
-        raise TypeError
+        if self.frozen:
+            raise TypeError
+        return super(QJImmutable, self).__setattr__( *args)
+
     def __delattr__(self, *args):
-        raise TypeError
-        
-        
+        if self.frozen:
+            raise TypeError
+        return super(QJImmutable, self).__delattr__( *args)
+
+
 @functools.total_ordering
 class QJAttribute(QJImmutable):
     attribute: ParagraphAttribute
@@ -164,7 +177,6 @@ class QJAttribute(QJImmutable):
             if self.attribute == ParagraphAttribute.ROLE:
                 roleName = tokens[1].lower()
                 try:
-                    tones.beep(500, 500)
                     value = controlTypes.role.Role.__getattr__(roleName.upper())
                 except AttributeError:
                     raise ValueError(f"Invalid role '{roleName}'.")
@@ -204,13 +216,13 @@ class QJAttribute(QJImmutable):
 
     def __hash__(self):
         return hash(self.__members())
-        
+
     def __lt__(self, other):
         if type(other) is type(self):
             return self.__members() < other.__members()
         else:
             return False
-    
+
 
 class QJAttributeMatch(QJImmutable):
     invert: bool
@@ -318,14 +330,26 @@ class QJSite(QJImmutable):
     autoClickContinuousDelay: int
 
     def __init__(self, d):
-        object.__setattr__(self, 'domain', d['domain'])
-        object.__setattr__(self, 'urlMatch', URLMatch(d['urlMatch']))
-        object.__setattr__(self, 'name', d['name'])
-        object.__setattr__(self, 'focusMode', FocusMode(d['focusMode']))
-        object.__setattr__(self, 'bookmarks', tuple([
+        super().__init__()
+        self.domain= d['domain']
+        self.urlMatch = URLMatch(d['urlMatch'])
+        self.name = d['name']
+        self.focusMode = FocusMode(d['focusMode'])
+        self.bookmarks = tuple([
             QJBookmark(bookmarkDict)
             for bookmarkDict in d['bookmarks']
-        ]))
+        ])
+        #d['autoClickOnFocus'] = False
+        #d['autoClickCategory'] = 5
+        #d['autoClickOnFocusDelay'] = 500
+        #d['autoClickContinuous'] = False
+        #d['autoClickContinuousDelay'] = 500
+        self.autoClickOnFocus = d['autoClickOnFocus']
+        self.autoClickCategory = BookmarkCategory(d['autoClickCategory'])
+        self.autoClickOnFocusDelay = d['autoClickOnFocusDelay']
+        self.autoClickContinuous = d['autoClickContinuous']
+        self.autoClickContinuousDelay = d['autoClickContinuousDelay']
+        self.freeze()
 
     def asDict(self):
         return {
@@ -333,7 +357,12 @@ class QJSite(QJImmutable):
             'urlMatch': self.urlMatch.value,
             'name': self.name,
             'focusMode': self.focusMode.value,
-            'bookmarks': [bookmark.asDict() for bookmark in self.bookmarks]
+            'bookmarks': [bookmark.asDict() for bookmark in self.bookmarks],
+            'autoClickOnFocus': self.autoClickOnFocus,
+            'autoClickCategory': self.autoClickCategory.value,
+            'autoClickOnFocusDelay': self.autoClickOnFocusDelay,
+            'autoClickContinuous': self.autoClickContinuous,
+            'autoClickContinuousDelay': self.autoClickContinuousDelay,
         }
 
 
@@ -361,10 +390,12 @@ class QJConfig(QJImmutable):
     sites: Tuple[QJSite]
 
     def __init__(self, d):
-        object.__setattr__(self, 'sites', tuple([
-                QJSite(item)
-                for item in d['sites']
-        ]))
+        super().__init__()
+        self.sites= tuple([
+            QJSite(item)
+            for item in d['sites']
+        ])
+        self.freeze()
 
     def asDict(self):
         return {
@@ -551,6 +582,48 @@ def new_event_gainFocus(self, obj, nextHandler):
         return nextHandler()
     return original_event_gainFocus(self, obj, nextHandler)
 
+asyncAutoclickCounter = 0
+def asyncAutoclick(self, asyncAutoclickCounterLocal, site):
+    global asyncAutoclickCounter
+    yield site.autoClickOnFocusDelay
+    category = site.autoClickCategory
+    while True:
+        if asyncAutoclickCounter != asyncAutoclickCounterLocal:
+            return
+        focus = api.getFocusObject()
+        try:
+            if focus.treeInterceptor != self:
+                return
+        except AttributeError:
+            return
+        autoClick(
+            self, 
+            gesture=None, 
+            category=category, 
+            site=site, 
+            automated=True
+        )
+        if site.autoClickContinuous:
+            yield site.autoClickContinuousDelay
+        else:
+            return
+
+original_event_treeInterceptor_gainFocus = None
+def pre_event_treeInterceptor_gainFocus(self):
+    if not self._hadFirstGainFocus:
+        tones.beep(500, 50)
+        url = getUrl(self)
+        sites = findSites(url, globalConfig)
+        autoClickSites = [site for site in sites if site.autoClickOnFocus]
+        if len(autoClickSites) >= 2:
+            ui.message(_("BrowserNav warning: Two or more sites matching this URL are configured to perform autoClick on load. This is not supported."))
+        elif len(autoClickSites) == 1:
+            site = autoClickSites[0]
+            if site.    autoClickOnFocus:
+                global asyncAutoclickCounter
+                asyncAutoclickCounter += 1
+                utils.executeAsynchronously(asyncAutoclick(self, asyncAutoclickCounter, site))
+    return original_event_treeInterceptor_gainFocus(self)
 @functools.lru_cache()
 def getRegexForBookmark(rule):
     if rule.patternMatch == PatternMatch.EXACT:
@@ -612,7 +685,7 @@ def matchAllWidthCompositeRegex(bookmarks, text):
             for b in bookmarks
             if b != m.bookmark
         ])
-        
+
 def matchTextAndAttributes(bookmarks, textInfo, distance=None):
     text = textInfo.text
     matches = matchAllWidthCompositeRegex(bookmarks, text)
@@ -634,8 +707,13 @@ def matchTextAndAttributes(bookmarks, textInfo, distance=None):
             yield m
 
 @functools.lru_cache()
-def findApplicableBookmarks(config, url, category=None):
-    sites = findSites(url, config)
+def findApplicableBookmarks(config=None, url=None, category=None, site=None):
+    if (url is not None) == (site is not None):
+        raise Exception("Must specify either URL or site, but not both.")
+    if url is not None:
+        sites = findSites(url, config)
+    else:
+        sites = [site]
     bookmarks = [
         bookmark
         for site in sites
@@ -663,7 +741,7 @@ def extractAttributesSet(textInfo):
             try:
                 #result[ParagraphAttribute.FONT_SIZE].add(field.field['font-size'])
                 result.add(QJAttribute({
-                    'attribute': ParagraphAttribute.FONT_SIZE, 
+                    'attribute': ParagraphAttribute.FONT_SIZE,
                     'value': field.field['font-size'],
                 }))
             except KeyError:
@@ -726,7 +804,7 @@ def quickJump(self, gesture, category, direction, errorMsg):
             self._set_selection(textInfo)
             self.selection = textInfo
             return
-            
+
 def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
     bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
     api.q = bookmarks
@@ -763,8 +841,11 @@ def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=tex
         skippedParagraphChime()
 
 
-def autoClick(self, gesture, category):
-    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
+def autoClick(self, gesture, category, site=None, automated=False):
+    if site is None:
+        bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
+    else:
+        bookmarks = findApplicableBookmarks(category=category, site=site)
     mylog(f"Found {len(bookmarks)} bookmarks")
     if len(bookmarks) == 0:
         return endOfDocument(
@@ -795,26 +876,42 @@ def autoClick(self, gesture, category):
                 if focusableErrorMsg is None:
                     focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
             else:
-                focusables.append(focusable)
-                if message is None and len(bookmark.message) > 0:
-                    message = bookmark.message
+                # Double check that NBDAObject is good - to avoid some race condition as often time the document is still updating.
+                try:
+                    startOffset, endOffset = thisInfo._getOffsetsFromNVDAObject(focusable)
+                except LookupError:
+                    continue
+                controlInfo = thisInfo.copy()
+                controlInfo._startOffset = startOffset
+                controlInfo._endOffset = endOffset
+                matches = len(list(matchTextAndAttributes((bookmark,), controlInfo))) > 0
+                if matches:
+                    focusables.append(focusable)
+                    if message is None and len(bookmark.message) > 0:
+                        message = bookmark.message
         distance += 1
         result = moveParagraph(textInfo, 1)
         if result == 0:
             break
     if len(focusables) == 0:
-        endOfDocument(focusableErrorMsg or _("No bookmarks matched!"))
+        if not automated:
+            endOfDocument(focusableErrorMsg or _("No bookmarks matched!"))
         return
-    if message is not None:
-        ui.message(message)
     for focusable in focusables:
-        focusable.doAction()
-    if message is None:
-        ui.message(_("Clicked {n} objects.").format(
-            n=len(focusables)
-        ))
-    
-    
+        try:
+            focusable.doAction()
+        except NotImplementedError as e:
+            api.q = focusable
+            raise e
+    if not automated:
+        if message is not None:
+            ui.message(message)
+        else:
+            ui.message(_("Clicked {n} objects.").format(
+                n=len(focusables)
+            ))
+
+
 
 def editOrCreateSite(self, site=None, url=None, domain=None):
     global globalConfig
@@ -1026,7 +1123,7 @@ class EditBookmarkDialog(wx.Dialog):
                 'category': BookmarkCategory.QUICK_JUMP,
                 'name': "",
                 'pattern': text if text is not None else "",
-                'patternMatch': 
+                'patternMatch':
                     PatternMatch.EXACT if (
                         paragraphInfo is not None
                         and text is not None
@@ -1093,7 +1190,7 @@ class EditBookmarkDialog(wx.Dialog):
       # Translators: label for Message edit box
         labelText = _("Spoken &message when bookmark is found:")
         self.messageTextCtrl=sHelper.addLabeledControl(labelText, wx.TextCtrl)
-        self.messageTextCtrl.SetValue(self.bookmark.message)                
+        self.messageTextCtrl.SetValue(self.bookmark.message)
       # offset spin
         labelText = _("Offset in paragraphs - select a value to place the cursor on following or preceding paragraph from the bookmark match:")
         self.offsetEdit = sHelper.addLabeledControl(
@@ -1125,6 +1222,7 @@ class EditBookmarkDialog(wx.Dialog):
         self.availableAttributesListBox.control.Bind(wx.EVT_CHAR, self.onChar)
         if paragraphInfo is None:
             self.availableAttributesListBox.control.Disable()
+
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -1133,12 +1231,13 @@ class EditBookmarkDialog(wx.Dialog):
         self.SetSizer(mainSizer)
         self.patternTextCtrl.SetFocus()
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
-        
+
         self.onCategory(None)
-        
+
     def make(self):
         patternMatch = list(PatternMatch)[self.matchModeCategory.control.GetSelection()]
         pattern = self.patternTextCtrl.Value
+        pattern = pattern.rstrip("\r\n")
         errorMsg = None
         if len(pattern) == 0:
             errorMsg = _('Pattern cannot be empty!')
@@ -1212,10 +1311,10 @@ class EditBookmarkDialog(wx.Dialog):
                 ui.message(_("Added '{item} to matched attributes edit box.'"))
         else:
             event.Skip()
-            
+
     def getCategory(self):
         return list(BookmarkCategory)[self.categoryComboBox.control.GetSelection()]
-            
+
     def onCategory(self, event):
         category = self.getCategory()
         self.messageTextCtrl.Disable() if category in {
@@ -1224,7 +1323,6 @@ class EditBookmarkDialog(wx.Dialog):
         self.offsetEdit.Disable() if category in {
             BookmarkCategory.SKIP_CLUTTER
         } else self.offsetEdit.Enable()
-        tones.beep(500, 50)
 
     def onOk(self,evt):
         bookmark = self.make()
@@ -1399,6 +1497,11 @@ class EditSiteDialog(wx.Dialog):
                 'urlMatch':URLMatch.EXACT.value if url is not None else URLMatch.SUBDOMAIN.value,
                 'focusMode':FocusMode.UNCHANGED.value,
                 'bookmarks': [],
+                'autoClickOnFocus': False,
+                'autoClickCategory': BookmarkCategory.AUTO_CLICK,
+                'autoClickOnFocusDelay': 500,
+                'autoClickContinuous': False,
+                'autoClickContinuousDelay': 500,
             })
         self.config = config
         self.knownSites = knownSites
@@ -1436,6 +1539,43 @@ class EditSiteDialog(wx.Dialog):
             ],
         )
         self.focusModeCategory.control.SetSelection(list(FocusMode).index(self.site.focusMode))
+      # Translators:  AutoClick on load combo box
+        text = _("Perform autoClick on page load automatically:")
+        self.autoClickOptions = [
+            None,
+            BookmarkCategory.AUTO_CLICK,
+            BookmarkCategory.AUTO_CLICK_2,
+            BookmarkCategory.AUTO_CLICK_3,
+        ]
+        self.autoClickComboBox = guiHelper.LabeledControlHelper(
+            self,
+            text,
+            wx.Choice,
+            choices=[BookmarkCategoryNames.get(option, _("Disabled"))  for option in self.autoClickOptions],
+        )
+        self.autoClickComboBox.control.Bind(wx.EVT_CHOICE,self.onAutoClickCombo)
+        self.autoClickComboBox.control.SetSelection(self.autoClickOptions.index(
+            self.site.autoClickCategory if self.    site.autoClickOnFocus else None
+        ))
+      # Initial delay spin
+        labelText = _("Delay before initial autoClick in milliseconds:")
+        self.delayEdit = sHelper.addLabeledControl(
+            labelText, nvdaControls.SelectOnFocusSpinCtrl,
+            min=1, max=10000,
+            initial=self.site.autoClickOnFocusDelay,
+        )
+      # Translators: label for enable recurrent auto click checkbox
+        Text = _("Enable recurrent auto click")
+        self.recurrentCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.recurrentCheckBox.Bind(wx.EVT_CHECKBOX,self.onRecurrent)
+        self.recurrentCheckBox.SetValue(self.site.autoClickContinuous)
+      # Recurrent  delay spin
+        labelText = _("Delay between recurring autoClicks  in milliseconds:")
+        self.recurrentDelayEdit = sHelper.addLabeledControl(
+            labelText, nvdaControls.SelectOnFocusSpinCtrl,
+            min=1, max=10000,
+            initial=self.site.autoClickContinuousDelay,
+        )
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -1444,6 +1584,8 @@ class EditSiteDialog(wx.Dialog):
         self.SetSizer(mainSizer)
         self.patternTextCtrl.SetFocus()
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
+
+        self.onAutoClickCombo(None)
 
     def make(self):
         urlMatch = list(URLMatch)[self.typeComboBox.control.GetSelection()]
@@ -1490,7 +1632,12 @@ class EditSiteDialog(wx.Dialog):
             'bookmarks': [
                 b.asDict()
                 for b in self.site.bookmarks
-            ]
+            ],
+            'autoClickOnFocus': self.getAutoClickCombo() is not None,
+            'autoClickCategory': (self.getAutoClickCombo() or BookmarkCategory.AUTO_CLICK).value,
+            'autoClickOnFocusDelay': self.delayEdit.Value,
+            'autoClickContinuous': self.recurrentCheckBox.Value,
+            'autoClickContinuousDelay': self.recurrentDelayEdit.Value,
         })
         return site
 
@@ -1506,6 +1653,28 @@ class EditSiteDialog(wx.Dialog):
             self.config = entryDialog.config
             mylog(f"EditSiteDialog.editBookmarks2 nb={len(self.site.bookmarks)}")
         entryDialog.Destroy()
+    def getAutoClickCombo(self):
+        return self.autoClickOptions[self.autoClickComboBox.control.GetSelection()]
+
+    def onAutoClickCombo(self, event):
+        category = self.getAutoClickCombo()
+        for control in [
+            self.delayEdit,
+            self.recurrentCheckBox,
+            self.recurrentDelayEdit,
+        ]:
+            if category is None:
+                control.Disable()
+            else:
+                control.Enable()
+        self.onRecurrent(event)
+
+    def onRecurrent(self, event):
+        enabled = self.recurrentCheckBox.Value
+        if enabled:
+            self.recurrentDelayEdit.Enable()
+        else:
+            self.recurrentDelayEdit.Disable()
 
     def onOk(self,evt):
         site = self.make()

@@ -854,7 +854,7 @@ def preTableScriptHelper(self, *args, **kwargs):
     result = originalTableScriptHelper(self, *args, **kwargs)
     sonifyTextInfo(self.selection)
     return result
-
+    
 selectionHistory = {}
 selectionHistoryLock = threading.Lock()
 def purgeSelectionHistory():
@@ -962,6 +962,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.new_event_gainFocus
         quickJump.originalShouldPassThrough = browseMode.BrowseModeTreeInterceptor.shouldPassThrough
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.newShouldPassThrough
+        quickJump.original_event_treeInterceptor_gainFocus = browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus
+        browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.pre_event_treeInterceptor_gainFocus
 
 
     def createMenu(self):
@@ -978,6 +980,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         cursorManager.CursorManager._set_selection = original_set_selection
         browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.original_event_gainFocus
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.originalShouldPassThrough
+        browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.original_event_treeInterceptor_gainFocus
 
     def script_moveToNextSibling(self, gesture, selfself):
         mode = getMode()
