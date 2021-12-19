@@ -760,21 +760,43 @@ def moveParagraph(textInfo, offset):
     result = textInfo.move(textInfos.UNIT_PARAGRAPH, offset)
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
     return result
+    
+    
+def moveParagraphWithSkipClutter(self, textInfo, offset):
+    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
+    direction = 1 if offset > 0 else -1
+    distance = 0
+    while offset != 0:
+        code = moveParagraph(textInfo, direction)
+        if code == 0:
+            return 0
+        distance += 1
+        if len(list(matchTextAndAttributes(bookmarks, textInfo))) > 0:
+            continue
+        offset -= direction
+    return direction * distance
+        
 
 def quickJump(self, gesture, category, direction, errorMsg):
-    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
+    url = getUrl(self)
+    bookmarks = findApplicableBookmarks(globalConfig, url, category)
+    skipClutterBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.SKIP_CLUTTER)
     if len(bookmarks) == 0:
         return endOfDocument(_('No quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
     textInfo.collapse()
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
     distance = 0
+    adjustedDistance = 0
     while True:
-        distance += 1
         result = moveParagraph(textInfo, direction)
         if result == 0:
             endOfDocument(errorMsg)
             return
+        distance += 1
+        if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
+            adjustedDistance += 1
+        
         for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
             bookmark = match.bookmark
             if len(bookmark.message) > 0:
@@ -784,7 +806,7 @@ def quickJump(self, gesture, category, direction, errorMsg):
                 textInfo.move(textInfos.UNIT_CHARACTER, match.start)
                 textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
             else:
-                moveParagraph(textInfo, bookmark.offset)
+                moveParagraphWithSkipClutter(self, textInfo, bookmark.offset)
             textInfo.updateCaret()
             beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
             speech.speakTextInfo(textInfo, reason=REASON_CARET)
@@ -795,7 +817,6 @@ def quickJump(self, gesture, category, direction, errorMsg):
 
 def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
     bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
-    skipRe = re.compile(getConfig("skipRegex"))
     skipped = False
     oldInfo=self.makeTextInfo(posConstant)
     info=oldInfo.copy()
@@ -911,11 +932,12 @@ def getIndentFunc(textInfo, document, future):
     except Exception as e:
         future.setException(e)
     
-def scanLevelsThreadFunc(self, future):
+def scanLevelsThreadFunc(self, config, future):
     futures = []
+    direction = 1
     try:
         category = BookmarkCategory.HIERARCHICAL
-        bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
+        bookmarks = findApplicableBookmarks(config, getUrl(self), category)
         if len(bookmarks) == 0:
             future.set([])
             return
@@ -932,7 +954,7 @@ def scanLevelsThreadFunc(self, future):
                 # We compute x indent of the paragraph where we matched the pattern.
                 # Computing it in thread pool for performance reasons.
                 innerFuture = utils.Future()
-                threadPool.add_task(getIndentFunc, thisInfo, document, innerFuture)
+                utils.threadPool.add_task(getIndentFunc, thisInfo, document, innerFuture)
                 futures.append(innerFuture)
                 
             distance += 1
@@ -949,34 +971,49 @@ def scanLevelsThreadFunc(self, future):
         
     
 def scanLevels(self):
+    global globalConfig, hierarchicalCache
+    config = globalConfig
     future = utils.Future()
-    hierarchicalCache[self] = future
-    utils.threadPool.add_task(scanLevelsThreadFunc, self, future)
+    utils.threadPool.add_task(scanLevelsThreadFunc, self, config, future)
+    try:
+        innerDict = hierarchicalCache[self]
+    except KeyError:
+        innerDict = {}
+        hierarchicalCache[self] = innerDict
+    innerDict[config] = future
     return future
 
 def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg):
-    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
+    url = getUrl(self)
+    bookmarks = findApplicableBookmarks(globalConfig, url, category)
+    skipClutterBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.SKIP_CLUTTER)
     if len(bookmarks) == 0:
         return endOfDocument(_('No hierarchical quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
-    levelsInfo = hierarchicalCache.get(self, None)
-    if levelsInfo is None:
-        scanLevels()
-        mylog(f"levelsInfo is None")
-    else:
+    try:
+        api.q = hierarchicalCache
+        levelsInfo = hierarchicalCache[self][globalConfig].get()
         mylog(f"level={level} levelsInfo={levelsInfo.offsets}")
+    except KeyError:
+        levelsInfo = None
+        scanLevels(self)
+        mylog(f"levelsInfo is None")
+        
     textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
     textInfo.collapse()
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
     document = utils.getIA2Document(textInfo)
     distance = 0
+    adjustedDistance = 0
     while True:
-        distance += 1
         result = moveParagraph(textInfo, direction)
         if result == 0:
             mylog("end of document")
             endOfDocument(errorMsg)
             return
-        for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
+        distance += 1
+        if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
+            adjustedDistance += 1
+        for match in matchTextAndAttributes(bookmarks, textInfo, distance=adjustedDistance*direction):
             bookmark = match.bookmark
             offset = utils.getGeckoParagraphIndent(textInfo, document=document)
             mylog(f"offset={offset}")
@@ -989,6 +1026,13 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
                 )
             ):
                 mylog("Perfect")
+                if (
+                    level is None
+                    and levelsInfo is not None
+                    and offset in levelsInfo.offsets
+                ):
+                    announceLevel = levelsInfo.offsets.index(offset) + 1
+                    ui.message(_("Level {announceLevel}").format(announceLevel=announceLevel))
                 if len(bookmark.message) > 0:
                     ui.message(bookmark.message)
                 if bookmark.offset == 0:
@@ -996,7 +1040,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
                     textInfo.move(textInfos.UNIT_CHARACTER, match.start)
                     textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
                 else:
-                    moveParagraph(textInfo, bookmark.offset)
+                    moveParagraphWithSkipClutter(self, textInfo, bookmark.offset)
                 textInfo.updateCaret()
                 beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                 speech.speakTextInfo(textInfo, reason=REASON_CARET)
@@ -1007,7 +1051,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
             elif offset not in levelsInfo.offsets:
                 # Something must have happened that current level is not recorded in the previous scan. Rescan after this script.
                 mylog("offset not in levelsInfo")
-                scanLevels()
+                scanLevels(self)
                 endOfDocument(_("BrowserNav error: inconsistent indents in the document. Recomputing indents, please try again."))
                 return
             elif levelsInfo.offsets.index(offset) > level:

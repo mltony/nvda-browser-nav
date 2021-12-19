@@ -1807,7 +1807,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     gesture,
                     quickJump.BookmarkCategory.HIERARCHICAL,
                     direction=1,
-                    level=level,
+                    level=level - 1 if level is not None else None,
                     unbounded=False,
                     errorMsg=_("No next hierarchical bookmark {levelStr}").format(levelStr=levelStr)
                 ),
@@ -1822,7 +1822,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     gesture,
                     quickJump.BookmarkCategory.HIERARCHICAL,
                     direction=-1,
-                    level=level,
+                    level=level - 1 if level is not None else None,
                     unbounded=False,
                     errorMsg=_("No previous hierarchical bookmark {levelStr}").format(levelStr=levelStr)
                 ),

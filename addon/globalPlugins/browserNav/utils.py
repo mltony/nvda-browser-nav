@@ -98,14 +98,15 @@ class Future:
     def __init__(self):
         self.__condition = Condition(Lock())
         self.__val = None
+        self.__exc = None
         self.__is_set = False
 
     def get(self):
         with self.__condition:
             while not self.__is_set:
                 self.__condition.wait()
-            if self.__exc__ is not None:
-                raise self.__exc__
+            if self.__exc is not None:
+                raise self.__exc
             return self.__val
 
     def set(self, val):
