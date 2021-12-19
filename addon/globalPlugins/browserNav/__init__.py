@@ -854,7 +854,7 @@ def preTableScriptHelper(self, *args, **kwargs):
     result = originalTableScriptHelper(self, *args, **kwargs)
     sonifyTextInfo(self.selection)
     return result
-    
+
 selectionHistory = {}
 selectionHistoryLock = threading.Lock()
 def purgeSelectionHistory():
@@ -1783,11 +1783,52 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "quickSearchBack",
             script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP, -1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
             doc="QuickSearch back according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+      # AutoClick
         self.injectBrowseModeKeystroke(
             "kb:Alt+J",
             "autoClick",
             script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.AUTO_CLICK),
-            doc="AutoClick  according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")            
+            doc="AutoClick  according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+      # Hierarchical
+        for letter in "`1234567890":
+            try:
+                level = int(letter)
+                if level == 0:
+                    level = 10
+                levelStr = _("at level {level}").format(level=level)
+            except ValueError:
+                level = None
+                levelStr = ""
+            self.injectBrowseModeKeystroke(
+                f"kb:Alt+{letter}",
+                f"hierarchicalQuickJumpForward{level}",
+                script=lambda selfself, gesture, level=level, levelStr=levelStr: quickJump.hierarchicalQuickJump(
+                    selfself,
+                    gesture,
+                    quickJump.BookmarkCategory.HIERARCHICAL,
+                    direction=1,
+                    level=level,
+                    unbounded=False,
+                    errorMsg=_("No next hierarchical bookmark {levelStr}").format(levelStr=levelStr)
+                ),
+                doc="Jump to next hierarchical bookmark {levelStr}; please check browserNav configuration panel for hierarchical bookmark configuration.".format(
+                    levelStr=levelStr
+                ))
+            self.injectBrowseModeKeystroke(
+                f"kb:Alt+Shift+{letter}",
+                f"hierarchicalQuickJumpBack{level}",
+                script=lambda selfself, gesture, level=level, levelStr=levelStr: quickJump.hierarchicalQuickJump(
+                    selfself,
+                    gesture,
+                    quickJump.BookmarkCategory.HIERARCHICAL,
+                    direction=-1,
+                    level=level,
+                    unbounded=False,
+                    errorMsg=_("No previous hierarchical bookmark {levelStr}").format(levelStr=levelStr)
+                ),
+                doc="Jump to previous hierarchical bookmark {levelStr}; please check browserNav configuration panel for hierarchical bookmark configuration.".format(
+                    levelStr=levelStr
+                ))                
       # Tabs
         # Example page with tabs:
         # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
@@ -1939,33 +1980,33 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "copyJupyterText",
             script=lambda selfself, gesture: self.script_copyJupyterText(gesture, selfself),
             doc="Copy the last text from semi-accessible edit box to clipboard.")
-      # Toggle skip mode
+      # Toggle skip clutter
         self.injectBrowseModeKeystroke(
-            "kb:NVDA+Control+/",
+            "kb:Control+/",
             "toggleSkipEmptyParagraphs",
             script=lambda selfself, gesture: self.script_toggleOption(
                 gesture,
                 selfself,
                 "skipEmptyParagraphs",
                 [
-                    _("Not skipping over empty paragraphs and paragraphs matching skip regex "),
-                    _("Skipping over empty paragraphs and paragraphs matching skip regex "),
+                    _("Skip clutter off for paragraph navigation"),
+                    _("Skip clutter on for paragraph navigation"),
                 ]
             ),
-            doc="Toggle skipping over empty paragraphs and paragraphs matching skip regex")
+            doc="Toggle skip clutter for paragraph navigation")
         self.injectBrowseModeKeystroke(
-            "kb:NVDA+/",
+            "kb:/",
             "toggleSkipEmptyLines",
             script=lambda selfself, gesture: self.script_toggleOption(
                 gesture,
                 selfself,
                 "skipEmptyLines",
                 [
-                    _("Not skipping over empty lines and lines matching skip regex "),
-                    _("Skipping over empty lines and lines matching skip regex "),
+                    _("Skip clutter off for line navigation"),
+                    _("Skip clutter on for line navigation"),
                 ]
             ),
-            doc="Toggle skipping over empty lines and lines matching skip regex")
+            doc="Toggle skip clutter for line navigation")
       # Go back in browse mode
         self.injectBrowseModeKeystroke(
             "kb:NVDA+Shift+LeftArrow",

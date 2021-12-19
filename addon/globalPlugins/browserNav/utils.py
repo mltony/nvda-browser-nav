@@ -9,10 +9,28 @@ import IAccessibleHandler
 from queue import Queue
 import threading
 from threading import Thread
+from threading import Lock, Condition
 import tones
 import types
 from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
+import weakref
 import winUser
+
+def weakMemoize(func):
+    cache = weakref.WeakKeyDictionary()
+
+    def memoized_func(*args):
+        arg = args[0]
+        if len(args) > 1:
+            raise Exception("Only supports single argument!")
+        value = cache.get(arg)
+        if value is not None:
+            return value
+        result = func(*args)
+        cache.update({arg: result})
+        return result
+
+    return memoized_func
 
 def executeAsynchronously(gen):
     """
@@ -73,6 +91,42 @@ class ThreadPool:
 
 
 threadPool = ThreadPool(5)
+
+
+
+class Future:
+    def __init__(self):
+        self.__condition = Condition(Lock())
+        self.__val = None
+        self.__is_set = False
+
+    def get(self):
+        with self.__condition:
+            while not self.__is_set:
+                self.__condition.wait()
+            if self.__exc__ is not None:
+                raise self.__exc__
+            return self.__val
+
+    def set(self, val):
+        with self.__condition:
+            if self.__is_set:
+                raise RuntimeError("Future has already been set")
+            self.__val = val
+            self.__is_set = True
+            self.__condition.notify_all()
+
+    def setException(self, val):
+        with self.__condition:
+            if self.__is_set:
+                raise RuntimeError("Future has already been set")
+            self.__exc = val
+            self.__is_set = True
+            self.__condition.notify_all()
+
+    def done(self):
+        return self.__is_set
+
 
 def getIA2Document(textInfo):
     # IAccessibleHandler.getRecursiveTextFromIAccessibleTextObject(IAccessibleHandler.normalizeIAccessible(pacc1.accParent))

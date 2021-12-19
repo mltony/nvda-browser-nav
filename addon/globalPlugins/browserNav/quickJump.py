@@ -5,12 +5,12 @@
 
 import api
 from collections import namedtuple, defaultdict
+from contextlib import ExitStack
 import controlTypes
 from controlTypes import OutputReason
 import copy
 import dataclasses
 from dataclasses import dataclass
-#from dataclasses_json import dataclass_json
 from enum import Enum
 import functools
 import globalVars
@@ -50,21 +50,7 @@ else:
         pass
 
 
-def weakMemoize(func):
-    cache = weakref.WeakKeyDictionary()
 
-    def memoized_func(*args):
-        arg = args[0]
-        if len(args) > 1:
-            raise Exception("Only supports single argument!")
-        value = cache.get(arg)
-        if value is not None:
-            return value
-        result = func(*args)
-        cache.update({arg: result})
-        return result
-
-    return memoized_func
 
 class BookmarkCategory(Enum):
     QUICK_JUMP = 1
@@ -74,6 +60,7 @@ class BookmarkCategory(Enum):
     AUTO_CLICK = 5
     AUTO_CLICK_2 = 6
     AUTO_CLICK_3 = 7
+    HIERARCHICAL = 8
 
 BookmarkCategoryNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump - assigned to J by default'),
@@ -83,6 +70,7 @@ BookmarkCategoryNames = {
     BookmarkCategory.AUTO_CLICK: _('AutoClick'),
     BookmarkCategory.AUTO_CLICK_2: _('AutoClick2'),
     BookmarkCategory.AUTO_CLICK_3: _('AutoClick3'),
+    BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
 }
 
 class URLMatch(Enum):
@@ -545,7 +533,7 @@ def getFocusMode(url, config):
     ])
     return FocusMode(mode)
 
-@weakMemoize
+@utils.weakMemoize
 def getUrlFromObject(object):
     while object is not None:
         try:
@@ -558,7 +546,7 @@ def getUrlFromObject(object):
                 return url
         object = object.simpleParent
 
-@weakMemoize
+@utils.weakMemoize
 def getUrl(self):
     url = self.documentConstantIdentifier
     if url is None or len(url) == 0:
@@ -807,7 +795,6 @@ def quickJump(self, gesture, category, direction, errorMsg):
 
 def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
     bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
-    api.q = bookmarks
     skipRe = re.compile(getConfig("skipRegex"))
     skipped = False
     oldInfo=self.makeTextInfo(posConstant)
@@ -901,7 +888,6 @@ def autoClick(self, gesture, category, site=None, automated=False):
         try:
             focusable.doAction()
         except NotImplementedError as e:
-            api.q = focusable
             raise e
     if not automated:
         if message is not None:
@@ -912,6 +898,130 @@ def autoClick(self, gesture, category, site=None, automated=False):
             ))
 
 
+class HierarchicalLevelsInfo:
+    offsets: List[int]
+    def __init__(self, offsets):
+        self.offsets = offsets
+
+hierarchicalCache = weakref.WeakKeyDictionary()
+def getIndentFunc(textInfo, document, future):
+    try:
+        x = utils.getGeckoParagraphIndent(textInfo, document=document)
+        future.set(x)
+    except Exception as e:
+        future.setException(e)
+    
+def scanLevelsThreadFunc(self, future):
+    futures = []
+    try:
+        category = BookmarkCategory.HIERARCHICAL
+        bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
+        if len(bookmarks) == 0:
+            future.set([])
+            return
+        textInfo = self.makeTextInfo(textInfos.POSITION_ALL)
+        textInfo.collapse()
+        textInfo.expand(textInfos.UNIT_PARAGRAPH)
+        document = utils.getIA2Document(textInfo)
+        distance = 0
+        while True:
+            for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
+                bookmark = match.bookmark
+                thisInfo = textInfo.copy()
+                # Here we don't move to the actual text within the paragraph, nor do we respect bookmark.offset parameter.
+                # We compute x indent of the paragraph where we matched the pattern.
+                # Computing it in thread pool for performance reasons.
+                innerFuture = utils.Future()
+                threadPool.add_task(getIndentFunc, thisInfo, document, innerFuture)
+                futures.append(innerFuture)
+                
+            distance += 1
+            result = moveParagraph(textInfo, direction)
+            if result == 0:
+                # collect all the futures and return
+                future.set(HierarchicalLevelsInfo(sorted(list({
+                    inner.get()
+                    for inner in futures
+                }))))
+                return
+    except Exception as e:
+        future.setException(e)
+        
+    
+def scanLevels(self):
+    future = utils.Future()
+    hierarchicalCache[self] = future
+    utils.threadPool.add_task(scanLevelsThreadFunc, self, future)
+    return future
+
+def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg):
+    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
+    if len(bookmarks) == 0:
+        return endOfDocument(_('No hierarchical quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
+    levelsInfo = hierarchicalCache.get(self, None)
+    if levelsInfo is None:
+        scanLevels()
+        mylog(f"levelsInfo is None")
+    else:
+        mylog(f"level={level} levelsInfo={levelsInfo.offsets}")
+    textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
+    textInfo.collapse()
+    textInfo.expand(textInfos.UNIT_PARAGRAPH)
+    document = utils.getIA2Document(textInfo)
+    distance = 0
+    while True:
+        distance += 1
+        result = moveParagraph(textInfo, direction)
+        if result == 0:
+            mylog("end of document")
+            endOfDocument(errorMsg)
+            return
+        for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
+            bookmark = match.bookmark
+            offset = utils.getGeckoParagraphIndent(textInfo, document=document)
+            mylog(f"offset={offset}")
+            if (
+                levelsInfo is None 
+                or level is None
+                or (
+                    offset in levelsInfo.offsets
+                    and levelsInfo.offsets.index(offset) == level
+                )
+            ):
+                mylog("Perfect")
+                if len(bookmark.message) > 0:
+                    ui.message(bookmark.message)
+                if bookmark.offset == 0:
+                    textInfo.collapse()
+                    textInfo.move(textInfos.UNIT_CHARACTER, match.start)
+                    textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
+                else:
+                    moveParagraph(textInfo, bookmark.offset)
+                textInfo.updateCaret()
+                beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
+                speech.speakTextInfo(textInfo, reason=REASON_CARET)
+                textInfo.collapse()
+                self._set_selection(textInfo)
+                self.selection = textInfo
+                return
+            elif offset not in levelsInfo.offsets:
+                # Something must have happened that current level is not recorded in the previous scan. Rescan after this script.
+                mylog("offset not in levelsInfo")
+                scanLevels()
+                endOfDocument(_("BrowserNav error: inconsistent indents in the document. Recomputing indents, please try again."))
+                return
+            elif levelsInfo.offsets.index(offset) > level:
+                mylog("levelsInfo.offsets.index(offset) > level")
+                continue
+            elif levelsInfo.offsets.index(offset) < level:
+                mylog("levelsInfo.offsets.index(offset) < level")
+                if unbounded:
+                    continue
+                else:
+                    endOfDocument(errorMsg)
+                    return
+            else:
+                raise Exception("Impossible!")
 
 def editOrCreateSite(self, site=None, url=None, domain=None):
     global globalConfig
@@ -1060,7 +1170,6 @@ def makeBookmarkSubmenu(self, frame):
         return menu
 
     bookmarks = findApplicableBookmarks(globalConfig, url, category=None)
-    #bookmarks = tuple(bookmarks)
     matches = matchAllWidthCompositeRegex(bookmarks, text)
     attributes = extractAttributes(paragraphInfo)
 
@@ -1318,10 +1427,11 @@ class EditBookmarkDialog(wx.Dialog):
     def onCategory(self, event):
         category = self.getCategory()
         self.messageTextCtrl.Disable() if category in {
-            BookmarkCategory.SKIP_CLUTTER
+            BookmarkCategory.SKIP_CLUTTER,
+            BookmarkCategory.HIERARCHICAL,
         } else self.messageTextCtrl.Enable()
         self.offsetEdit.Disable() if category in {
-            BookmarkCategory.SKIP_CLUTTER
+            BookmarkCategory.SKIP_CLUTTER,
         } else self.offsetEdit.Enable()
 
     def onOk(self,evt):
