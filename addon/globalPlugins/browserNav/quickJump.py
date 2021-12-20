@@ -116,7 +116,13 @@ patterMatchNames = {
 
 class ParagraphAttribute(Enum):
     ROLE = 'role'
+    HEADING = 'heading'
     FONT_SIZE = 'font-size'
+    FONT_FAMILY = 'font-family'
+    COLOR = 'color'
+    BACKGROUND_COLOR = 'background-color'
+    BOLD = 'bold'
+    ITALIC = 'italic'
 
 class QJImmutable:
     def __init__(self):
@@ -725,14 +731,22 @@ def extractAttributesSet(textInfo):
             #result[ParagraphAttribute.ROLE].add(role)
             result.add(QJAttribute(role=role))
         elif field.command == 'formatChange':
-            try:
-                #result[ParagraphAttribute.FONT_SIZE].add(field.field['font-size'])
-                result.add(QJAttribute({
-                    'attribute': ParagraphAttribute.FONT_SIZE,
-                    'value': field.field['font-size'],
-                }))
-            except KeyError:
-                pass
+            for key, pAttr in [
+                ("level", ParagraphAttribute.HEADING),
+                ("font-family", ParagraphAttribute.FONT_FAMILY),
+                ("font-size", ParagraphAttribute.FONT_SIZE),
+                ("color", ParagraphAttribute.COLOR),
+                ("background-color", ParagraphAttribute.BACKGROUND_COLOR),
+                ("bold", ParagraphAttribute.BOLD),
+                ("italic", ParagraphAttribute.ITALIC),
+            ]:
+                try:
+                    result.add(QJAttribute({
+                        'attribute': pAttr,
+                        'value': field.field[key],
+                    }))
+                except KeyError:
+                    pass
         else:
             pass
     return result
