@@ -424,6 +424,13 @@ class RegexSearchDialog(wx.Dialog):
         global lastRegexSearch
         lastRegexSearch = strVal
 
+class TextCtrlWithFixedPasting(wx.TextCtrl):
+    def __init__(self, parent, style):
+        super().__init__(parent, style)
+
+    def Paste(self):
+        tones.beep(500, 50)
+        super().Paste()
 
 class EditTextDialog(wx.Dialog):
     def __init__(self, parent, text, cursorLine, cursorColumn, onTextComplete):
@@ -444,6 +451,7 @@ class EditTextDialog(wx.Dialog):
         #self.textCtrl = StyledTextCtrl(self, style=wx.TE_MULTILINE|wx.TE_DONTWRAP)
         self.textCtrl.Bind(wx.EVT_CHAR, self.onChar)
         self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
+        self.textCtrl.Bind(wx.EVT_TEXT_PASTE, self.onClipboardPaste)
         sHelper.addItem(self.textCtrl)
         self.textCtrl.SetValue(text)
         self.SetFocus()
@@ -634,6 +642,13 @@ class EditTextDialog(wx.Dialog):
             globalVars.s1 = self.originalText
             globalVars.s2 = self.text
             wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, hasChanged, lineNum, columnNum, None))
+        event.Skip()
+        
+    def onClipboardPaste(self, event):
+        tones.beep(500, 50)
+        s = api.getClipData()
+        s = s.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
+        api.copyToClip(s)
         event.Skip()
 
 jupyterUpdateInProgress = False
