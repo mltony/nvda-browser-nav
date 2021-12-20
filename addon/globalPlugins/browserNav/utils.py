@@ -5,6 +5,7 @@
 
 import controlTypes
 import core
+import _ctypes
 import IAccessibleHandler
 from queue import Queue
 import threading
@@ -142,7 +143,11 @@ def getIA2Document(textInfo):
     raise Exception("Infinite loop!")
 
 
-def getGeckoParagraphIndent(textInfo, document=None):
+class DocumentHolder:
+    def __init__(self, document):
+        self.document = document
+
+def getGeckoParagraphIndent(textInfo, documentHolder=None, oneLastAttempt=False):
     if not isinstance(textInfo, Gecko_ia2_TextInfo):
         raise Exception("This function only works with Gecko_ia2_TextInfo")
     # This is an optimized version of flow for Chrome and Firefox browsers, that avoids creating NVDAObject for performance reasons.
@@ -156,17 +161,26 @@ def getGeckoParagraphIndent(textInfo, document=None):
     # In order to optimize performance we query IAccessible document.
     # This allows us to have a single IAccessible object and query locations of all its children without the need to create multiple objects.
     try:
-        if document is None:
+        if documentHolder is None:
             document = getIA2Document(textInfo)
+        else:
+            document = documentHolder.document
         offset = textInfo._startOffset
         docHandle,ID=textInfo._getFieldIdentifierFromOffset(offset)
         location = document.accLocation(ID)
         return location[0]
     except WindowsError:
-        tones.beep(500, 50)
         return None
     except LookupError:
-        tones.beep(500, 50)
+        return None
+    except _ctypes.COMError:
+        if oneLastAttempt or documentHolder is None:
+            return None
+        # This tends to happen when page changes dynamically.
+        # We need to retry by recreating document and storing a new copy of it in the document holder.
+        documentHolder.document = getIA2Document(textInfo)
+        return getGeckoParagraphIndent(textInfo, documentHolder, oneLastAttempt=True)
+        
         return None
 # For quick finding paragraphs, llok at:
 # VirtualBufferTextInfo._getParagraphOffsets

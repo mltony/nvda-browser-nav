@@ -57,9 +57,9 @@ from . beeper import *
 from . import quickJump
 
 
-debug = False
+debug = True
 if debug:
-    f = open("C:\\Users\\tmal\\drp\\2.txt", "w")
+    f = open("C:\\Users\\tmal\\drp\\1.txt", "w", encoding='utf-8')
 def mylog(s):
     if debug:
         print(str(s), file=f)
@@ -1043,14 +1043,16 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def generateBrowseModeExtractors(self, selfself):
         textInfo = selfself.selection
         geckoMode = isinstance(textInfo, Gecko_ia2_TextInfo)
+        #geckoMode = False
         if geckoMode:
             document = utils.getIA2Document(textInfo)
+            documentHolder = utils.DocumentHolder(document)
         mode = getConfig("browserMode")
         if mode == 0:
             # horizontal offset
             extractFormattingFunc = lambda x: None
             if geckoMode:
-                extractIndentFunc = lambda textInfo,x: utils.getGeckoParagraphIndent(textInfo, document=document)
+                extractIndentFunc = lambda textInfo,x: utils.getGeckoParagraphIndent(textInfo, documentHolder)
             else:
                 extractIndentFunc= lambda textInfo,x: getSimpleHorizontalOffset(textInfo)
             extractStyleFunc = lambda x,y: None
@@ -1091,10 +1093,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
         textInfo = selfself.selection.copy()
         textInfo.collapse()
+        mylog(f"start: {textInfo.text}")
         textInfo.expand(textInfos.UNIT_PARAGRAPH)
         origFormatting = extractFormattingFunc(textInfo)
         origIndent = extractIndentFunc(textInfo, origFormatting)
         origStyle = extractStyleFunc(textInfo, origFormatting)
+        mylog(f"origIndent={str(origIndent)}")
         distance = 0
         while True:
             result =textInfo.move(textInfos.UNIT_PARAGRAPH, increment)
@@ -1107,7 +1111,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             formatting = extractFormattingFunc(textInfo)
             indent = extractIndentFunc(textInfo, formatting)
             style = extractStyleFunc(textInfo, formatting)
+            mylog(f'@{distance} text: {textInfo.text}')
+            mylog(f'indent={str(indent)}')
             if style == origStyle:
+                mylog("Styles math!")
                 if op(indent, origIndent):
                     self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                     speech.speakTextInfo(textInfo, reason=REASON_CARET)

@@ -599,7 +599,6 @@ def asyncAutoclick(self, asyncAutoclickCounterLocal, site):
 original_event_treeInterceptor_gainFocus = None
 def pre_event_treeInterceptor_gainFocus(self):
     if not self._hadFirstGainFocus:
-        tones.beep(500, 50)
         url = getUrl(self)
         sites = findSites(url, globalConfig)
         autoClickSites = [site for site in sites if site.autoClickOnFocus]
@@ -752,6 +751,8 @@ def extractDefaultAttributeMatches(textInfo):
             controlTypes.ROLE_BUTTON,
             controlTypes.ROLE_LINK,
             controlTypes.ROLE_EDITABLETEXT,
+            controlTypes.ROLE_GRAPHIC,
+            controlTypes.ROLE_MENUBUTTON,
         }
     ]
     return result
@@ -925,9 +926,9 @@ class HierarchicalLevelsInfo:
         self.offsets = offsets
 
 hierarchicalCache = weakref.WeakKeyDictionary()
-def getIndentFunc(textInfo, document, future):
+def getIndentFunc(textInfo, documentHolder, future):
     try:
-        x = utils.getGeckoParagraphIndent(textInfo, document=document)
+        x = utils.getGeckoParagraphIndent(textInfo, documentHolder)
         future.set(x)
     except Exception as e:
         future.setException(e)
@@ -945,6 +946,7 @@ def scanLevelsThreadFunc(self, config, future):
         textInfo.collapse()
         textInfo.expand(textInfos.UNIT_PARAGRAPH)
         document = utils.getIA2Document(textInfo)
+        documentHolder = utils.DocumentHolder(document)
         distance = 0
         while True:
             for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
@@ -954,7 +956,7 @@ def scanLevelsThreadFunc(self, config, future):
                 # We compute x indent of the paragraph where we matched the pattern.
                 # Computing it in thread pool for performance reasons.
                 innerFuture = utils.Future()
-                utils.threadPool.add_task(getIndentFunc, thisInfo, document, innerFuture)
+                utils.threadPool.add_task(getIndentFunc, thisInfo, documentHolder, innerFuture)
                 futures.append(innerFuture)
                 
             distance += 1
@@ -990,7 +992,6 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
     if len(bookmarks) == 0:
         return endOfDocument(_('No hierarchical quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     try:
-        api.q = hierarchicalCache
         levelsInfo = hierarchicalCache[self][globalConfig].get()
         mylog(f"level={level} levelsInfo={levelsInfo.offsets}")
     except KeyError:
@@ -1002,6 +1003,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
     textInfo.collapse()
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
     document = utils.getIA2Document(textInfo)
+    documentHolder = utils.DocumentHolder(document)
     distance = 0
     adjustedDistance = 0
     while True:
@@ -1015,7 +1017,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
             adjustedDistance += 1
         for match in matchTextAndAttributes(bookmarks, textInfo, distance=adjustedDistance*direction):
             bookmark = match.bookmark
-            offset = utils.getGeckoParagraphIndent(textInfo, document=document)
+            offset = utils.getGeckoParagraphIndent(textInfo, documentHolder)
             mylog(f"offset={offset}")
             if (
                 levelsInfo is None 
