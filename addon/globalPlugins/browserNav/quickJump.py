@@ -812,7 +812,7 @@ def quickJump(self, gesture, category, direction, errorMsg):
         if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
             adjustedDistance += 1
         
-        for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
+        for match in matchTextAndAttributes(bookmarks, textInfo, distance=adjustedDistance*direction):
             bookmark = match.bookmark
             if len(bookmark.message) > 0:
                 ui.message(bookmark.message)
@@ -869,7 +869,7 @@ def autoClick(self, gesture, category, site=None, automated=False):
         bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
     else:
         bookmarks = findApplicableBookmarks(category=category, site=site)
-    mylog(f"Found {len(bookmarks)} bookmarks")
+    mylog(f"Autoclick Found {len(bookmarks)} bookmarks")
     if len(bookmarks) == 0:
         return endOfDocument(
             _('No {category} bookmarks configured for current website. Please add {category} bookmarks in BrowserNav settings in NVDA settings window.').format(
@@ -885,7 +885,7 @@ def autoClick(self, gesture, category, site=None, automated=False):
     focusables = []
     while True:
         for match in matchTextAndAttributes(bookmarks, textInfo):
-            mylog(f"Match {distance} {textInfo.text}")
+            mylog(f"Autoclick Match {distance} {textInfo.text}")
             bookmark = match.bookmark
             thisInfo = textInfo.copy()
             if bookmark.offset == 0:
@@ -898,8 +898,9 @@ def autoClick(self, gesture, category, site=None, automated=False):
             if focusable.role in {controlTypes.ROLE_DOCUMENT, controlTypes.ROLE_DIALOG}:
                 if focusableErrorMsg is None:
                     focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
-            else:
+            elif bookmark.offset == 0:
                 # Double check that NBDAObject is good - to avoid some race condition as often time the document is still updating.
+                # TODO: we need to come up with some algorithm to double-check when offset is not zero.
                 try:
                     startOffset, endOffset = thisInfo._getOffsetsFromNVDAObject(focusable)
                 except LookupError:
@@ -912,6 +913,10 @@ def autoClick(self, gesture, category, site=None, automated=False):
                     focusables.append(focusable)
                     if message is None and len(bookmark.message) > 0:
                         message = bookmark.message
+            else:
+                focusables.append(focusable)
+                if message is None and len(bookmark.message) > 0:
+                    message = bookmark.message
         distance += 1
         result = moveParagraph(textInfo, 1)
         if result == 0:

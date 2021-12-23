@@ -777,60 +777,6 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
         initialDelay = 0 if beepVolume==0 else 50
         beeper.simpleCrackle(paragraphs, volume=getConfig("crackleVolume"), initialDelay=initialDelay)
 
-
-NON_SKIPPABLE_ROLES = {
-    controlTypes.ROLE_CHECKBOX,
-    controlTypes.ROLE_RADIOBUTTON,
-    controlTypes.ROLE_EDITABLETEXT,
-    controlTypes.ROLE_BUTTON,
-    controlTypes.ROLE_MENUBAR,
-    controlTypes.ROLE_MENUITEM,
-    controlTypes.ROLE_POPUPMENU,
-    controlTypes.ROLE_COMBOBOX,
-    controlTypes.ROLE_LIST,
-    controlTypes.ROLE_LISTITEM,
-    controlTypes.ROLE_HELPBALLOON,
-    controlTypes.ROLE_TOOLTIP,
-    controlTypes.ROLE_LINK,
-    controlTypes.ROLE_TREEVIEW,
-    controlTypes.ROLE_TREEVIEWITEM,
-    controlTypes.ROLE_TAB,
-    controlTypes.ROLE_TABCONTROL,
-    controlTypes.ROLE_SLIDER,
-    controlTypes.ROLE_PROGRESSBAR,
-    controlTypes.ROLE_SCROLLBAR,
-    controlTypes.ROLE_STATUSBAR,
-    controlTypes.ROLE_DROPDOWNBUTTON,
-    controlTypes.ROLE_FORM,
-    controlTypes.ROLE_APPLICATION,
-    controlTypes.ROLE_GROUPING,
-    controlTypes.ROLE_CHECKMENUITEM,
-    controlTypes.ROLE_DATEEDITOR,
-    controlTypes.ROLE_DIRECTORYPANE,
-    controlTypes.ROLE_RADIOMENUITEM,
-    controlTypes.ROLE_EDITBAR,
-    controlTypes.ROLE_TERMINAL,
-    controlTypes.ROLE_RICHEDIT,
-    controlTypes.ROLE_RULER,
-    controlTypes.ROLE_TOGGLEBUTTON,
-    controlTypes.ROLE_CARET,
-    controlTypes.ROLE_DROPLIST,
-    controlTypes.ROLE_SPLITBUTTON,
-    controlTypes.ROLE_MENUBUTTON,
-    controlTypes.ROLE_DROPDOWNBUTTONGRID,
-    controlTypes.ROLE_MATH,
-    controlTypes.ROLE_HOTKEYFIELD,
-    controlTypes.ROLE_INDICATOR,
-    controlTypes.ROLE_SPINBUTTON,
-    controlTypes.ROLE_SOUND,
-    controlTypes.ROLE_TREEVIEWBUTTON,
-    controlTypes.ROLE_IPADDRESS,
-    controlTypes.ROLE_FILECHOOSER,
-    controlTypes.ROLE_MENU,
-    controlTypes.ROLE_PASSWORDEDIT,
-    controlTypes.ROLE_FONTCHOOSER,
-}
-
 originalCaretMovementScriptHelper = None
 originalQuickNavScript = None
 originalTableScriptHelper = None
@@ -886,7 +832,7 @@ def pre_set_selection(self, info):
     except AttributeError:
         sh = SelectionHistory()
         self.selectionHistory = sh
-    #sh.append(info)
+    sh.append(info)
     return original_set_selection(self, info)
 
 class SelectionHistory:
@@ -901,16 +847,20 @@ class SelectionHistory:
             pass
         info = info.copy()
         info.expand(textInfos.UNIT_PARAGRAPH)
-        self.entries.append(info)
+        self.entries.append(info._startOffset)
         self.ptr = len(self.entries)
 
     def goBack(self, info):
-        info = info.copy()
-        info.expand(textInfos.UNIT_PARAGRAPH)
+        currentInfo = info.copy()
+        currentInfo.expand(textInfos.UNIT_PARAGRAPH)
+        historicalInfo = currentInfo.copy()
         while self.ptr > 0:
             self.ptr -= 1
-            if not info.isOverlapping(self.entries[self.ptr]):
-                return self.entries[self.ptr]
+            offset = self.entries[self.ptr]
+            historicalInfo._startOffset = historicalInfo._endOffset = offset
+            historicalInfo.expand(textInfos.UNIT_PARAGRAPH)
+            if not currentInfo.isOverlapping(historicalInfo):
+                return historicalInfo
         raise IndexError()
 
 
