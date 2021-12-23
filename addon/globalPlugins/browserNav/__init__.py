@@ -425,13 +425,6 @@ class RegexSearchDialog(wx.Dialog):
         global lastRegexSearch
         lastRegexSearch = strVal
 
-class TextCtrlWithFixedPasting(wx.TextCtrl):
-    def __init__(self, parent, style):
-        super().__init__(parent, style)
-
-    def Paste(self):
-        tones.beep(500, 50)
-        super().Paste()
 
 class EditTextDialog(wx.Dialog):
     def __init__(self, parent, text, cursorLine, cursorColumn, onTextComplete):
@@ -646,7 +639,6 @@ class EditTextDialog(wx.Dialog):
         event.Skip()
         
     def onClipboardPaste(self, event):
-        tones.beep(500, 50)
         s = api.getClipData()
         s = s.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
         api.copyToClip(s)
