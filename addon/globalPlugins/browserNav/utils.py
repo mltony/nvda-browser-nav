@@ -3,6 +3,7 @@
 #This file is covered by the GNU General Public License.
 #See the file LICENSE  for more details.
 
+from .constants import *
 import controlTypes
 import core
 import _ctypes
@@ -135,7 +136,7 @@ def getIA2Document(textInfo):
     ia = textInfo.NVDAObjectAtStart.IAccessibleObject
     for i in range(1000):
         try:
-            if controlTypes.ROLE_DOCUMENT == IAccessibleHandler.IAccessibleRolesToNVDARoles[ia.accRole(winUser.CHILDID_SELF)]:
+            if ROLE_DOCUMENT == IAccessibleHandler.IAccessibleRolesToNVDARoles[ia.accRole(winUser.CHILDID_SELF)]:
                 return ia
         except KeyError:
             pass

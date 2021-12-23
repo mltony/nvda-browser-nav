@@ -14,6 +14,7 @@ import browseMode
 from contextlib import ExitStack
 import controlTypes
 import config
+from . constants import *
 import core
 import ctypes
 import cursorManager
@@ -1402,7 +1403,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 api.processPendingEvents(processEventQueue=True)
         else:
             obj=selfself.currentNVDAObject
-        if obj.role != controlTypes.ROLE_EDITABLETEXT:
+        if obj.role != ROLE_EDITABLETEXT:
             ui.message(_("Not editable"))
             return
         uniqueID = obj.IA2UniqueID
@@ -1433,7 +1434,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         cursorColumn = len(preLines[-1])
         def getFocusObjectVerified():
                 focus = api.getFocusObject()
-                if focus.role != controlTypes.ROLE_EDITABLETEXT:
+                if focus.role != ROLE_EDITABLETEXT:
                     raise EditBoxUpdateError(_("Browser state has changed. Focused element is not an edit box. Role: %d.") % focus.role)
                 if (uniqueID is not None) and (uniqueID != 0):
                     if uniqueID != focus.IA2UniqueID:
@@ -1506,15 +1507,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     focus = api.getFocusObject()
                     roles.append(focus.role)
                     if focus.role in [
-                        controlTypes.ROLE_PANE,
-                        controlTypes.ROLE_FRAME,
-                        controlTypes.ROLE_DOCUMENT,
+                        ROLE_PANE,
+                        ROLE_FRAME,
+                        ROLE_DOCUMENT,
                     ]:
                         # All good, Firefox is burning cpu, keep sleeping!
                         yield 10
                         goodCounter = 0
                         continue
-                    elif focus.role == controlTypes.ROLE_EDITABLETEXT:
+                    elif focus.role == ROLE_EDITABLETEXT:
                         goodCounter += 1
                         if goodCounter > 10:
                             tones.beep(1000, 100)
@@ -1809,7 +1810,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "nextTab",
             script=lambda selfself, gesture: self.findByRole(
                 direction=1,
-                roles={controlTypes.ROLE_TAB, controlTypes.ROLE_TABCONTROL},
+                roles={ROLE_TAB, ROLE_TABCONTROL},
                 errorMessage=_("No next tab"),
                 newMethod=True,
             ),
@@ -1819,14 +1820,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "previousTab",
             script=lambda selfself, gesture: self.findByRole(
                 direction=-1,
-                roles=[controlTypes.ROLE_TAB],
+                roles={ROLE_TAB, ROLE_TABCONTROL},
                 errorMessage=_("No previous tab"),
                 newMethod=True,
             ),
             doc="Jump to previous tab")
 
       #Dialog
-        dialogTypes = [controlTypes.ROLE_APPLICATION, controlTypes.ROLE_DIALOG]
+        dialogTypes = [ROLE_APPLICATION, ROLE_DIALOG]
         self.injectBrowseModeKeystroke(
             "kb:P",
             "nextDialog",
@@ -1845,14 +1846,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             doc="Jump to previous dialog")
       # Menus
         menuTypes = [
-            controlTypes.ROLE_MENU,
-            controlTypes.ROLE_MENUBAR,
-            controlTypes.ROLE_MENUITEM,
-            controlTypes.ROLE_POPUPMENU,
-            controlTypes.ROLE_CHECKMENUITEM,
-            controlTypes.ROLE_RADIOMENUITEM,
-            controlTypes.ROLE_TEAROFFMENU,
-            controlTypes.ROLE_MENUBUTTON,
+            ROLE_MENU,
+            ROLE_MENUBAR,
+            ROLE_MENUITEM,
+            ROLE_POPUPMENU,
+            ROLE_CHECKMENUITEM,
+            ROLE_RADIOMENUITEM,
+            ROLE_TEAROFFMENU,
+            ROLE_MENUBUTTON,
         ]
         self.injectBrowseModeKeystroke(
             "kb:Z",
@@ -1881,7 +1882,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "nextTreeView",
             script=lambda selfself, gesture: self.findByRole(
                 direction=1,
-                roles=[controlTypes.ROLE_TREEVIEW],
+                roles=[ROLE_TREEVIEW],
                 errorMessage=_("No next tree view")),
             doc="Jump to next tree view")
         self.injectBrowseModeKeystroke(
@@ -1889,7 +1890,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "previousTreeView",
             script=lambda selfself, gesture: self.findByRole(
                 direction=-1,
-                roles=[controlTypes.ROLE_TREEVIEW],
+                roles=[ROLE_TREEVIEW],
                 errorMessage=_("No previous tree view")),
             doc="Jump to previous tree view")
         self.injectBrowseModeKeystroke(
@@ -1897,7 +1898,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "nextToolBar",
             script=lambda selfself, gesture: self.findByControlField(
                 direction=1,
-                role=controlTypes.ROLE_TOOLBAR,
+                role=ROLE_TOOLBAR,
                 errorMessage=_("No next tool bar")),
             doc="Jump to next tool bar")
         self.injectBrowseModeKeystroke(
@@ -1905,7 +1906,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "previousToolBar",
             script=lambda selfself, gesture: self.findByControlField(
                 direction=-1,
-                role=controlTypes.ROLE_TOOLBAR,
+                role=ROLE_TOOLBAR,
                 errorMessage=_("No previous tool bar")),
             doc="Jump to previous tool bar")
       #Format change

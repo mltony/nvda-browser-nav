@@ -5,6 +5,7 @@
 
 import api
 from collections import namedtuple, defaultdict
+from .constants import *
 from contextlib import ExitStack
 import controlTypes
 from controlTypes import OutputReason
@@ -762,11 +763,11 @@ def extractDefaultAttributeMatches(textInfo):
         for attr in attrs
         if attr.attribute == ParagraphAttribute.ROLE
         and attr.value in {
-            controlTypes.ROLE_BUTTON,
-            controlTypes.ROLE_LINK,
-            controlTypes.ROLE_EDITABLETEXT,
-            controlTypes.ROLE_GRAPHIC,
-            controlTypes.ROLE_MENUBUTTON,
+            ROLE_BUTTON,
+            ROLE_LINK,
+            ROLE_EDITABLETEXT,
+            ROLE_GRAPHIC,
+            ROLE_MENUBUTTON,
         }
     ]
     return result
@@ -895,7 +896,7 @@ def autoClick(self, gesture, category, site=None, automated=False):
             else:
                 moveParagraph(thisInfo, bookmark.offset)
             focusable = thisInfo.focusableNVDAObjectAtStart
-            if focusable.role in {controlTypes.ROLE_DOCUMENT, controlTypes.ROLE_DIALOG}:
+            if focusable.role in {ROLE_DOCUMENT, ROLE_DIALOG}:
                 if focusableErrorMsg is None:
                     focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
             elif bookmark.offset == 0:
