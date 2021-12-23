@@ -870,29 +870,9 @@ def browserNavPopup(selfself,gesture):
     gui.mainFrame.prePopup()
     try:
         frame = wx.Frame(None, -1,"Fake popup frame", pos=(1, 1),size=(1, 1))
-        imp = wx.Menu()
-        imp.Append(wx.ID_ANY, 'SubMenu 1')
-        imp.Append(wx.ID_ANY, 'SubMenu 2')
-        imp.Append(wx.ID_ANY, 'SubMenu 3')
         menu = wx.Menu()
         menu.AppendMenu(wx.ID_ANY, '&Bookmark', quickJump.makeBookmarkSubmenu(self, frame))
         menu.AppendMenu(wx.ID_ANY, '&Website', quickJump.makeWebsiteSubmenu(self, frame))
-        menu.AppendMenu(wx.ID_ANY, '&Imp', imp)
-        item = menu.Append(wx.ID_ANY, 'hahaha')
-        if False:
-            for func, menuStr  in [
-                (copyCell, _("Copy ce&ll")),
-                (copyColumn, _("Copy &column")),
-                (copyRow, _("Copy &row")),
-                (copyTable, _("Copy &table")),
-            ]:
-                item = menu.Append(wx.ID_ANY, menuStr)
-                frame.Bind(
-                    wx.EVT_MENU,
-                    lambda evt, func=func: func(selfself, gesture),
-                    item,
-                )
-
         frame.Bind(
             wx.EVT_MENU_CLOSE,
             lambda evt: frame.Close()
