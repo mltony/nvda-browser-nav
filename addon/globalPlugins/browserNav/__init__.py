@@ -114,6 +114,8 @@ def initConfiguration():
         "skipEmptyLines" : "boolean( default=True)",
         "skipChimeVolume" : "integer( default=25, min=0, max=100)",
         "skipRegex" : "string( default='(^Hide or report this$)')",
+        "beepOnFocus" : "boolean( default=False)",
+        "beepOnAutoClick" : "boolean( default=False)",
     }
     config.conf.spec["browsernav"] = confspec
 
@@ -192,33 +194,17 @@ class SettingsDialog(SettingsPanel):
         label = _("Use bold and italic attributes for style")
         self.useBoldItalicCheckBox = sHelper.addItem(wx.CheckBox(self, label=label))
         self.useBoldItalicCheckBox.Value = getConfig("useBoldItalic")
-      # BrowserMarks regexp text edit
-        self.marksEdit = gui.guiHelper.LabeledControlHelper(self, _("Browser marks regexp"), wx.TextCtrl).control
-        self.marksEdit.Value = getConfig("marks")
 
-      # Skipping over empty paragraphs
-        # Translators: Checkbox that controls whether we should skip over empty paragraphs
-        label = _("Skip over empty paragraphs (unless in form fields)")
-        self.skipEmptyParagraphsCheckbox = sHelper.addItem(wx.CheckBox(self, label=label))
-        self.skipEmptyParagraphsCheckbox.Value = getConfig("skipEmptyParagraphs")
-
-        # Translators: Checkbox that controls whether we should skip over empty lines
-        label = _("Skip over empty lines (unless in form fields)")
-        self.skipEmptyLinesCheckbox = sHelper.addItem(wx.CheckBox(self, label=label))
-        self.skipEmptyLinesCheckbox.Value = getConfig("skipEmptyLines")
       # skipChimeVolumeSlider
         sizer=wx.BoxSizer(wx.HORIZONTAL)
         # Translators: volume of skip chime slider
-        label=wx.StaticText(self,wx.ID_ANY,label=_("Volume of skip paragraph chime"))
+        label=wx.StaticText(self,wx.ID_ANY,label=_("Volume of skipClutter chime"))
         slider=wx.Slider(self, wx.NewId(), minValue=0,maxValue=100)
         slider.SetValue(getConfig("skipChimeVolume"))
         sizer.Add(label)
         sizer.Add(slider)
         settingsSizer.Add(sizer)
         self.skipChimeVolumeSlider = slider
-      # Skip regexp text edit
-        self.skipRegexEdit = gui.guiHelper.LabeledControlHelper(self, _("Also skip over paragraphs that match regex:"), wx.TextCtrl).control
-        self.skipRegexEdit.Value = getConfig("skipRegex")
 
 
     def onSave(self):
@@ -230,11 +216,7 @@ class SettingsDialog(SettingsPanel):
         config.conf["browsernav"]["useColor"] = self.useColorCheckBox.Value
         config.conf["browsernav"]["useBackgroundColor"] = self.useBackgroundColorCheckBox.Value
         config.conf["browsernav"]["useBoldItalic"] = self.useBoldItalicCheckBox.Value
-        config.conf["browsernav"]["marks"] = self.marksEdit.Value
-        config.conf["browsernav"]["skipEmptyParagraphs"] = self.skipEmptyParagraphsCheckbox.Value
-        config.conf["browsernav"]["skipEmptyLines"] = self.skipEmptyLinesCheckbox.Value
         config.conf["browsernav"]["skipChimeVolume"] = self.skipChimeVolumeSlider.Value
-        config.conf["browsernav"]["skipRegex"] = self.skipRegexEdit.Value
 
 
 def getMode():
@@ -637,7 +619,7 @@ class EditTextDialog(wx.Dialog):
             globalVars.s2 = self.text
             wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, hasChanged, lineNum, columnNum, None))
         event.Skip()
-        
+
     def onClipboardPaste(self, event):
         s = api.getClipData()
         s = s.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
@@ -1065,34 +1047,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 
 
-    def findMark(self, direction, regexp, errorMessage, selfself):
-        r = re.compile(regexp)
-        focus = api.getFocusObject().treeInterceptor
-        textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
-        textInfo.expand(textInfos.UNIT_PARAGRAPH)
-        distance = 0
-        while True:
-            distance += 1
-            textInfo.collapse()
-            result = textInfo.move(textInfos.UNIT_PARAGRAPH, direction)
-            if result == 0:
-                endOfDocument(errorMessage)
-                return
-            textInfo.expand(textInfos.UNIT_PARAGRAPH)
-            m = r.search(textInfo.text)
-            if m:
-                textInfo.collapse()
-                textInfo.move(textInfos.UNIT_CHARACTER, m.start(0))
-                end = textInfo.copy()
-                end.move(textInfos.UNIT_CHARACTER, len(m.group(0)))
-                textInfo.setEndPoint(end, "endToEnd")
-                textInfo.updateCaret()
-                self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
-                speech.speakTextInfo(textInfo, reason=REASON_CARET)
-                textInfo.collapse()
-                focus._set_selection(textInfo)
-                selfself.selection = textInfo
-                return
 
     def isRolePresent(self, textInfo, roles):
         formatConfig=config.conf['documentFormatting']
@@ -1705,35 +1659,55 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "rotor",
             doc="Adjusts BrowserNav rotor")
 
-      # Marks
-        if False:
-            # old implementation:
-            self.injectBrowseModeKeystroke(
-                "kb:j",
-                "nextMark",
-                script=lambda selfself, gesture: self.findMark(1, getConfig("marks"), "No next browser mark. To configure browser marks, go to BrowserNav settings.", selfself=selfself),
-                doc="Jump to next browser mark.")
-            self.injectBrowseModeKeystroke(
-                "kb:Shift+j",
-                "previousMark",
-                script=lambda selfself, gesture: self.findMark(-1, getConfig("marks"), _("No previous browser mark. To configure browser marks, go to BrowserNav settings."), selfself=selfself),
-                doc="Jump to previous browser mark.")
+      # QuickJump 1 bookmarks
         self.injectBrowseModeKeystroke(
             "kb:J",
-            "quickSearchForward",
+            "quickJumpForward",
             script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP, 1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
-            doc="QuickSearch forward according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+            doc="QuickJump forward according to BrowserNav QuickJump bookmarks; please check browserNav configuration panel for the list of bookmarks.")
         self.injectBrowseModeKeystroke(
             "kb:Shift+J",
-            "quickSearchBack",
+            "quickJumpBack",
             script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP, -1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
-            doc="QuickSearch back according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+            doc="QuickJump back according to BrowserNav QuickJump bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+      # QuickJump 2 and 3 bookmarks
+        self.injectBrowseModeKeystroke(
+            [],
+            "quickJump2Forward",
+            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP_2, 1,  _("No next QuickJump result for QuickJump2 bookmarks. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
+            doc="QuickJump forward according to BrowserNav QuickJump2 bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+        self.injectBrowseModeKeystroke(
+            [],
+            "quickJump2Back",
+            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP_2, -1,  _("No next QuickJump result for QuickJump2 bookmarks. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
+            doc="QuickJump back according to BrowserNav QuickJump2 bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+        self.injectBrowseModeKeystroke(
+            [],
+            "quickJump3Forward",
+            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP_3, 1,  _("No next QuickJump result for QuickJump3 bookmarks. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
+            doc="QuickJump forward according to BrowserNav QuickJump3 bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+        self.injectBrowseModeKeystroke(
+            [],
+            "quickJump3Back",
+            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP_3, -1,  _("No next QuickJump result for QuickJump3 bookmarks. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
+            doc="QuickJump back according to BrowserNav QuickJump3 bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+
       # AutoClick
         self.injectBrowseModeKeystroke(
             "kb:Alt+J",
             "autoClick",
             script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.AUTO_CLICK),
-            doc="AutoClick  according to BrowserNav bookmarks; please check browserNav configuration panel for the list of bookmarks.")
+            doc="AutoClick  according to BrowserNav AutoClick bookmark; please check browserNav configuration panel for the list of bookmarks.")
+        self.injectBrowseModeKeystroke(
+            [],
+            "autoClick2",
+            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.AUTO_CLICK_2),
+            doc="AutoClick  according to BrowserNav AutoClick2 bookmark; please check browserNav configuration panel for the list of bookmarks.")
+        self.injectBrowseModeKeystroke(
+            [],
+            "autoClick3",
+            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.AUTO_CLICK_3),
+            doc="AutoClick  according to BrowserNav AutoClick3 bookmark; please check browserNav configuration panel for the list of bookmarks.")
       # Hierarchical
         for letter in "`1234567890":
             try:
@@ -1773,7 +1747,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 ),
                 doc="Jump to previous hierarchical bookmark {levelStr}; please check browserNav configuration panel for hierarchical bookmark configuration.".format(
                     levelStr=levelStr
-                ))                
+                ))
       # Tabs
         # Example page with tabs:
         # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
