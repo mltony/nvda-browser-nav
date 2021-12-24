@@ -188,7 +188,7 @@ class QJAttribute(QJImmutable):
     def asDict(self):
         return {
             'attribute': self.attribute.value,
-            'value': self.value.value if self.attribute == ParagraphAttribute.ROLE else selv.value,
+            'value': self.value.value if self.attribute == ParagraphAttribute.ROLE else self.value,
 
         }
 
@@ -439,36 +439,6 @@ def saveConfig():
 
 globalConfig  = loadConfig()
 
-if False:
-    from dataclasses import dataclass, asdict
-    from enum import Enum
-
-
-    @dataclass
-    class Foobar:
-      name: str
-      template: "FoobarEnum"
-
-
-    class FoobarEnum(Enum):
-      FIRST = "foobar"
-      SECOND = "baz"
-
-
-    def custom_asdict_factory(data):
-
-        def convert_value(obj):
-            if isinstance(obj, Enum):
-                return obj.value
-            return obj
-
-        return dict((k, convert_value(v)) for k, v in data)
-
-
-    foobar = Foobar(name="John", template=FoobarEnum.FIRST)
-
-    print(asdict(foobar, dict_factory=custom_asdict_factory))
-    # {'name': 'John', 'template': 'foobar'}
 
 @functools.lru_cache()
 def re_compile(s):
@@ -642,10 +612,8 @@ def makeCompositeRegex(bookmarks):
     return re_compile(re_string)
 
 def matchWidthCompositeRegex(bookmarks, text):
-    mylog(f"matchWidthCompositeRegex")
     m = makeCompositeRegex(bookmarks).search(text)
     if m is None:
-        mylog(f"no matches!")
         return None
     matchIndices = [
         int(key[len(NAMED_REGEX_PREFIX):])
@@ -721,7 +689,6 @@ def findApplicableBookmarks(config=None, url=None, category=None, site=None):
     return tuple(bookmarks)
 
 def extractAttributesSet(textInfo):
-    #result = defaultdict(set)
     result = set()
     fields = textInfo.getTextWithFields()
     for field in fields:
@@ -729,7 +696,6 @@ def extractAttributesSet(textInfo):
             continue
         elif field.command == 'controlStart':
             role = field.field['role']
-            #result[ParagraphAttribute.ROLE].add(role)
             result.add(QJAttribute(role=role))
         elif field.command == 'formatChange':
             for key, pAttr in [
@@ -744,7 +710,7 @@ def extractAttributesSet(textInfo):
                 try:
                     result.add(QJAttribute({
                         'attribute': pAttr,
-                        'value': field.field[key],
+                        'value': str(field.field[key]).replace(" ", "_"),
                     }))
                 except KeyError:
                     pass
@@ -898,6 +864,7 @@ def autoClick(self, gesture, category, site=None, automated=False):
             focusable = thisInfo.focusableNVDAObjectAtStart
             if focusable.role in {ROLE_DOCUMENT, ROLE_DIALOG}:
                 if focusableErrorMsg is None:
+                    mylog("Bookmark points to non-focusable NVDA object, cannot click it.")
                     focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
             elif bookmark.offset == 0:
                 # Double check that NBDAObject is good - to avoid some race condition as often time the document is still updating.
@@ -905,16 +872,24 @@ def autoClick(self, gesture, category, site=None, automated=False):
                 try:
                     startOffset, endOffset = thisInfo._getOffsetsFromNVDAObject(focusable)
                 except LookupError:
+                    mylog("LookupError! skipping this match.")
                     continue
                 controlInfo = thisInfo.copy()
                 controlInfo._startOffset = startOffset
                 controlInfo._endOffset = endOffset
+                controlInfo.collapse()
+                controlInfo.expand(textInfos.UNIT_PARAGRAPH)
                 matches = len(list(matchTextAndAttributes((bookmark,), controlInfo))) > 0
                 if matches:
+                    mylog("Verification successful!")
                     focusables.append(focusable)
                     if message is None and len(bookmark.message) > 0:
                         message = bookmark.message
+                else:
+                    mylog("Verification failed:")
+                    mylog(controlInfo.text)
             else:
+                mylog("Verification skipped since offset is non-zero")
                 focusables.append(focusable)
                 if message is None and len(bookmark.message) > 0:
                     message = bookmark.message
