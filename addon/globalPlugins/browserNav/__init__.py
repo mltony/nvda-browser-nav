@@ -114,8 +114,6 @@ def initConfiguration():
         "skipEmptyLines" : "boolean( default=True)",
         "skipChimeVolume" : "integer( default=25, min=0, max=100)",
         "skipRegex" : "string( default='(^Hide or report this$)')",
-        "beepOnFocus" : "boolean( default=False)",
-        "beepOnAutoClick" : "boolean( default=False)",
     }
     config.conf.spec["browsernav"] = confspec
 
@@ -884,6 +882,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.newShouldPassThrough
         quickJump.original_event_treeInterceptor_gainFocus = browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.pre_event_treeInterceptor_gainFocus
+        quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
+        NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
+        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
+
+        
 
 
     def createMenu(self):
@@ -901,6 +904,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.original_event_gainFocus
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.originalShouldPassThrough
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.original_event_treeInterceptor_gainFocus
+        NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.originalReportLiveRegion
+        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
+
 
     def script_moveToNextSibling(self, gesture, selfself):
         mode = getMode()
@@ -1943,3 +1949,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 gesture,
             ),
             doc="Show BrowserNav popup menu.")
+
+
+
+

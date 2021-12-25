@@ -102,7 +102,28 @@ focusModeNames = {
     FocusMode.DISABLE_FOCUS: _('Ignore all focus events - good for websites that misuse focus events'),
 }
 
+class LiveRegionMode(Enum):
+    UNCHANGED = 0
+    MUTE_LIVE_REGION = 1
 
+
+liveRegionModeNames = {
+    LiveRegionMode.UNCHANGED: _("Speak live regions"),
+    LiveRegionMode.MUTE_LIVE_REGION: _("Mute live regions"),
+}
+
+class DebugBeepMode(Enum):
+    NO_BEEPS = 0
+    ON_FOCUS = 1
+    ON_AUTO_CLICK = 2
+    ON_LIVE_REGION = 3
+    
+debugBeepModeNames = {
+    DebugBeepMode.NO_BEEPS: _("No beeps"),
+    DebugBeepMode.ON_FOCUS: _("Beep on every focus event"),
+    DebugBeepMode.ON_AUTO_CLICK: _("Beep on every successful autoClick"),
+    DebugBeepMode.ON_LIVE_REGION: _("Beep on every update from live region"),
+}
 
 class PatternMatch(Enum):
     EXACT = 1
@@ -317,6 +338,8 @@ class QJSite(QJImmutable):
     urlMatch: URLMatch
     name: str
     focusMode: FocusMode
+    liveRegionMode: LiveRegionMode
+    debugBeepMode: DebugBeepMode
     bookmarks: Tuple[QJBookmark]
     autoClickOnFocus: bool
     autoClickCategory: BookmarkCategory
@@ -330,15 +353,12 @@ class QJSite(QJImmutable):
         self.urlMatch = URLMatch(d['urlMatch'])
         self.name = d['name']
         self.focusMode = FocusMode(d['focusMode'])
+        self.liveRegionMode = LiveRegionMode(d['liveRegionMode'])
+        self.debugBeepMode = DebugBeepMode(d['debugBeepMode'])
         self.bookmarks = tuple([
             QJBookmark(bookmarkDict)
             for bookmarkDict in d['bookmarks']
         ])
-        #d['autoClickOnFocus'] = False
-        #d['autoClickCategory'] = 5
-        #d['autoClickOnFocusDelay'] = 500
-        #d['autoClickContinuous'] = False
-        #d['autoClickContinuousDelay'] = 500
         self.autoClickOnFocus = d['autoClickOnFocus']
         self.autoClickCategory = BookmarkCategory(d['autoClickCategory'])
         self.autoClickOnFocusDelay = d['autoClickOnFocusDelay']
@@ -352,6 +372,8 @@ class QJSite(QJImmutable):
             'urlMatch': self.urlMatch.value,
             'name': self.name,
             'focusMode': self.focusMode.value,
+            'liveRegionMode': self.liveRegionMode.value,
+            'debugBeepMode': self.debugBeepMode.value,
             'bookmarks': [bookmark.asDict() for bookmark in self.bookmarks],
             'autoClickOnFocus': self.autoClickOnFocus,
             'autoClickCategory': self.autoClickCategory.value,
@@ -510,6 +532,27 @@ def getFocusMode(url, config):
     ])
     return FocusMode(mode)
 
+def getLiveRegionMode(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return LiveRegionMode.UNCHANGED
+    mode = max([
+        site.liveRegionMode.value
+        for site in sites
+    ])
+    return LiveRegionMode(mode)
+
+
+def getDebugBeepModes(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return set()
+    return {
+        site.debugBeepMode
+        for site in sites
+    }
+
+
 @utils.weakMemoize
 def getUrlFromObject(object):
     while object is not None:
@@ -542,10 +585,31 @@ def newShouldPassThrough(self, obj, reason= None):
 
 original_event_gainFocus = None
 def new_event_gainFocus(self, obj, nextHandler):
-    focusMode = getFocusMode(getUrl(self), globalConfig)
+    url = getUrl(self)
+    if DebugBeepMode.ON_FOCUS in getDebugBeepModes(url, globalConfig):
+        tones.beep(500, 50)
+    focusMode = getFocusMode(url, globalConfig)
     if focusMode == FocusMode.DISABLE_FOCUS:
         return nextHandler()
     return original_event_gainFocus(self, obj, nextHandler)
+
+originalReportLiveRegion = None
+@ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_wchar_p, ctypes.c_wchar_p)
+def newReportLiveRegion(text: str, politeness: str):
+    obj = api.getFocusObject()
+    url = None
+    try:
+        interceptor = obj.treeInterceptor
+        url = getUrl(interceptor)
+    except AttributeError:
+        pass
+    if url is not None:
+        if DebugBeepMode.ON_LIVE_REGION in getDebugBeepModes(url, globalConfig):
+            tones.beep(500, 50)
+        if LiveRegionMode.MUTE_LIVE_REGION == getLiveRegionMode(url, globalConfig):
+            # Skipping!
+            return -1
+    return originalReportLiveRegion(text, politeness)
 
 asyncAutoclickCounter = 0
 def asyncAutoclick(self, asyncAutoclickCounterLocal, site):
@@ -906,7 +970,10 @@ def autoClick(self, gesture, category, site=None, automated=False):
             focusable.doAction()
         except NotImplementedError as e:
             raise e
-    if not automated:
+    if automated:
+        if site is not None and site.debugBeepMode == DebugBeepMode.ON_AUTO_CLICK:
+            tones.beep(500, 50)
+    else:
         if message is not None:
             ui.message(message)
         else:
@@ -1412,6 +1479,18 @@ class EditBookmarkDialog(wx.Dialog):
             gui.messageBox(errorMsg, _("Bookmark Entry Error"), wx.OK|wx.ICON_WARNING, self)
             self.attributesTextCtrl.SetFocus()
             return
+        if self.getCategory() == BookmarkCategory.SKIP_CLUTTER:
+            result = gui.messageBox(
+                _("Warning: you are about to create a skip clutter bookmark. If your pattern is too generic, it might hide significant part of your website. For example, if you specify a single whitespace as pattern and substring match, then all paragraphs containing at least a single whitespace would disappear. Please make sure you understand how skip clutter works and how to undo this change if you have to. Would you like to continue?"),
+                _("Bookmark Entry warning"),
+                wx.YES|wx.NO|wx.ICON_WARNING,
+                self
+            )
+            if result == wx.YES:
+                pass
+            else:
+                self.categoryComboBox.control.SetFocus()
+                return None
 
         bookmark = QJBookmark({
             'enabled': self.enabledCheckBox.Value,
@@ -1647,6 +1726,8 @@ class EditSiteDialog(wx.Dialog):
                 'name':'',
                 'urlMatch':URLMatch.EXACT.value if url is not None else URLMatch.SUBDOMAIN.value,
                 'focusMode':FocusMode.UNCHANGED.value,
+                'liveRegionMode':LiveRegionMode.UNCHANGED.value,
+                'debugBeepMode':DebugBeepMode.NO_BEEPS.value,
                 'bookmarks': [],
                 'autoClickOnFocus': False,
                 'autoClickCategory': BookmarkCategory.AUTO_CLICK,
@@ -1690,6 +1771,30 @@ class EditSiteDialog(wx.Dialog):
             ],
         )
         self.focusModeCategory.control.SetSelection(list(FocusMode).index(self.site.focusMode))
+      # Translators: Live region Mode comboBox
+        labelText=_("&Live region mode")
+        self.liveRegionModeCategory=guiHelper.LabeledControlHelper(
+            self,
+            labelText,
+            wx.Choice,
+            choices=[
+                liveRegionModeNames[m]
+                for m in LiveRegionMode
+            ],
+        )
+        self.liveRegionModeCategory.control.SetSelection(list(LiveRegionMode).index(self.site.liveRegionMode))
+      # Translators: Debug Beep  comboBox
+        labelText=_("Debug &beep mode")
+        self.debugBeepModeCategory=guiHelper.LabeledControlHelper(
+            self,
+            labelText,
+            wx.Choice,
+            choices=[
+                debugBeepModeNames[m]
+                for m in DebugBeepMode
+            ],
+        )
+        self.debugBeepModeCategory.control.SetSelection(list(DebugBeepMode).index(self.site.debugBeepMode))
       # Translators:  AutoClick on load combo box
         text = _("Perform autoClick on page load automatically:")
         self.autoClickOptions = [
@@ -1780,6 +1885,8 @@ class EditSiteDialog(wx.Dialog):
             'urlMatch':urlMatch,
             'name':self.commentTextCtrl.Value,
             'focusMode': list(FocusMode)[self.focusModeCategory.control.GetSelection()],
+            'liveRegionMode': list(LiveRegionMode)[self.liveRegionModeCategory.control.GetSelection()],
+            'debugBeepMode': list(DebugBeepMode)[self.debugBeepModeCategory.control.GetSelection()],
             'bookmarks': [
                 b.asDict()
                 for b in self.site.bookmarks
