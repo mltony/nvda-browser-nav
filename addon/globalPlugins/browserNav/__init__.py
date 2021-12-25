@@ -114,6 +114,7 @@ def initConfiguration():
         "skipEmptyLines" : "boolean( default=True)",
         "skipChimeVolume" : "integer( default=25, min=0, max=100)",
         "skipRegex" : "string( default='(^Hide or report this$)')",
+        "tableNavigateToCell" : "boolean( default=True)",
     }
     config.conf.spec["browsernav"] = confspec
 
@@ -192,6 +193,12 @@ class SettingsDialog(SettingsPanel):
         label = _("Use bold and italic attributes for style")
         self.useBoldItalicCheckBox = sHelper.addItem(wx.CheckBox(self, label=label))
         self.useBoldItalicCheckBox.Value = getConfig("useBoldItalic")
+        
+        label = _("Jump to the first cell of the table when T or Shift+T is pressed.")
+        self.tableNavigateToCellCheckBox = sHelper.addItem(wx.CheckBox(self, label=label))
+        self.tableNavigateToCellCheckBox.Value = getConfig("tableNavigateToCell")
+
+
 
       # skipChimeVolumeSlider
         sizer=wx.BoxSizer(wx.HORIZONTAL)
@@ -214,6 +221,7 @@ class SettingsDialog(SettingsPanel):
         config.conf["browsernav"]["useColor"] = self.useColorCheckBox.Value
         config.conf["browsernav"]["useBackgroundColor"] = self.useBackgroundColorCheckBox.Value
         config.conf["browsernav"]["useBoldItalic"] = self.useBoldItalicCheckBox.Value
+        config.conf["browsernav"]["tableNavigateToCell"] = self.tableNavigateToCellCheckBox.Value
         config.conf["browsernav"]["skipChimeVolume"] = self.skipChimeVolumeSlider.Value
 
 
@@ -666,6 +674,28 @@ def getFontSize(textInfo, formatting):
     except:
         return 0
 
+def extractRoles(textInfo):
+    result = set()
+    fields = textInfo.getTextWithFields()
+    for field in fields:
+        try:
+            role = field.field['role']
+        except:
+            continue
+        result.add(role)
+    return result
+
+def isRolePresent(textInfo, roles):
+    formatConfig=config.conf['documentFormatting']
+    fields = textInfo.getTextWithFields(formatConfig)
+    for field in fields:
+        try:
+            role = field.field['role']
+        except:
+            continue
+        if role in roles:
+            return True
+    return False
 def getFormatting(info):
     formatField=textInfos.FormatField()
     formatConfig=config.conf['documentFormatting']
@@ -777,9 +807,28 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
     if unit not in {textInfos.UNIT_CHARACTER, textInfos.UNIT_WORD}:
         sonifyTextInfo(self.selection)
 
-def preQuickNavScript(self, *args, **kwargs):
+def preQuickNavScript(self,gesture, itemType, direction, errorMessage, readUnit, *args, **kwargs):
     oldSelection = self.selection
-    result = originalQuickNavScript(self, *args, **kwargs)
+    result = originalQuickNavScript(self,gesture, itemType, direction, errorMessage, readUnit, *args, **kwargs)
+    if itemType == 'table' and getConfig("tableNavigateToCell"):
+        info = self.selection.copy()
+        info.collapse()
+        info.expand(textInfos.UNIT_PARAGRAPH)
+        roles = extractRoles(info)
+        if (
+            controlTypes.Role.TABLE in roles
+            and controlTypes.Role.TABLECELL not in roles
+        ):
+            info.move(textInfos.UNIT_PARAGRAPH, 1)
+            info.expand(textInfos.UNIT_PARAGRAPH)
+            roles = extractRoles(info)
+            if (
+                controlTypes.Role.TABLE in roles
+                and controlTypes.Role.TABLECELL in roles
+            ):
+                self._set_selection(info, reason=controlTypes.OutputReason.QUICKNAV)
+                speech.speakTextInfo(info, reason=controlTypes.OutputReason.QUICKNAV)
+        
     sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
     return result
 
@@ -1050,22 +1099,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     return
             distance += 1
 
-
-
-
-
-    def isRolePresent(self, textInfo, roles):
-        formatConfig=config.conf['documentFormatting']
-        fields = textInfo.getTextWithFields(formatConfig)
-        for field in fields:
-            try:
-                role = field.field['role']
-            except:
-                continue
-            if role in roles:
-                return True
-        return False
-
     def findByRole(self, direction, roles, errorMessage, newMethod=False):
         focus = api.getFocusObject().treeInterceptor
         textInfo = focus.makeTextInfo(textInfos.POSITION_CARET)
@@ -1083,7 +1116,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 obj = textInfo.NVDAObjectAtStart
                 testResult =  obj is not None and obj.role in roles
             else:
-                testResult = self.isRolePresent(textInfo, roles)
+                testResult = isRolePresent(textInfo, roles)
             if testResult:
                 textInfo.updateCaret()
                 self.beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
