@@ -21,7 +21,7 @@ addon_info = {
 In browsers it allows to quickly find vertically aligned paragraphs with the same offset from the left edge of the screen, such as first level comments in a hierarchical tree of comments.
 It can also find paragraphs with the same font size or same font style."""),
 	# version
-	"addon_version" : "1.16dev",
+	"addon_version" : "2.0",
 	# Author(s)
 	"addon_author" : u"Tony Malykh <anton.malykh@gmail.com>",
 	# URL for the add-on documentation support
@@ -31,7 +31,7 @@ It can also find paragraphs with the same font size or same font style."""),
 	# Minimum NVDA version supported (e.g. "2018.3")
 	"addon_minimumNVDAVersion" : "2019.3.0",
 	# Last NVDA version supported/tested (e.g. "2018.4", ideally more recent than minimum version)
-	"addon_lastTestedNVDAVersion" : "2021.1.0",
+	"addon_lastTestedNVDAVersion" : "2022.1.0",
 	# Add-on update channel (default is stable or None)
 	"addon_updateChannel" : None,
 }
