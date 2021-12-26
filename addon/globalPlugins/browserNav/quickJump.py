@@ -600,7 +600,8 @@ def newReportLiveRegion(text: str, politeness: str):
     url = None
     try:
         interceptor = obj.treeInterceptor
-        url = getUrl(interceptor)
+        if interceptor is not None:
+            url = getUrl(interceptor)
     except AttributeError:
         pass
     if url is not None:
