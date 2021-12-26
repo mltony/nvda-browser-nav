@@ -61,7 +61,7 @@ Because of this flexible definition, on every given webpage multiple QuickJump s
 Once you have configured site definition, you can proceed to define some bookmarks on it.
 BrowserNav currently supports four types of bookmarks:
 * QuickJump bookmarks: you can jump to them by pressing J or Shift+J.
-* SkipClutter bookmarks: These bookmarks are skipped automatically when navigating by line (Up/Down arrow) or by paragraph (Control+Up/Down arrows). This allows to hide clutter on webpages, such as empty lines, timestamps and any other redundant information. The information is not removed completely, SkipClutter can be temporarily disabled via / or Control+/ commands.
+* SkipClutter bookmarks: These bookmarks are skipped automatically when navigating by line (Up/Down arrow) or by paragraph (Control+Up/Down arrows). This allows to hide clutter on webpages, such as empty lines, timestamps and any other redundant information. The information is not removed completely, SkipClutter can be temporarily disabled via / or Control+/ commands. By default SkipClutter skips empty paragraphs on all websites.
 * AutoClick bookmarks: you can mark clickable elements, such as links, buttons or checkboxes to be autoClick bookmarks. Then by pressing Alt+J you can quickly press all autoClick bookmarks on current page with a single keystroke without moving the cursor. This can come in handy to press a frequently used button on a website, such as play button on YouTube or Mute button on  video-conferencing websites.
 * Hierarchical bookmarks: this is similar to quickJump bookmarks, but this takes into account horizontal offset of a bookmark. Sites like Reddit and Hacker News have a hierarchical tree of comments, that was pretty challenging to efficiently  navigate for screenreader users. On these websites you can mark comments as a hierarchical bookmark and then you can navigate between them By pressing Alt+digit or Shift+Alt+ditgit, where digit stands for number row 1,2,3,...0 - that is the level of the comment.
 
@@ -84,9 +84,12 @@ In site configuration dialog you can specify a number of advanced options:
 * Debug beep mode: this is mostly good for debugging purposes. You can make NVDA beep when certain event (focus, live region update or successful autoClick) happened.
 * AutoClick options: when you set up QuickClick bookmark, this allows you to configure this bookmark to be pressed automatically after a certain delay once the website is fully loaded. Another option allows BrowserNav to keep monitoring the website and whenever any more of such QuickClick bookmarks appear, it would click them automatically still. Please note that this feature is experimental.
 
+### Configuration
+Bookmark definitions are stored in NVDA configuration directory in file `browserNavRules.json`. You can edit this file manually or share it with someone.
+NVDA Configuration directory can be found by opening Start menu and typing: Explore NVDA user configuration directory.
+BrowserNav comes with default configuration file with sample bookmarks.
+
 ## Editing semi-accessible edit boxes
-
-
 Many modern web applications, notably Jupyter among others,  use edit boxes, that are not that accessible, e.g. they appear blank, but you can copy text in and out of them using Control+A, Control+C and Control+V keystrokes.
 
 BrowserNav offers an experimental feature to edit those edit boxes in a more convenient way. IN order to use it:
