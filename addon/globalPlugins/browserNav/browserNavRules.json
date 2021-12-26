@@ -1,4 +1,506 @@
 {
-        "sites": [],
-        "rules": []
-    }
+    "sites": [
+        {
+            "autoClickCategory": 5,
+            "autoClickContinuous": false,
+            "autoClickContinuousDelay": 500,
+            "autoClickOnFocus": false,
+            "autoClickOnFocusDelay": 500,
+            "bookmarks": [
+                {
+                    "attributes": [],
+                    "category": 1,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "^\\d+ items? in cart$",
+                    "patternMatch": 3
+                },
+                {
+                    "attributes": [],
+                    "category": 1,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "Your Orders",
+                    "patternMatch": 1
+                },
+                {
+                    "attributes": [],
+                    "category": 1,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "^\\d+ orders? matching \"",
+                    "patternMatch": 3
+                },
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 19
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 1,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "^[.\\d]+ out of 5 stars[,\\d]+ ratings?$",
+                    "patternMatch": 3
+                }
+            ],
+            "debugBeepMode": 0,
+            "domain": "amazon.com",
+            "focusMode": 0,
+            "liveRegionMode": 0,
+            "name": "Amazon",
+            "urlMatch": 2
+        },
+        {
+            "autoClickCategory": 5,
+            "autoClickContinuous": false,
+            "autoClickContinuousDelay": 500,
+            "autoClickOnFocus": false,
+            "autoClickOnFocusDelay": 500,
+            "bookmarks": [
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 19
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 1,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 2,
+                    "pattern": "upvote",
+                    "patternMatch": 1
+                },
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 19
+                            },
+                            "invert": false
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 19
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 8,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 2,
+                    "pattern": "upvote",
+                    "patternMatch": 1
+                },
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 19
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 4,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "downvote",
+                    "patternMatch": 1
+                }
+            ],
+            "debugBeepMode": 0,
+            "domain": "news.ycombinator.com",
+            "focusMode": 0,
+            "liveRegionMode": 0,
+            "name": "Hacker news",
+            "urlMatch": 2
+        },
+        {
+            "autoClickCategory": 5,
+            "autoClickContinuous": false,
+            "autoClickContinuousDelay": 500,
+            "autoClickOnFocus": false,
+            "autoClickOnFocusDelay": 500,
+            "bookmarks": [
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 19
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 8,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 1,
+                    "pattern": "^\\[\u2013\\].* points\\d+ (hours?|minutes?|seconds?|days?|weeks?|months?|years?) ago",
+                    "patternMatch": 3
+                },
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 19
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 1,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "load more comments\u00a0\\(\\d+ (reply|replies)\\)",
+                    "patternMatch": 3
+                }
+            ],
+            "debugBeepMode": 0,
+            "domain": "old.reddit.com",
+            "focusMode": 0,
+            "liveRegionMode": 0,
+            "name": "Reddit old",
+            "urlMatch": 2
+        },
+        {
+            "autoClickCategory": 5,
+            "autoClickContinuous": false,
+            "autoClickContinuousDelay": 500,
+            "autoClickOnFocus": false,
+            "autoClickOnFocusDelay": 500,
+            "bookmarks": [
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 9
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 5,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "Play (k)",
+                    "patternMatch": 1
+                },
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 9
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 5,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "Pause (k)",
+                    "patternMatch": 1
+                },
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 24
+                            },
+                            "invert": false
+                        }
+                    ],
+                    "category": 1,
+                    "enabled": true,
+                    "message": "",
+                    "name": "",
+                    "offset": 0,
+                    "pattern": "Seconds$",
+                    "patternMatch": 3
+                }
+            ],
+            "debugBeepMode": 0,
+            "domain": "youtube.com",
+            "focusMode": 0,
+            "liveRegionMode": 0,
+            "name": "Youtube",
+            "urlMatch": 2
+        },
+        {
+            "autoClickCategory": 5,
+            "autoClickContinuous": false,
+            "autoClickContinuousDelay": 500,
+            "autoClickOnFocus": false,
+            "autoClickOnFocusDelay": 500,
+            "bookmarks": [
+                {
+                    "attributes": [
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 5
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 6
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 8
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 9
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 10
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 11
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 12
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 13
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 14
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 15
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 19
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 20
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 21
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 22
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 23
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 24
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 25
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 60
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 76
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 80
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 83
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 92
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 101
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 102
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 104
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 106
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 108
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 111
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 119
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 121
+                            },
+                            "invert": true
+                        },
+                        {
+                            "attribute": {
+                                "attribute": "role",
+                                "value": 123
+                            },
+                            "invert": true
+                        }
+                    ],
+                    "category": 4,
+                    "enabled": true,
+                    "message": "",
+                    "name": "Empty paragraph",
+                    "offset": 0,
+                    "pattern": "^\\s*$",
+                    "patternMatch": 3
+                }
+            ],
+            "debugBeepMode": 0,
+            "domain": "",
+            "focusMode": 0,
+            "liveRegionMode": 0,
+            "name": "All sites",
+            "urlMatch": 0
+        }
+    ]
+}
