@@ -58,9 +58,9 @@ class BookmarkCategory(Enum):
     QUICK_JUMP_2 = 2
     QUICK_JUMP_3 = 3
     SKIP_CLUTTER = 4
-    AUTO_CLICK = 5
-    AUTO_CLICK_2 = 6
-    AUTO_CLICK_3 = 7
+    QUICK_CLICK = 5
+    QUICK_CLICK_2 = 6
+    QUICK_CLICK_3 = 7
     HIERARCHICAL = 8
 
 BookmarkCategoryNames = {
@@ -68,9 +68,9 @@ BookmarkCategoryNames = {
     BookmarkCategory.QUICK_JUMP_2: _('QuickJump2'),
     BookmarkCategory.QUICK_JUMP_3: _('QuickJump3'),
     BookmarkCategory.SKIP_CLUTTER: _('SkipClutter - will automatically skip this paragraph or line when navigating via Control+Up/Down or Up/Down keystrokes; must match the whole paragraph. or '),
-    BookmarkCategory.AUTO_CLICK: _('AutoClick'),
-    BookmarkCategory.AUTO_CLICK_2: _('AutoClick2'),
-    BookmarkCategory.AUTO_CLICK_3: _('AutoClick3'),
+    BookmarkCategory.QUICK_CLICK: _('QuickClick'),
+    BookmarkCategory.QUICK_CLICK_2: _('QuickClick2'),
+    BookmarkCategory.QUICK_CLICK_3: _('QuickClick3'),
     BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
 }
 
@@ -1730,7 +1730,7 @@ class EditSiteDialog(wx.Dialog):
                 'debugBeepMode':DebugBeepMode.NO_BEEPS.value,
                 'bookmarks': [],
                 'autoClickOnFocus': False,
-                'autoClickCategory': BookmarkCategory.AUTO_CLICK,
+                'autoClickCategory': BookmarkCategory.QUICK_CLICK,
                 'autoClickOnFocusDelay': 500,
                 'autoClickContinuous': False,
                 'autoClickContinuousDelay': 500,
@@ -1799,9 +1799,9 @@ class EditSiteDialog(wx.Dialog):
         text = _("Perform autoClick on page load automatically:")
         self.autoClickOptions = [
             None,
-            BookmarkCategory.AUTO_CLICK,
-            BookmarkCategory.AUTO_CLICK_2,
-            BookmarkCategory.AUTO_CLICK_3,
+            BookmarkCategory.QUICK_CLICK,
+            BookmarkCategory.QUICK_CLICK_2,
+            BookmarkCategory.QUICK_CLICK_3,
         ]
         self.autoClickComboBox = guiHelper.LabeledControlHelper(
             self,
@@ -1892,7 +1892,7 @@ class EditSiteDialog(wx.Dialog):
                 for b in self.site.bookmarks
             ],
             'autoClickOnFocus': self.getAutoClickCombo() is not None,
-            'autoClickCategory': (self.getAutoClickCombo() or BookmarkCategory.AUTO_CLICK).value,
+            'autoClickCategory': (self.getAutoClickCombo() or BookmarkCategory.QUICK_CLICK).value,
             'autoClickOnFocusDelay': self.delayEdit.Value,
             'autoClickContinuous': self.recurrentCheckBox.Value,
             'autoClickContinuousDelay': self.recurrentDelayEdit.Value,
