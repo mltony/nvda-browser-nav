@@ -58,7 +58,7 @@ from . beeper import *
 from . import quickJump
 
 
-debug = True
+debug = False
 if debug:
     f = open("C:\\Users\\tmal\\drp\\1.txt", "w", encoding='utf-8')
 def mylog(s):

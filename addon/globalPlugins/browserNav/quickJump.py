@@ -39,7 +39,7 @@ except AttributeError:
 
 
 
-debug = True
+debug = False
 if debug:
     f = open("C:\\Users\\tony\\drp\\2.txt", "w", encoding='utf-8')
     def mylog(s):
