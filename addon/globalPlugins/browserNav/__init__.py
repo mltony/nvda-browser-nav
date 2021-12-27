@@ -1739,17 +1739,17 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         self.injectBrowseModeKeystroke(
             "kb:Alt+J",
             "autoClick",
-            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.AUTO_CLICK),
+            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.QUICK_CLICK),
             doc="AutoClick  according to BrowserNav AutoClick bookmark; please check browserNav configuration panel for the list of bookmarks.")
         self.injectBrowseModeKeystroke(
             [],
             "autoClick2",
-            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.AUTO_CLICK_2),
+            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.QUICK_CLICK_2),
             doc="AutoClick  according to BrowserNav AutoClick2 bookmark; please check browserNav configuration panel for the list of bookmarks.")
         self.injectBrowseModeKeystroke(
             [],
             "autoClick3",
-            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.AUTO_CLICK_3),
+            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.QUICK_CLICK_3),
             doc="AutoClick  according to BrowserNav AutoClick3 bookmark; please check browserNav configuration panel for the list of bookmarks.")
       # Hierarchical
         for letter in "`1234567890":
