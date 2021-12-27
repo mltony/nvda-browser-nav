@@ -863,6 +863,8 @@ class SelectionHistory:
         self.ptr = -1
 
     def append(self, info):
+        if not isinstance(info, Gecko_ia2_TextInfo):
+            return
         try:
             del self.entries[self.ptr + 1:]
         except IndexError:
