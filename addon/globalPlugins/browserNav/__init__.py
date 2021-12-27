@@ -58,6 +58,7 @@ from . beeper import *
 from . import quickJump
 
 
+
 debug = False
 if debug:
     f = open("C:\\Users\\tmal\\drp\\1.txt", "w", encoding='utf-8')
@@ -731,6 +732,7 @@ def sonifyTextInfo(textInfo, oldTextInfo=None, includeCrackle=False):
     if textInfo is None:
         return
     return sonifyTextInfoImpl(textInfo, oldTextInfo, includeCrackle)
+quickJump.sonifyTextInfo = sonifyTextInfo
 def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
     w = lambda: scriptHandler.isScriptWaiting()
     beepVolume=getConfig("beepVolume")
@@ -775,7 +777,7 @@ def sonifyTextInfoImpl(textInfo, lastTextInfo, includeCrackle):
                 paragraphs = len(list(span.getTextInChunks(textInfos.UNIT_PARAGRAPH)))
         else:
             # new simplified way:
-            paragraphs = (t2._endOffset - t1._startOffset) // 10
+            paragraphs = (t2._endOffset - t1._startOffset) // 20
         paragraphs = max(0, paragraphs - 2)
         initialDelay = 0 if beepVolume==0 else 50
         beeper.simpleCrackle(paragraphs, volume=getConfig("crackleVolume"), initialDelay=initialDelay)

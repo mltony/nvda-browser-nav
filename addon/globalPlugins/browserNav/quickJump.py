@@ -28,6 +28,7 @@ import ui
 import weakref
 import wx
 
+sonifyTextInfo = None # Due to import error we set this value from __init__
 from . beeper import *
 from . import utils
 
@@ -825,6 +826,7 @@ def moveParagraphWithSkipClutter(self, textInfo, offset):
         
 
 def quickJump(self, gesture, category, direction, errorMsg):
+    oldSelection = self.selection
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
     skipClutterBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.SKIP_CLUTTER)
@@ -855,11 +857,11 @@ def quickJump(self, gesture, category, direction, errorMsg):
             else:
                 moveParagraphWithSkipClutter(self, textInfo, bookmark.offset)
             textInfo.updateCaret()
-            beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
             speech.speakTextInfo(textInfo, reason=REASON_CARET)
             textInfo.collapse()
             self._set_selection(textInfo)
             self.selection = textInfo
+            sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
             return
 
 def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
@@ -1049,6 +1051,7 @@ def scanLevels(self):
     return future
 
 def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg):
+    oldSelection = self.selection
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
     skipClutterBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.SKIP_CLUTTER)
@@ -1107,11 +1110,11 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
                 else:
                     moveParagraphWithSkipClutter(self, textInfo, bookmark.offset)
                 textInfo.updateCaret()
-                beeper.simpleCrackle(distance, volume=getConfig("crackleVolume"))
                 speech.speakTextInfo(textInfo, reason=REASON_CARET)
                 textInfo.collapse()
                 self._set_selection(textInfo)
                 self.selection = textInfo
+                sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
                 return
             elif offset not in levelsInfo.offsets:
                 # Something must have happened that current level is not recorded in the previous scan. Rescan after this script.
