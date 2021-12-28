@@ -820,13 +820,17 @@ def preQuickNavScript(self,gesture, itemType, direction, errorMessage, readUnit,
         if (
             controlTypes.Role.TABLE in roles
             and controlTypes.Role.TABLECELL not in roles
+            and controlTypes.Role.TABLECOLUMNHEADER not in roles
         ):
             info.move(textInfos.UNIT_PARAGRAPH, 1)
             info.expand(textInfos.UNIT_PARAGRAPH)
             roles = extractRoles(info)
             if (
                 controlTypes.Role.TABLE in roles
-                and controlTypes.Role.TABLECELL in roles
+                and (
+                    controlTypes.Role.TABLECELL in roles
+                    or controlTypes.Role.TABLECOLUMNHEADER in roles
+                )
             ):
                 self._set_selection(info, reason=controlTypes.OutputReason.QUICKNAV)
                 speech.speakTextInfo(info, reason=controlTypes.OutputReason.QUICKNAV)
