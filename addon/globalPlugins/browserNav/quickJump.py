@@ -761,8 +761,11 @@ def extractAttributesSet(textInfo):
         if not isinstance(field, textInfos.FieldCommand):
             continue
         elif field.command == 'controlStart':
-            role = field.field['role']
-            result.add(QJAttribute(role=role))
+            try:
+                role = field.field['role']
+                result.add(QJAttribute(role=role))
+            except KeyError:
+                pass
         elif field.command == 'formatChange':
             for key, pAttr in [
                 ("level", ParagraphAttribute.HEADING),
