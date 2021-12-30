@@ -967,15 +967,18 @@ def autoClick(self, gesture, category, site=None, automated=False):
         result = moveParagraph(textInfo, 1)
         if result == 0:
             break
-    if len(focusables) == 0:
-        if not automated:
-            endOfDocument(focusableErrorMsg or _("No bookmarks matched!"))
-        return
+    numSuccessfulClicks = 0
     for focusable in focusables:
         try:
             focusable.doAction()
+            numSuccessfulClicks += 1
         except NotImplementedError as e:
-            raise e
+            # Not sure why this is occasionally thrown
+            pass
+    if numSuccessfulClicks == 0:
+        if not automated:
+            endOfDocument(focusableErrorMsg or _("No bookmarks matched!"))
+        return
     if automated:
         if site is not None and site.debugBeepMode == DebugBeepMode.ON_AUTO_CLICK:
             tones.beep(500, 50)
