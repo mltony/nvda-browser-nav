@@ -569,7 +569,10 @@ def getUrlFromObject(object):
 
 @utils.weakMemoize
 def getUrl(self):
-    url = self.documentConstantIdentifier
+    try:
+        url = self.documentConstantIdentifier
+    except AttributeError:
+        return ""
     if url is None or len(url) == 0:
         url = getUrlFromObject(self.currentNVDAObject)
         if url is None or len(url) == 0:
