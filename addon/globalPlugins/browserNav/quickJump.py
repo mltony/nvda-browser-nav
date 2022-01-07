@@ -27,6 +27,8 @@ from typing import List, Tuple
 import ui
 import weakref
 import wx
+import addonHandler
+addonHandler.initTranslation()
 
 sonifyTextInfo = None # Due to import error we set this value from __init__
 from . beeper import *
