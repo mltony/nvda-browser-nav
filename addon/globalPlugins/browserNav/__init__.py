@@ -70,7 +70,7 @@ def mylog(s):
 
 def myAssert(condition):
     if not condition:
-        raise RuntimeError_("Assertion failed")
+        raise RuntimeError("Assertion failed")
 
 try:
     REASON_CARET = controlTypes.REASON_CARET
@@ -333,7 +333,7 @@ def executeAsynchronously(gen):
     Essentially the generator function will be paused every time it calls yield, then the updates will be processed by NVDA and then the remainder of generator function will continue executing.
     """
     if not isinstance(gen, types.GeneratorType):
-        raise Exception_("Generator function required")
+        raise Exception("Generator function required")
     try:
         value = gen.__next__()
     except StopIteration:
@@ -585,7 +585,7 @@ class EditTextDialog(wx.Dialog):
                 lineText = self.textCtrl.GetLineText(lineNum)
                 m = re.search("^\s*", lineText)
                 if not m:
-                    raise Exception_("This regular expression must match always.")
+                    raise Exception("This regular expression must match always.")
                 indent = len(m.group(0))
                 if indent == colNum:
                     newColNum = 0
@@ -651,7 +651,7 @@ def blockAllKeys(timeoutSeconds):
     global blockKeysUntil
     now = time.time()
     if blockKeysUntil > now:
-        raise Exception_("Keys are already blocked")
+        raise Exception("Keys are already blocked")
     blockKeysUntil =now  + timeoutSeconds
     beeper.fancyBeep("CDGA", length=int(1000 * timeoutSeconds), left=5, right=5)
 
