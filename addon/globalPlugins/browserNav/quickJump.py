@@ -564,7 +564,7 @@ def getUrlFromObject(object):
         except AttributeError:
             pass
         if interceptor is not None:
-            url = interceptor.documentConstantIdentifier
+            url = interceptor._get_documentConstantIdentifier()
             if url is not None and len(url) > 0:
                 return url
         object = object.simpleParent
@@ -572,7 +572,7 @@ def getUrlFromObject(object):
 @utils.weakMemoize
 def getUrl(self):
     try:
-        url = self.documentConstantIdentifier
+        url = self._get_documentConstantIdentifier()
     except AttributeError:
         return ""
     if url is None or len(url) == 0:
