@@ -327,20 +327,6 @@
                         {
                             "attribute": {
                                 "attribute": "role",
-                                "value": 14
-                            },
-                            "invert": true
-                        },
-                        {
-                            "attribute": {
-                                "attribute": "role",
-                                "value": 15
-                            },
-                            "invert": true
-                        },
-                        {
-                            "attribute": {
-                                "attribute": "role",
                                 "value": 19
                             },
                             "invert": true
