@@ -694,14 +694,14 @@ def matchWidthCompositeRegex(bookmarks, text):
         if key.startswith(NAMED_REGEX_PREFIX)
             and value is not None
     ]
-    mylog(f"matchIndices={matchIndices}")
+    #mylog(f"matchIndices={matchIndices}")
     if len(matchIndices) == 0:
         return
     i = matchIndices[0]
 
     groupName = f"{NAMED_REGEX_PREFIX}{i}"
-    mylog(f"i={i}")
-    mylog(f"groupName={groupName}")
+    #mylog(f"i={i}")
+    #mylog(f"groupName={groupName}")
     return BookmarkMatch(
         bookmark=bookmarks[i],
         text=m.group(groupName),
@@ -1013,12 +1013,15 @@ def getIndentFunc(textInfo, documentHolder, future):
     except Exception as e:
         future.setException(e)
     
-def scanLevelsThreadFunc(self, config, future):
+def scanLevelsThreadFunc(self, config, future, bookmarks):
+    #mylog("sltf begin")
     futures = []
     direction = 1
     try:
         category = BookmarkCategory.HIERARCHICAL
-        bookmarks = findApplicableBookmarks(config, getUrl(self), category)
+        #url = getUrl(self)
+        #bookmarks = findApplicableBookmarks(config, url, category)
+        mylog(f"sltf bookmarks={len(bookmarks)} url=?")
         if len(bookmarks) == 0:
             future.set([])
             return
@@ -1028,6 +1031,7 @@ def scanLevelsThreadFunc(self, config, future):
         document = utils.getIA2Document(textInfo)
         documentHolder = utils.DocumentHolder(document)
         distance = 0
+        #mylog(f"loop:sltf->matchTextAndAttributes({len(bookmarks)})")
         while True:
             for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
                 bookmark = match.bookmark
@@ -1043,20 +1047,24 @@ def scanLevelsThreadFunc(self, config, future):
             result = moveParagraph(textInfo, direction)
             if result == 0:
                 # collect all the futures and return
-                future.set(HierarchicalLevelsInfo(sorted(list({
+                result = HierarchicalLevelsInfo(sorted(list({
                     inner.get()
                     for inner in futures
-                }))))
+                })))
+                future.set(result)
+                #mylog("sltf success")
+                #mylog(f"sltf result={result.offsets}")
                 return
     except Exception as e:
+        #mylog("sltf fail")
         future.setException(e)
         
     
-def scanLevels(self):
+def scanLevels(self, bookmarks):
     global globalConfig, hierarchicalCache
     config = globalConfig
     future = utils.Future()
-    utils.threadPool.add_task(scanLevelsThreadFunc, self, config, future)
+    utils.threadPool.add_task(scanLevelsThreadFunc, self, config, future, bookmarks)
     try:
         innerDict = hierarchicalCache[self]
     except KeyError:
@@ -1069,17 +1077,19 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
     oldSelection = self.selection
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
+    mylog(f"hqj bookmarks={len(bookmarks)} url={url}")
     skipClutterBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.SKIP_CLUTTER)
     if len(bookmarks) == 0:
         return endOfDocument(_('No hierarchical quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     try:
         levelsInfo = hierarchicalCache[self][globalConfig].get()
-        mylog(f"level={level} levelsInfo={levelsInfo.offsets}")
+        
     except KeyError:
         levelsInfo = None
-        scanLevels(self)
+        scanLevels(self, bookmarks)
         mylog(f"levelsInfo is None")
-        
+        levelsInfo = hierarchicalCache[self][globalConfig].get()
+    mylog(f"level={level} levelsInfo={levelsInfo.offsets}")
     textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
     textInfo.collapse()
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
@@ -1087,19 +1097,23 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
     documentHolder = utils.DocumentHolder(document)
     distance = 0
     adjustedDistance = 0
+    mylog(f"hqj->loop:matchTextAndAttributes(skipClutter:{len(skipClutterBookmarks)}")
+    mylog(f"hqj->loop:matchTextAndAttributes({len(bookmarks)}")
     while True:
         result = moveParagraph(textInfo, direction)
         if result == 0:
-            mylog("end of document")
+            #mylog("end of document")
             endOfDocument(errorMsg)
             return
         distance += 1
+        
         if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
             adjustedDistance += 1
+        #mylog("hqj->matchTextAndAttributes2")
         for match in matchTextAndAttributes(bookmarks, textInfo, distance=adjustedDistance*direction):
             bookmark = match.bookmark
             offset = utils.getGeckoParagraphIndent(textInfo, documentHolder)
-            mylog(f"offset={offset}")
+            #mylog(f"offset={offset}")
             if (
                 levelsInfo is None 
                 or level is None
@@ -1108,7 +1122,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
                     and levelsInfo.offsets.index(offset) == level
                 )
             ):
-                mylog("Perfect")
+                #mylog("Perfect")
                 if (
                     level is None
                     and levelsInfo is not None
@@ -1138,10 +1152,10 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
                 endOfDocument(_("BrowserNav error: inconsistent indents in the document. Recomputing indents, please try again."))
                 return
             elif levelsInfo.offsets.index(offset) > level:
-                mylog("levelsInfo.offsets.index(offset) > level")
+                #mylog("levelsInfo.offsets.index(offset) > level")
                 continue
             elif levelsInfo.offsets.index(offset) < level:
-                mylog("levelsInfo.offsets.index(offset) < level")
+                #mylog("levelsInfo.offsets.index(offset) < level")
                 if unbounded:
                     continue
                 else:
