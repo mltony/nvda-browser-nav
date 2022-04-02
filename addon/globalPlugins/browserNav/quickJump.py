@@ -556,7 +556,6 @@ def getDebugBeepModes(url, config):
     }
 
 
-@utils.weakMemoize
 def getUrlFromObject(object):
     while object is not None:
         try:
@@ -569,7 +568,6 @@ def getUrlFromObject(object):
                 return url
         object = object.simpleParent
 
-@utils.weakMemoize
 def getUrl(self):
     try:
         url = self._get_documentConstantIdentifier()
