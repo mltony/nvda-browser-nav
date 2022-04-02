@@ -499,7 +499,7 @@ def isUrlMatch(url, site):
             return False
         siteDomain = site.domain.lower()
         if site.urlMatch == URLMatch.DOMAIN:
-            return domain == site_domain
+            return domain == siteDomain
         elif site.urlMatch == URLMatch.SUBDOMAIN:
             return (
                 domain == siteDomain
