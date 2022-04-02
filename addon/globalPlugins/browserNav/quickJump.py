@@ -42,7 +42,7 @@ except AttributeError:
 
 
 
-debug = False
+debug = True
 if debug:
     f = open("C:\\Users\\tony\\drp\\2.txt", "w", encoding='utf-8')
     def mylog(s):
@@ -723,6 +723,8 @@ def matchAllWidthCompositeRegex(bookmarks, text):
 
 def matchTextAndAttributes(bookmarks, textInfo, distance=None):
     text = textInfo.text
+    text = text.rstrip("\r\n")
+    #mylog(f"matchTextAndAttributes '{text}'")
     matches = matchAllWidthCompositeRegex(bookmarks, text)
     attrs = None
     for m in matches:
