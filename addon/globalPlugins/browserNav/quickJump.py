@@ -84,6 +84,7 @@ class URLMatch(Enum):
     SUBSTRING = 3
     EXACT = 4
     REGEX = 5
+    EMPTY = 6
 
 urlMatchNames = {
     URLMatch.IGNORE: _('Match all sites (domain field ignored) '),
@@ -92,6 +93,7 @@ urlMatchNames = {
     URLMatch.SUBSTRING: _('Match substring in URL'),
     URLMatch.EXACT: _('Exact URL match'),
     URLMatch.REGEX: _('Regex match of URL'),
+    URLMatch.EMPTY: _('Match empty URL only, that is pages without URL'),
 }
 
 class FocusMode(Enum):
@@ -513,6 +515,8 @@ def isUrlMatch(url, site):
         return site.domain.lower() ==  url.lower()
     elif site.urlMatch == URLMatch.REGEX:
         return re_compile(site.domain).search(url) is not None
+    elif site.urlMatch == URLMatch.EMPTY:
+        return url is None or url == ""
     else:
         raise Exception("Impossible!")
 
@@ -1860,9 +1864,9 @@ class EditSiteDialog(wx.Dialog):
         urlMatch = list(URLMatch)[self.typeComboBox.control.GetSelection()]
         domain = self.patternTextCtrl.Value
         errorMsg = None
-        if urlMatch == URLMatch.IGNORE:
+        if urlMatch in [URLMatch.IGNORE, URLMatch.EMPTY]:
             if len(domain) > 0:
-                errorMsg = _("You must specify blank domain in order to match all sites.")
+                errorMsg = _("You must specify blank domain for this match option.")
         else:
             if len(domain) == 0:
                 errorMsg = _("You must specify non-empty string as domain")
