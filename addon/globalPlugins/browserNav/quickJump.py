@@ -1500,7 +1500,7 @@ class EditBookmarkDialog(wx.Dialog):
             return
         if self.getCategory() == BookmarkCategory.SKIP_CLUTTER:
             result = gui.messageBox(
-                _("Warning: you are about to create a skip clutter bookmark. If your pattern is too generic, it might hide significant part of your website. For example, if you specify a single whitespace as pattern and substring match, then all paragraphs containing at least a single whitespace would disappear. Please make sure you understand how skip clutter works and how to undo this change if you have to. Would you like to continue?"),
+                _("Warning: you are about to create or update a skip clutter bookmark. If your pattern is too generic, it might hide significant part of your website. For example, if you specify a single whitespace as pattern and substring match, then all paragraphs containing at least a single whitespace would disappear. Please make sure you understand how skip clutter works and how to undo this change if you have to. Would you like to continue?"),
                 _("Bookmark Entry warning"),
                 wx.YES|wx.NO|wx.ICON_WARNING,
                 self
