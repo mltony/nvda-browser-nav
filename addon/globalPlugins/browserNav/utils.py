@@ -25,6 +25,9 @@ def weakMemoize(func):
         arg = args[0]
         if len(args) > 1:
             raise Exception("Only supports single argument!")
+        if arg is None:
+            # Cannot create weak reference to None
+            return func(*args)
         value = cache.get(arg)
         if value is not None:
             return value
