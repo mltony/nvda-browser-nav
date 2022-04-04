@@ -12,13 +12,16 @@ from queue import Queue
 import threading
 from threading import Thread
 from threading import Lock, Condition
+import time
 import tones
 import types
 from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import weakref
 import winUser
 
-def weakMemoize(func):
+NoneObjectForWeakRef = ""
+
+def weakMemoize(func, timeoutSecs=0):
     cache = weakref.WeakKeyDictionary()
 
     def memoized_func(*args):
@@ -27,15 +30,25 @@ def weakMemoize(func):
             raise Exception("Only supports single argument!")
         if arg is None:
             # Cannot create weak reference to None
-            return func(*args)
-        value = cache.get(arg)
-        if value is not None:
+            arg = NoneObjectForWeakRef
+        timestamp,value = cache.get(arg, (None, None))
+        if (
+            value is not None
+            and (
+                timeoutSecs == 0
+                or time.time() - timestamp < timeoutSecs
+            )
+        ):
             return value
         result = func(*args)
-        cache.update({arg: result})
+        timestamp = time.time()
+        cache.update({arg: (timestamp,result)})
         return result
 
     return memoized_func
+
+def weakMemoizeWithTimeout(timeoutSecs):
+    return lambda func: weakMemoize(func, timeoutSecs)
 
 def executeAsynchronously(gen):
     """
