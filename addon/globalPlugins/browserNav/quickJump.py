@@ -605,6 +605,7 @@ def new_event_gainFocus(self, obj, nextHandler):
 originalReportLiveRegion = None
 @ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_wchar_p, ctypes.c_wchar_p)
 def newReportLiveRegion(text: str, politeness: str):
+    return originalReportLiveRegion(text, politeness)
     obj = api.getFocusObject()
     url = None
     try:

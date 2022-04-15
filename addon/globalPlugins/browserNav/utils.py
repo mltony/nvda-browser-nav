@@ -19,7 +19,10 @@ from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import weakref
 import winUser
 
-NoneObjectForWeakRef = ""
+class FakeObjectForWeakMemoize:
+    pass
+
+NoneObjectForWeakRef = FakeObjectForWeakMemoize()
 
 def weakMemoize(func, timeoutSecs=0):
     cache = weakref.WeakKeyDictionary()
