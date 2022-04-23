@@ -187,7 +187,11 @@ class QJAttribute(QJImmutable):
             object.__setattr__(self, 'attribute', ParagraphAttribute(d['attribute']))
             value = d['value']
             if self.attribute == ParagraphAttribute.ROLE:
-                value = controlTypes.Role(value)
+                try:
+                    textValue = utils.NVDA2021Role(value).name
+                except ValueError:
+                    textValue = value
+                value = getattr(controlTypes.Role, textValue)
             object.__setattr__(self, 'value', value)
         elif userString is not None:
             s = userString.strip()
@@ -217,7 +221,7 @@ class QJAttribute(QJImmutable):
     def asDict(self):
         return {
             'attribute': self.attribute.value,
-            'value': self.value.value if self.attribute == ParagraphAttribute.ROLE else self.value,
+            'value': self.value.name if self.attribute == ParagraphAttribute.ROLE else self.value,
 
         }
 
