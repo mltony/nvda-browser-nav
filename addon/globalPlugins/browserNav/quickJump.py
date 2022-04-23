@@ -10,6 +10,7 @@ from contextlib import ExitStack
 import controlTypes
 from controlTypes import OutputReason
 import copy
+import core
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
@@ -22,6 +23,8 @@ import json
 import os
 import re
 import textInfos
+import threading
+import time
 import tones
 from typing import List, Tuple
 import ui
@@ -42,7 +45,7 @@ except AttributeError:
 
 
 
-debug = False
+debug = True
 if debug:
     f = open("C:\\Users\\tony\\drp\\2.txt", "w", encoding='utf-8')
     def mylog(s):
@@ -571,18 +574,53 @@ def getUrlFromObject(object):
             if url is not None and len(url) > 0:
                 return url
         object = object.simpleParent
-
-@utils.weakMemoizeWithTimeout(1)
-def getUrl(self):
-    try:
-        url = self._get_documentConstantIdentifier()
-    except AttributeError:
+urlCache = weakref.WeakKeyDictionary()
+#@utils.weakMemoizeWithTimeout(1)
+def getUrl(self, onlyFromCache=False):
+    t0 = time.time()
+    urlFromObject = False
+    if not onlyFromCache and not isinstance(threading.currentThread(), threading._MainThread):
+        raise RuntimeError("Impossible: URL can only be determined from the main thread.")
+    if self is None:
         return ""
-    if url is None or len(url) == 0:
-        url = getUrlFromObject(self.currentNVDAObject)
-        if url is None or len(url) == 0:
+    if onlyFromCache:
+        try:
+            return urlCache[self]
+        except KeyError:
             return ""
-    return url
+    try:
+        try:
+            url = self._get_documentConstantIdentifier()
+        except AttributeError:
+            return ""
+        if url is None or len(url) == 0:
+            urlFromObject = True
+            url = getUrlFromObject(self.currentNVDAObject)
+    finally:
+        t1 = time.time()
+        tt = int(1000 * (t1-t0))
+        mylog(f"getUrl {tt} ms = {url} {urlFromObject}")
+        mylog(str(threading.currentThread()))
+    urlCache[self] = url
+    if url is None or len(url) == 0:
+        return ""
+        #future.set("")
+    else:
+        return url
+        #future.set(url)
+
+if False:
+    @utils.weakMemoizeWithTimeout(1)
+    def getUrl(self):
+        #return self.rootNVDAObject.IAccessibleObject.accValue(0)
+        future = utils.Future()
+        if isinstance(threading.currentThread(), threading._MainThread):
+            getUrlImpl(self, future)
+        else:
+            core.callLater(0, getUrlImpl, self, future)
+        while not future.isSet():
+            api.processPendingEvents()
+        return future.get()
 
 originalShouldPassThrough = None
 def newShouldPassThrough(self, obj, reason= None):
@@ -605,15 +643,17 @@ def new_event_gainFocus(self, obj, nextHandler):
 originalReportLiveRegion = None
 @ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_wchar_p, ctypes.c_wchar_p)
 def newReportLiveRegion(text: str, politeness: str):
-    return originalReportLiveRegion(text, politeness)
+    #return originalReportLiveRegion(text, politeness)
+    tones.beep(500, 5000)
     obj = api.getFocusObject()
     url = None
     try:
         interceptor = obj.treeInterceptor
         if interceptor is not None:
-            url = getUrl(interceptor)
+            url = getUrl(interceptor, onlyFromCache=True)
     except AttributeError:
         pass
+    tones.player.stop()
     if url is not None:
         if DebugBeepMode.ON_LIVE_REGION in getDebugBeepModes(url, globalConfig):
             tones.beep(500, 50)

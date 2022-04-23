@@ -145,6 +145,9 @@ class Future:
             self.__exc = val
             self.__is_set = True
             self.__condition.notify_all()
+            
+    def isSet(self):
+        return self.__is_set
 
     def done(self):
         return self.__is_set
