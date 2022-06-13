@@ -194,7 +194,7 @@ class SettingsDialog(SettingsPanel):
         label = _("Use bold and italic attributes for style")
         self.useBoldItalicCheckBox = sHelper.addItem(wx.CheckBox(self, label=label))
         self.useBoldItalicCheckBox.Value = getConfig("useBoldItalic")
-        
+
         label = _("Jump to the first cell of the table when T or Shift+T is pressed.")
         self.tableNavigateToCellCheckBox = sHelper.addItem(wx.CheckBox(self, label=label))
         self.tableNavigateToCellCheckBox.Value = getConfig("tableNavigateToCell")
@@ -712,7 +712,9 @@ def getBeepTone(textInfo):
     mode = getConfig("browserMode")
     if mode == 0:
         offset = getSimpleHorizontalOffset(textInfo)
-        octave_pixels = 500
+        width = api.getDesktopObject().location.right
+        MAX_ALLOWED_OCTAVES = 3
+        octave_pixels = width/MAX_ALLOWED_OCTAVES
         base_freq = speech.IDT_BASE_FREQUENCY
         tone = base_freq * (2 ** (offset/octave_pixels))
         return tone
@@ -834,7 +836,7 @@ def preQuickNavScript(self,gesture, itemType, direction, errorMessage, readUnit,
             ):
                 self._set_selection(info, reason=controlTypes.OutputReason.QUICKNAV)
                 speech.speakTextInfo(info, reason=controlTypes.OutputReason.QUICKNAV)
-        
+
     sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
     return result
 
@@ -943,7 +945,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
 
-        
+
 
 
     def createMenu(self):
