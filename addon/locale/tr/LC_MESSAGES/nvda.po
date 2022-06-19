@@ -7,242 +7,1093 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BrowserNav\n"
 "Report-Msgid-Bugs-To: nvda-translations@freelists.org\n"
-"POT-Creation-Date: 2020-04-21 13:53+0300\n"
-"PO-Revision-Date: 2020-04-21 13:53+0300\n"
-"Last-Translator: José Manuel Delicado <jmdaweb@hotmail.com>\n"
+"POT-Creation-Date: 2022-01-09 22:00+0300\n"
+"PO-Revision-Date: 2022-01-09 22:06+0300\n"
+"Last-Translator: Çağrı Doğan <cagrid@hotmail.com>\n"
 "Language-Team: cagrid@hotmail.com\n"
 "Language: tr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 2.3\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Poedit-Basepath: ../../../globalPlugins\n"
+"X-Generator: Poedit 3.0.1\n"
+"X-Poedit-Basepath: ../../..\n"
 "X-Poedit-SearchPath-0: .\n"
 
-#: browserNav.py:93
+#: buildVars.py:17 globalPlugins/browserNav/__init__.py:915
+msgid "BrowserNav"
+msgstr "BrowserNav"
+
+#: buildVars.py:20
+#| msgid ""
+#| "Indentation Navigation addon.\n"
+#| "It allows NVDA users to navigate by indentation level or offset of lines "
+#| "or paragraphs.\n"
+#| "In browsers it allows to quickly find paragraphs with the same offset "
+#| "from the left edge of the screen, such as first level comments in a "
+#| "hierarchical tree of comments.\n"
+#| "Also while editing source code in many programming languages, it allows "
+#| "to jump between the lines of the same indentation level, as well as "
+#| "quickly find lines with greater or lesser indentation level."
+msgid ""
+"Browser Navigation addon.\n"
+"In browsers it allows to quickly find vertically aligned paragraphs with the "
+"same offset from the left edge of the screen, such as first level comments "
+"in a hierarchical tree of comments.\n"
+"It can also find paragraphs with the same font size or same font style."
+msgstr ""
+"Tarayıcı navigasyon eklentisi.\n"
+"Tarayıcılarda, hiyerarşik bir yorum ağacındaki birinci seviye yorumlar gibi "
+"ekranın sol kenarından aynı uzaklığa sahip paragraflar arasında hızlı bir "
+"şekilde dolaşmayı sağlar.\n"
+"Aynı yazı tipi boyutuna veya yazı tipi stiline sahip paragraflar arasında  "
+"da dolaşılabilir."
+
+#: globalPlugins/browserNav/__init__.py:133
 msgid "BrowserNav settings"
 msgstr "BrowserNav ayarları"
 
-#: browserNav.py:103
+#: globalPlugins/browserNav/__init__.py:143
 msgid "Crackling volume"
 msgstr "Bip ses seviyesi"
 
-#: browserNav.py:113
+#: globalPlugins/browserNav/__init__.py:153
 msgid "Beeping volume"
 msgstr "Bip ses seviyesi"
 
-#: browserNav.py:124
+#: globalPlugins/browserNav/__init__.py:164
 msgid "Volume of chime when no more sentences available"
 msgstr "Başka cümle olmadığında çıkan bip ses seviyesi"
 
-#: browserNav.py:134
+#: globalPlugins/browserNav/__init__.py:174
 msgid ""
 "Speak message when no next paragraph containing text available in the "
 "document"
 msgstr "İLeride metin içeren bir paragraf yoksa bunu konuşarak bildir"
 
-#: browserNav.py:139
+#: globalPlugins/browserNav/__init__.py:179
 msgid "Use font family for style"
 msgstr "Stil için yazı tipi ailesini kullan"
 
-#: browserNav.py:144
+#: globalPlugins/browserNav/__init__.py:184
 msgid "Use font color for style"
 msgstr "Stil için yazı tipi rengini kullan"
 
-#: browserNav.py:149
+#: globalPlugins/browserNav/__init__.py:189
 msgid "Use background color for style"
 msgstr "Stil için arka plan rengini kullan"
 
-#: browserNav.py:154
+#: globalPlugins/browserNav/__init__.py:194
 msgid "Use bold and italic attributes for style"
 msgstr "Stil için koyu ve italik niteliklerini kullan"
 
-#: browserNav.py:158
-msgid "Browser marks regexp"
-msgstr "Tarayıcı işaretleri düzenli ifade"
+#: globalPlugins/browserNav/__init__.py:198
+msgid "Jump to the first cell of the table when T or Shift+T is pressed."
+msgstr "T veya Shift+T tuşlarına basıldığında tablonun ilk hücresine atla."
 
-#: browserNav.py:180
+#: globalPlugins/browserNav/__init__.py:207
+msgid "Volume of skipClutter chime"
+msgstr "DağınıklıkGeçiş zil ses düzeyi"
+
+#: globalPlugins/browserNav/__init__.py:234
 msgid "horizontal offset"
 msgstr "yatay ofset"
 
-#: browserNav.py:181
+#: globalPlugins/browserNav/__init__.py:235
 msgid "font size"
 msgstr "yazı Boyutu"
 
-#: browserNav.py:182
+#: globalPlugins/browserNav/__init__.py:236
 msgid "font size and same style"
 msgstr "yazı tipi boyutu ve aynı stil"
 
-#: browserNav.py:188
+#: globalPlugins/browserNav/__init__.py:242
 msgid "smaller"
 msgstr "daha küçük"
 
-#: browserNav.py:189
+#: globalPlugins/browserNav/__init__.py:243
 msgid "greater"
 msgstr "daha büyük"
 
-#: browserNav.py:340
+#: globalPlugins/browserNav/__init__.py:360
+msgid "Go to line"
+msgstr "satıra git"
+
+#: globalPlugins/browserNav/__init__.py:365
+#: globalPlugins/browserNav/__init__.py:396
+msgid "Go to line:"
+msgstr "Satıra git:"
+
+#: globalPlugins/browserNav/__init__.py:380
+msgid "Line number must be a positive integer!"
+msgstr "Satır numarası pozitif bir tam sayı olmalı!"
+
+#: globalPlugins/browserNav/__init__.py:381
+msgid "Wrong line number"
+msgstr "Yanlış satır numarası"
+
+#: globalPlugins/browserNav/__init__.py:392
+msgid "Regex search"
+msgstr "Regex araması"
+
+#: globalPlugins/browserNav/__init__.py:407
+msgid "Invalid regular expression"
+msgstr "Geçersiz kurallı ifade"
+
+#: globalPlugins/browserNav/__init__.py:408
+msgid "Wrong regex"
+msgstr "Hatalı regex"
+
+#: globalPlugins/browserNav/__init__.py:422
 msgid "Edit text"
 msgstr "Metni düzenle"
 
-#: browserNav.py:586
-msgid "BrowserNav"
-msgstr "BrowserNav"
+#: globalPlugins/browserNav/__init__.py:477
+msgid "No match!"
+msgstr "Eşleşme yok!"
 
-#: browserNav.py:608
-msgid "BrowserNav..."
-msgstr "BrowserNav..."
-
-#: browserNav.py:622
+#: globalPlugins/browserNav/__init__.py:971
 #, python-brace-format
 msgid "No next paragraph with the same {mode} in the document"
 msgstr "Belge içinde ileride aynı {mode} paragraf yok"
 
-#: browserNav.py:629
+#: globalPlugins/browserNav/__init__.py:978
 #, python-brace-format
 msgid "No previous paragraph with the same {mode} in the document"
 msgstr "Belge içinde geride aynı {mode} paragraf yok"
 
-#: browserNav.py:638 browserNav.py:666
+#: globalPlugins/browserNav/__init__.py:987
+#: globalPlugins/browserNav/__init__.py:1015
 #, python-brace-format
 msgid "No previous paragraph  with {qualifier} {mode} in the document"
 msgstr "Belgede geride {qualifier} {mode} paragraf yok"
 
-#: browserNav.py:647 browserNav.py:657
+#: globalPlugins/browserNav/__init__.py:996
+#: globalPlugins/browserNav/__init__.py:1006
 #, python-brace-format
 msgid "No next paragraph  with {qualifier} {mode} in the document"
 msgstr "Belgede ileride {qualifier} {mode} paragraf yok"
 
-#: browserNav.py:853
+#: globalPlugins/browserNav/__init__.py:1024
+msgid "BrowserNav navigates by "
+msgstr "BrowserNav rotoru:"
+
+#: globalPlugins/browserNav/__init__.py:1148
+msgid "Done."
+msgstr "Tamamlandı."
+
+#: globalPlugins/browserNav/__init__.py:1295
+msgid "No next format change!"
+msgstr "İleride format değişimi yok!"
+
+#: globalPlugins/browserNav/__init__.py:1371
 msgid "Timeout while trying to focus current edit box."
 msgstr "Geçerli düzenleme kutusuna odaklanmaya çalışılırken zaman aşımı."
 
-#: browserNav.py:862
+#: globalPlugins/browserNav/__init__.py:1380
 msgid "Not editable"
 msgstr "Düzenlenebilir değil"
 
-#: browserNav.py:877
-msgid "Time out while waiting for selection to appear."
-msgstr "Seçimin görünmesini beklerken zaman aşımı."
+#: globalPlugins/browserNav/__init__.py:1397
+msgid ""
+"Cannot copy text out of edit box. Please make sure edit box is not empty and "
+"not read-only!"
+msgstr ""
+"Düzenleme kutusundan metin kopyalanamıyor. Lütfen düzenleme kutusunun boş "
+"veya salt okunur olmadığından emin olun!"
 
-#: browserNav.py:896
+#: globalPlugins/browserNav/__init__.py:1411
 #, python-format
 msgid ""
 "Browser state has changed. Focused element is not an edit box. Role: %d."
 msgstr ""
 "Tarayıcı durumu değişti. Odaklanmış öğe bir düzenleme kutusu değil. Tür: %d."
 
-#: browserNav.py:899
+#: globalPlugins/browserNav/__init__.py:1414
 msgid ""
 "Browser state has changed. Different element on the page is now focused."
 msgstr "Tarayıcı durumu değişti. Artık odak sayfadaki farklı bir öğe üzerinde."
 
-#: browserNav.py:913
+#: globalPlugins/browserNav/__init__.py:1455
 msgid "Timed out during release modifiers stage"
 msgstr "Modifiyerleri serbest bırakma aşamasında zaman aşımı"
 
-#: browserNav.py:924
+#: globalPlugins/browserNav/__init__.py:1466
 msgid "Timed out during switch to browser window stage"
 msgstr "Tarayıcı penceresi değiştirme aşamasında zaman aşımı"
 
-#: browserNav.py:937
+#: globalPlugins/browserNav/__init__.py:1479
 msgid "Timed out during switch to window stage"
 msgstr "Pencere değiştirme aşamasında zaman aşımı"
 
-#: browserNav.py:956
+#: globalPlugins/browserNav/__init__.py:1498
 #, python-format
 msgid "Error during switch to window stage, focused element role is %d"
 msgstr "Pencere değiştirme aşamasında hata, Odaklanan öğe rolü %d"
 
-#: browserNav.py:971
-msgid "Timed out during Control+A stage"
-msgstr "Control + A aşamasında zaman aşımı"
+#: globalPlugins/browserNav/__init__.py:1522
+msgid "Timed out during single-character control+C stage"
+msgstr "Tek karakterli kontrol+C aşaması sırasında zaman aşımı"
 
-#: browserNav.py:983
-msgid "Timed out during Control+V stage"
-msgstr "Control + V aşamasında zaman aşımı"
-
-#: browserNav.py:1006
+#: globalPlugins/browserNav/__init__.py:1554
 msgid "Last edited text has been copied to the clipboard."
 msgstr "Son düzenlenen metin panoya kopyalandı."
 
-#: browserNav.py:1020
+#: globalPlugins/browserNav/__init__.py:1568
 msgid "Last Jupyter text has been copied to clipboard."
 msgstr "Son Jupyter metni panoya kopyalandı."
 
-#: browserNav.py:1022
+#: globalPlugins/browserNav/__init__.py:1570
 msgid "No last Jupyter text., or last Jupyter text is empty."
 msgstr "Son Jupyter metni yok veya son Jupyter metni boş."
 
-#: browserNav.py:1141
+#: globalPlugins/browserNav/__init__.py:1580
 msgid ""
-"No previous browser mark. To configure browser marks, go to BrowserNav "
-"settings."
+"Failed to read clipboard data. Please make sure clipboard is not empty - "
+"copy some text to clipboard."
 msgstr ""
-"Geride tarayıcı işareti yok. Tarayıcı işaretlerini yapılandırmak için "
-"BrowserNav ayarlarına gidin."
+"Pano verileri okunamadı. Lütfen panonun boş olmadığından emin olun - panoya "
+"bir miktar metin kopyalayın."
 
-#: browserNav.py:1163
+#: globalPlugins/browserNav/__init__.py:1648
+msgid "No cursor history available"
+msgstr "İmleç geçmişi yok"
+
+#: globalPlugins/browserNav/__init__.py:1653
+msgid "Cannot go back any more"
+msgstr "daha fazla geri gidilemez"
+
+#: globalPlugins/browserNav/__init__.py:1682
+msgid "Moves to next sibling in browser"
+msgstr "Tarayıcıda bir sonraki kardeşe gider"
+
+#: globalPlugins/browserNav/__init__.py:1686
+msgid "Moves to previous sibling in browser"
+msgstr "Tarayıcıda bir önceki kardeşe gider"
+
+#: globalPlugins/browserNav/__init__.py:1690
+#: globalPlugins/browserNav/__init__.py:1694
+msgid "Moves to next parent in browser"
+msgstr "Tarayıcıda bir sonraki ebeveyne gider"
+
+#: globalPlugins/browserNav/__init__.py:1698
+msgid "Moves to next child in browser"
+msgstr "Tarayıcıda bir sonraki çocuğa gider"
+
+#: globalPlugins/browserNav/__init__.py:1702
+msgid "Moves to previous child in browser"
+msgstr "Tarayıcıda bir önceki çocuğa gider"
+
+#: globalPlugins/browserNav/__init__.py:1707
+msgid "Adjusts BrowserNav rotor"
+msgstr "BrowserNav rotorunu ayarla"
+
+#: globalPlugins/browserNav/__init__.py:1713
+#: globalPlugins/browserNav/__init__.py:1718
+msgid ""
+"No next QuickJump result. To configure QuickJump rules, please go to "
+"BrowserNav settings in NVDA configuration window."
+msgstr ""
+"Sonraki ÇabukAtlama sonucu yok. ÇabukAtlama kurallarını yapılandırmak için "
+"lütfen NVDA ayarlar penceresinde BrowserNav ayarlarına gidin."
+
+#: globalPlugins/browserNav/__init__.py:1714
+msgid ""
+"QuickJump forward according to BrowserNav QuickJump bookmarks; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav ÇabukAtlama yer imlerine göre sonraki ÇabukAtlama; yer imlerinin "
+"listesi için lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1719
+msgid ""
+"QuickJump back according to BrowserNav QuickJump bookmarks; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav ÇabukAtlama yer imlerine göre önceki ÇabukAtlama; yer imlerinin "
+"listesi için lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1724
+#: globalPlugins/browserNav/__init__.py:1729
+msgid ""
+"No next QuickJump result for QuickJump2 bookmarks. To configure QuickJump "
+"rules, please go to BrowserNav settings in NVDA configuration window."
+msgstr ""
+"ÇabukAtlama2 yer imleri için sonraki ÇabukAtlama sonucu yok. ÇabukAtlama "
+"kurallarını yapılandırmak için lütfen NVDA ayarlar penceresinde BrowserNav "
+"ayarlarına gidin."
+
+#: globalPlugins/browserNav/__init__.py:1725
+msgid ""
+"QuickJump forward according to BrowserNav QuickJump2 bookmarks; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav ÇabukAtlama yer imlerine göre sonraki ÇabukAtlama2; yer imlerinin "
+"listesi için lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1730
+msgid ""
+"QuickJump back according to BrowserNav QuickJump2 bookmarks; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav ÇabukAtlama yer imlerine göre önceki ÇabukAtlama2; yer imlerinin "
+"listesi için lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1734
+#: globalPlugins/browserNav/__init__.py:1739
+msgid ""
+"No next QuickJump result for QuickJump3 bookmarks. To configure QuickJump "
+"rules, please go to BrowserNav settings in NVDA configuration window."
+msgstr ""
+"ÇabukAtlama3 yer imleri için sonraki ÇabukAtlama sonucu yok. ÇabukAtlama "
+"kurallarını yapılandırmak için lütfen NVDA ayarlar penceresinde BrowserNav "
+"ayarlarına gidin."
+
+#: globalPlugins/browserNav/__init__.py:1735
+msgid ""
+"QuickJump forward according to BrowserNav QuickJump3 bookmarks; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav ÇabukAtlama yer imlerine göre sonraki ÇabukAtlama3; yer imlerinin "
+"listesi için lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1740
+msgid ""
+"QuickJump back according to BrowserNav QuickJump3 bookmarks; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav ÇabukAtlama yer imlerine göre önceki ÇabukAtlama3; yer imlerinin "
+"listesi için lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1747
+msgid ""
+"AutoClick  according to BrowserNav AutoClick bookmark; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav OtoTık yer imlerine göre OtoTık; yer imlerinin listesi için "
+"lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1752
+msgid ""
+"AutoClick  according to BrowserNav AutoClick2 bookmark; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav OtoTık yer imlerine göre OtoTık2; yer imlerinin listesi için "
+"lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1757
+msgid ""
+"AutoClick  according to BrowserNav AutoClick3 bookmark; please check "
+"browserNav configuration panel for the list of bookmarks."
+msgstr ""
+"BrowserNav OtoTık yer imlerine göre OtoTık3; yer imlerinin listesi için "
+"lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1764
+#, python-brace-format
+msgid "at level {level}"
+msgstr "{level} düzeyinde"
+
+#: globalPlugins/browserNav/__init__.py:1778
+#, python-brace-format
+msgid "No next hierarchical bookmark {levelStr}"
+msgstr "{levelStr} ileride hiyerarşik yer imi yok"
+
+#: globalPlugins/browserNav/__init__.py:1780
+#, python-brace-format
+msgid ""
+"Jump to next hierarchical bookmark {levelStr}; please check browserNav "
+"configuration panel for hierarchical bookmark configuration."
+msgstr ""
+"Sonraki hiyerarşik yer imine atla {levelStr}; hiyerarşik yer imi "
+"yapılandırması için lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1793
+#, python-brace-format
+msgid "No previous hierarchical bookmark {levelStr}"
+msgstr "{levelStr} geride hiyerarşik yer imi yok"
+
+#: globalPlugins/browserNav/__init__.py:1795
+#, python-brace-format
+msgid ""
+"Jump to previous hierarchical bookmark {levelStr}; please check browserNav "
+"configuration panel for hierarchical bookmark configuration."
+msgstr ""
+"Önceki hiyerarşik yer imine atla {levelStr}; hiyerarşik yer imi "
+"yapılandırması için lütfen browserNav konfigürasyon panelini kontrol edin."
+
+#: globalPlugins/browserNav/__init__.py:1807
 msgid "No next tab"
 msgstr "İleride sekme yok"
 
-#: browserNav.py:1171
+#: globalPlugins/browserNav/__init__.py:1810
+msgid "Jump to next tab"
+msgstr "Sonraki sekmeye atla"
+
+#: globalPlugins/browserNav/__init__.py:1817
 msgid "No previous tab"
 msgstr "Geride sekme yok"
 
-#: browserNav.py:1182
+#: globalPlugins/browserNav/__init__.py:1820
+msgid "Jump to previous tab"
+msgstr "Önceki sekmeye atla"
+
+#: globalPlugins/browserNav/__init__.py:1830
 msgid "No next dialog"
 msgstr "İleride iletişim kutusu yok"
 
-#: browserNav.py:1190
+#: globalPlugins/browserNav/__init__.py:1831
+msgid "Jump to next dialog"
+msgstr "Sonraki iletişim kutusuna atla"
+
+#: globalPlugins/browserNav/__init__.py:1838
 msgid "No previous dialog"
 msgstr "Geride iletişim kutusu yok"
 
-#: browserNav.py:1209
+#: globalPlugins/browserNav/__init__.py:1839
+msgid "Jump to previous dialog"
+msgstr "Önceki iletişim kutusuna atla"
+
+#: globalPlugins/browserNav/__init__.py:1857
 msgid "No next menu"
 msgstr "İleride menü yok"
 
-#: browserNav.py:1217
+#: globalPlugins/browserNav/__init__.py:1860
+msgid "Jump to next menu"
+msgstr "Sonraki menüye atla"
+
+#: globalPlugins/browserNav/__init__.py:1867
 msgid "No previous menu"
 msgstr "Geride menü yok"
 
-#: browserNav.py:1227
+#: globalPlugins/browserNav/__init__.py:1870
+msgid "Jump to previous menu"
+msgstr "Önceki menüye atla"
+
+#: globalPlugins/browserNav/__init__.py:1879
 msgid "No next tree view"
 msgstr "İleride ağaç görünümü yok"
 
-#: browserNav.py:1235
+#: globalPlugins/browserNav/__init__.py:1880
+msgid "Jump to next tree view"
+msgstr "Sonraki ağaç görünümüne atla"
+
+#: globalPlugins/browserNav/__init__.py:1887
 msgid "No previous tree view"
 msgstr "Geride ağaç görünümü yok"
 
-#: browserNav.py:1243
+#: globalPlugins/browserNav/__init__.py:1888
+msgid "Jump to previous tree view"
+msgstr "Önceki ağaç görünümüne atla"
+
+#: globalPlugins/browserNav/__init__.py:1895
 msgid "No next tool bar"
 msgstr "İleride araç çubuğu yok"
 
-#: browserNav.py:1251
+#: globalPlugins/browserNav/__init__.py:1896
+msgid "Jump to next tool bar"
+msgstr "Sonraki araç çubuğuna atla"
+
+#: globalPlugins/browserNav/__init__.py:1903
 msgid "No previous tool bar"
 msgstr "Geride araç çubuğu yok"
 
-#~ msgid "IndentNav"
-#~ msgstr "IndentNav"
+#: globalPlugins/browserNav/__init__.py:1904
+msgid "Jump to previous tool bar"
+msgstr "Önceki araç çubuğuna atla"
+
+#: globalPlugins/browserNav/__init__.py:1912
+msgid "No next format change"
+msgstr "İleride format değişimi yok"
+
+#: globalPlugins/browserNav/__init__.py:1913
+msgid "Jump to next format change"
+msgstr "Sonraki biçim değişikliğine atla"
+
+#: globalPlugins/browserNav/__init__.py:1920
+msgid "No previous format change"
+msgstr "Geride format değişimi yok"
+
+#: globalPlugins/browserNav/__init__.py:1921
+msgid "Jump to previous format change"
+msgstr "Önceki biçim değişikliğine atla"
+
+#: globalPlugins/browserNav/__init__.py:1928
+msgid "Scrolling forward. This may load more elements on the page."
+msgstr "İleri kaydırma. Bu, sayfaya daha fazla öğe yükleyebilir."
+
+#: globalPlugins/browserNav/__init__.py:1929
+msgid "Scroll to all possible elements forward"
+msgstr "Tüm olası öğeleri ileri kaydır"
+
+#: globalPlugins/browserNav/__init__.py:1935
+msgid "Scrolling backward. This may load more elements on the page."
+msgstr "Geri kaydırma. Bu, sayfaya daha fazla öğe yükleyebilir."
+
+#: globalPlugins/browserNav/__init__.py:1936
+msgid "Scroll to all possible elements backward"
+msgstr "Tüm olası öğeleri geri kaydır"
+
+#: globalPlugins/browserNav/__init__.py:1943
+msgid "Edit semi-accessible edit box."
+msgstr "Yarı erişilebilir yazı alanını düzenle."
+
+#: globalPlugins/browserNav/__init__.py:1948
+msgid "Copy the last text from semi-accessible edit box to clipboard."
+msgstr "Yarı erişilebilir yazı alanından son metni panoya kopyala."
+
+#: globalPlugins/browserNav/__init__.py:1958
+msgid "Skip clutter off for paragraph navigation"
+msgstr "Paragraf navigasyonu için Dağınıklık geçişi kapalı"
+
+#: globalPlugins/browserNav/__init__.py:1959
+msgid "Skip clutter on for paragraph navigation"
+msgstr "Paragraf navigasyonu için Dağınıklık geçişi açık"
+
+#: globalPlugins/browserNav/__init__.py:1962
+msgid "Toggle skip clutter for paragraph navigation"
+msgstr "Paragraf navigasyonu için Dağınıklık geçişini değiştir"
+
+#: globalPlugins/browserNav/__init__.py:1971
+msgid "Skip clutter off for line navigation"
+msgstr "Satır navigasyonu için Dağınıklık geçişi kapalı"
+
+#: globalPlugins/browserNav/__init__.py:1972
+msgid "Skip clutter on for line navigation"
+msgstr "Satır navigasyonu için Dağınıklık geçişi açık"
+
+#: globalPlugins/browserNav/__init__.py:1975
+msgid "Toggle skip clutter for line navigation"
+msgstr "Satır navigasyonu için Dağınıklık geçişini değiştir"
+
+#: globalPlugins/browserNav/__init__.py:1984
+msgid ""
+"Experimental: go back to the previous location of cursor in current document"
+msgstr "Deneysel: mevcut belgede imlecin önceki konumuna geri dön"
+
+#: globalPlugins/browserNav/__init__.py:1992
+msgid "Show BrowserNav popup menu."
+msgstr "BrowserNav açılır menüsünü göster."
+
+#: globalPlugins/browserNav/quickJump.py:70
+msgid "QuickJump - assigned to J by default"
+msgstr "ÇabukAtlama - varsayılan olarak J'ye atanmış"
+
+#: globalPlugins/browserNav/quickJump.py:71
+msgid "QuickJump2"
+msgstr "ÇabukAtlama2"
+
+#: globalPlugins/browserNav/quickJump.py:72
+msgid "QuickJump3"
+msgstr "ÇabukAtlama3"
+
+#: globalPlugins/browserNav/quickJump.py:73
+msgid ""
+"SkipClutter - will automatically skip this paragraph or line when navigating "
+"via Control+Up/Down or Up/Down keystrokes; must match the whole paragraph. "
+"or "
+msgstr ""
+"DağınıklığıGeç - Control+Yukarı/Aşağı veya Yukarı/Aşağı yön tuşlarıyla "
+"gezinirken bu paragrafı veya satırı otomatik olarak atlayacaktır; paragrafın "
+"tamamıyla eşleşmelidir. veya "
+
+#: globalPlugins/browserNav/quickJump.py:74
+msgid "QuickClick"
+msgstr "ÇabukTık"
+
+#: globalPlugins/browserNav/quickJump.py:75
+msgid "QuickClick2"
+msgstr "ÇabukTık2"
+
+#: globalPlugins/browserNav/quickJump.py:76
+msgid "QuickClick3"
+msgstr "ÇabukTık3"
+
+#: globalPlugins/browserNav/quickJump.py:77
+msgid "Hierarchical quick jump"
+msgstr "Hiyerarşik çabuk atlama"
+
+#: globalPlugins/browserNav/quickJump.py:89
+msgid "Match all sites (domain field ignored) "
+msgstr "Tüm sitelerle eşleştir (alan bölümü dikkate alınmaz)"
+
+#: globalPlugins/browserNav/quickJump.py:90
+msgid "Match domain name"
+msgstr "Alan adıyla eşleştir"
+
+#: globalPlugins/browserNav/quickJump.py:91
+msgid "Match domain and its subdomains"
+msgstr "Alan ve alt alanlarla eşleştir"
+
+#: globalPlugins/browserNav/quickJump.py:92
+msgid "Match substring in URL"
+msgstr "URL'de alt dizeyle eşleştir"
+
+#: globalPlugins/browserNav/quickJump.py:93
+msgid "Exact URL match"
+msgstr "Tam URL eşleşmesi"
+
+#: globalPlugins/browserNav/quickJump.py:94
+msgid "Regex match of URL"
+msgstr "URL'nin kurallı ifade eşleşmesi"
+
+#: globalPlugins/browserNav/quickJump.py:103
+msgid "Keep default NVDA focus behavior"
+msgstr "Varsayılan NVDA odak davranışını koru"
+
+#: globalPlugins/browserNav/quickJump.py:104
+msgid "React to focus event, but prevent entering focus mode"
+msgstr "Odak olayına tepki ver, ancak odak kipine girmeyi önle"
+
+#: globalPlugins/browserNav/quickJump.py:105
+msgid "Ignore all focus events - good for websites that misuse focus events"
+msgstr ""
+"Tüm odak olaylarını yoksay - odak olaylarını yanlış kullanan web siteleri "
+"için iyidir"
+
+#: globalPlugins/browserNav/quickJump.py:114
+msgid "Speak live regions"
+msgstr "Canlı bölgeleri seslendir"
+
+#: globalPlugins/browserNav/quickJump.py:115
+msgid "Mute live regions"
+msgstr "Canlı bölgeleri sessize al"
+
+#: globalPlugins/browserNav/quickJump.py:125
+msgid "No beeps"
+msgstr "bip sesi yok"
+
+#: globalPlugins/browserNav/quickJump.py:126
+msgid "Beep on every focus event"
+msgstr "Her odak olayında bip sesi"
+
+#: globalPlugins/browserNav/quickJump.py:127
+msgid "Beep on every successful autoClick"
+msgstr "Her başarılı OtoTık'da bip sesi"
+
+#: globalPlugins/browserNav/quickJump.py:128
+msgid "Beep on every update from live region"
+msgstr "Canlı bölgeden her güncellenişinde bip sesi"
+
+#: globalPlugins/browserNav/quickJump.py:137
+msgid "Exact paragraph match"
+msgstr "Tam paragraf eşleşmesi"
+
+#: globalPlugins/browserNav/quickJump.py:138
+msgid "Substring paragraph match"
+msgstr "Paragraf alt dize eşleşmesi"
+
+#: globalPlugins/browserNav/quickJump.py:139
+msgid "Regex paragraph match"
+msgstr "Paragraf kurallı ifade eşleşmesi"
+
+#: globalPlugins/browserNav/quickJump.py:654
+msgid ""
+"BrowserNav warning: Two or more sites matching this URL are configured to "
+"perform autoClick on load. This is not supported."
+msgstr ""
+"BrowserNav uyarısı: Bu URL ile eşleşen iki veya daha fazla site, "
+"yüklendiğinde otomatik Tıklama gerçekleştirmek üzere yapılandırılmış. Bu "
+"desteklenmez."
+
+#: globalPlugins/browserNav/quickJump.py:842
+msgid ""
+"No quickJump bookmarks configured for current website. Please add QuickJump "
+"bookmarks in BrowserNav settings in NVDA settings window."
+msgstr ""
+"mevcut web sitesi için ÇabukAtlama yerimleri yapılandırılmamış. Lütfen NVDA "
+"ayarları penceresinde BrowserNav ayarlarında ÇabukAtlama yer imlerini "
+"ekleyin."
+
+#: globalPlugins/browserNav/quickJump.py:917
+#, python-brace-format
+msgid ""
+"No {category} bookmarks configured for current website. Please add "
+"{category} bookmarks in BrowserNav settings in NVDA settings window."
+msgstr ""
+"Mevcut web sitesi için {category} yer imleri yapılandırılmamış. Lütfen NVDA "
+"ayarları penceresindeki BrowserNav ayarlarına {category} yer imi ekleyin."
+
+#: globalPlugins/browserNav/quickJump.py:943
+msgid "Bookmark points to non-focusable NVDA object, cannot click it."
+msgstr "Yer imi, odaklanamayan NVDA nesnesini işaret ediyor, tıklanamaz."
+
+#: globalPlugins/browserNav/quickJump.py:985
+msgid "No bookmarks matched!"
+msgstr "Eşleşen yer imi yok!"
+
+#: globalPlugins/browserNav/quickJump.py:994
+#, python-brace-format
+msgid "Clicked {n} objects."
+msgstr "{n} nesne tıklandı."
+
+#: globalPlugins/browserNav/quickJump.py:1070
+msgid ""
+"No hierarchical quickJump bookmarks configured for current website. Please "
+"add QuickJump bookmarks in BrowserNav settings in NVDA settings window."
+msgstr ""
+"Mevcut web sitesi için yapılandırılmış hiyerarşik ÇabukAtlama yer imi yok. "
+"Lütfen NVDA ayarları penceresinde BrowserNav ayarlarından ÇabukAtlama yer "
+"imlerini ekleyin."
+
+#: globalPlugins/browserNav/quickJump.py:1114
+#, python-brace-format
+msgid "Level {announceLevel}"
+msgstr "Düzey {announceLevel}"
+
+#: globalPlugins/browserNav/quickJump.py:1134
+msgid ""
+"BrowserNav error: inconsistent indents in the document. Recomputing indents, "
+"please try again."
+msgstr ""
+"BrowserNav hatası: belgede tutarsız girintiler. Girintiler yeniden "
+"inceleniyor, lütfen tekrar deneyin."
+
+#: globalPlugins/browserNav/quickJump.py:1177
+#, python-format
+msgid "Edit existing website %s"
+msgstr "Mevcut %s web sitesini düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1187
+#, python-format
+msgid "Create new website for domain %s"
+msgstr "%s alanı için yeni web sitesi oluştur"
+
+#: globalPlugins/browserNav/quickJump.py:1196
+msgid "Create new website with custom URL matching options"
+msgstr "Özel URL eşleştirme seçenekleriyle yeni web sitesi oluştur"
+
+#: globalPlugins/browserNav/quickJump.py:1273
+msgid "Current selection spans across multiple paragraphs."
+msgstr "Geçerli seçim birden çok paragrafa yayılmış."
+
+#: globalPlugins/browserNav/quickJump.py:1274
+msgid ""
+"Bookmarks that span across paragraphs is not supported by BrowserNav. Please "
+"clear the selection or select something within a single paragraph."
+msgstr ""
+"Paragraflara yayılan yer işaretleri BrowserNav tarafından desteklenmez. "
+"Lütfen seçimi temizleyin veya tek bir paragraf içinde bir şey seçin."
+
+#: globalPlugins/browserNav/quickJump.py:1278
+#: globalPlugins/browserNav/quickJump.py:1290
+msgid "Bookmark Error"
+msgstr "Yer imi Hatası"
+
+#: globalPlugins/browserNav/quickJump.py:1285
+msgid "No sites are configured for current URL."
+msgstr "Geçerli URL için hiçbir site yapılandırılmamış."
+
+#: globalPlugins/browserNav/quickJump.py:1286
+msgid "Please create a new site configuration in site submenu."
+msgstr "Lütfen site alt menüsünde yeni bir site yapılandırması oluşturun."
+
+#: globalPlugins/browserNav/quickJump.py:1314
+#, python-brace-format
+msgid ""
+"Edit perfect match bookmark {bookmark} of category {category} from site "
+"{site}"
+msgstr ""
+"{site} sitesinden {category} kategorisinin mükemmel eşleşme {bookmark} yer "
+"imini düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1316
+#, python-brace-format
+msgid ""
+"Edit bookmark {bookmark} of category {category} that doesn't match "
+"formatting for current paragraph from site {site}"
+msgstr ""
+"{site} sitesinden {category} kategorisinin geçerli paragraf için "
+"biçimlendirmeyle eşleşmeyen {bookmark} yer imini düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1329
+#, python-brace-format
+msgid "Create new bookmark from current paragraph for site {site}"
+msgstr "{site} sitesi için mevcut paragraftan yeni yer imi oluştur"
+
+#: globalPlugins/browserNav/quickJump.py:1343
+msgid "Edit browserNav bookmark"
+msgstr "BrowserNav yer imini düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1370
+msgid "&Pattern"
+msgstr "&İfade"
+
+#: globalPlugins/browserNav/quickJump.py:1375
+msgid "Pattern &match type:"
+msgstr "Desen &eşleşme türü:"
+
+#: globalPlugins/browserNav/quickJump.py:1387
+msgid "&Category:"
+msgstr "&Kategori:"
+
+#: globalPlugins/browserNav/quickJump.py:1397
+msgid "&Site this bookmark belongs to:"
+msgstr "&Bu yer işaretinin ait olduğu site:"
+
+#: globalPlugins/browserNav/quickJump.py:1414
+msgid "Bookmark enabled"
+msgstr "Yer imi etkin"
+
+#: globalPlugins/browserNav/quickJump.py:1419
+#: globalPlugins/browserNav/quickJump.py:1756
+msgid "&Display name (optional)"
+msgstr "&Görünen isim (İsteğe bağlı)"
+
+#: globalPlugins/browserNav/quickJump.py:1423
+msgid "Spoken &message when bookmark is found:"
+msgstr "Yer imi bulunduğunda söylenecek &mesaj:"
+
+#: globalPlugins/browserNav/quickJump.py:1427
+msgid ""
+"Offset in paragraphs - select a value to place the cursor on following or "
+"preceding paragraph from the bookmark match:"
+msgstr ""
+"Paragraflarda ofset - imleci yer imi eşleşmesinden sonraki veya önceki "
+"paragrafa yerleştirmek için bir değer seçin:"
+
+#: globalPlugins/browserNav/quickJump.py:1434
+msgid "&Attributes (space separated list):"
+msgstr "&Özellikler (boşlukla ayrılmış liste):"
+
+#: globalPlugins/browserNav/quickJump.py:1442
+msgid ""
+"Available attributes in current paragraph (press space to add to current "
+"bookmark):"
+msgstr ""
+"Geçerli paragrafta mevcut özellikler (geçerli yer imine eklemek için boşluk "
+"tuşuna basın):"
+
+#: globalPlugins/browserNav/quickJump.py:1475
+msgid "Pattern cannot be empty!"
+msgstr "İfade boş olamaz!"
+
+#: globalPlugins/browserNav/quickJump.py:1480
+#: globalPlugins/browserNav/quickJump.py:1879
+#, python-format
+msgid "Failed to compile regular expression: %s"
+msgstr "Kurallı ifade derlenemedi: %s"
+
+#: globalPlugins/browserNav/quickJump.py:1484
+msgid "Bookmark entry error"
+msgstr "Yer imi giriş hatası"
+
+#: globalPlugins/browserNav/quickJump.py:1493
+#, python-brace-format
+msgid "Cannot parse attribute: {e}"
+msgstr "Özellik ayrıştırılamıyor: {e}"
+
+#: globalPlugins/browserNav/quickJump.py:1494
+msgid "Bookmark Entry Error"
+msgstr "Yer imi Giriş Hatası"
+
+#: globalPlugins/browserNav/quickJump.py:1499
+msgid ""
+"Warning: you are about to create a skip clutter bookmark. If your pattern is "
+"too generic, it might hide significant part of your website. For example, if "
+"you specify a single whitespace as pattern and substring match, then all "
+"paragraphs containing at least a single whitespace would disappear. Please "
+"make sure you understand how skip clutter works and how to undo this change "
+"if you have to. Would you like to continue?"
+msgstr ""
+"Uyarı: Bir dağınıklık geçiş yer imi oluşturmak üzeresiniz. Modeliniz çok "
+"genelse, web sitenizin önemli bir bölümünü gizleyebilir. Örneğin, ifade ve "
+"alt dize eşleşmesi olarak tek bir boşluk belirtirseniz, en az bir boşluk "
+"içeren tüm paragraflar kaybolur. Lütfen dağınıklık geçişinin nasıl "
+"çalıştığını ve gerekirse bu değişikliği nasıl geri alacağınızı "
+"anladığınızdan emin olun. Devam etmek istiyor musunuz?"
+
+#: globalPlugins/browserNav/quickJump.py:1500
+#: globalPlugins/browserNav/quickJump.py:1532
+msgid "Bookmark Entry warning"
+msgstr "Yer imi Giriş uyarısı"
+
+#: globalPlugins/browserNav/quickJump.py:1531
+#, python-format
+msgid ""
+"Warning: you are about to move this bookmark to site %s. This bookmark will "
+"disappear from the old site %s. Would you like to proceed?"
+msgstr ""
+"Uyarı: Bu yer imini %s sitesine taşımak üzeresiniz. Yer imi eski %s "
+"sitesinden silinecek. Devam etmek istiyor musunuz?"
+
+#: globalPlugins/browserNav/quickJump.py:1555
+#, python-brace-format
+msgid "Added '{item} to matched attributes edit box.'"
+msgstr "'{item} eşleşen özellikler düzenleme kutusuna.' eklendi"
+
+#: globalPlugins/browserNav/quickJump.py:1586
+#, python-format
+msgid "Edit bookmarks for %s"
+msgstr "%s için yer imlerini düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1594
+msgid "&Bookmarks"
+msgstr "&Yer imleri"
+
+#: globalPlugins/browserNav/quickJump.py:1603
+#: globalPlugins/browserNav/quickJump.py:1980
+msgid "Name"
+msgstr "İsim"
+
+#: globalPlugins/browserNav/quickJump.py:1604
+msgid "Pattern"
+msgstr "İfade"
+
+#: globalPlugins/browserNav/quickJump.py:1605
+msgid "Match type"
+msgstr "Eşleşme türü"
+
+#: globalPlugins/browserNav/quickJump.py:1606
+msgid "Category"
+msgstr "Kategori"
+
+#: globalPlugins/browserNav/quickJump.py:1607
+#: globalPlugins/browserNav/quickJump.py:1640
+msgid "Enabled"
+msgstr "Etkin"
+
+#: globalPlugins/browserNav/quickJump.py:1613
+#: globalPlugins/browserNav/quickJump.py:1988
+msgid "&Add"
+msgstr "&Ekle"
+
+#: globalPlugins/browserNav/quickJump.py:1615
+msgid "&Edit"
+msgstr "&Düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1617
+msgid "&Remove bookmark"
+msgstr "Ye&r imini kaldır"
+
+#: globalPlugins/browserNav/quickJump.py:1619
+#: globalPlugins/browserNav/quickJump.py:1996
+msgid "Move &up"
+msgstr "y&ukarı taşı"
+
+#: globalPlugins/browserNav/quickJump.py:1621
+#: globalPlugins/browserNav/quickJump.py:1998
+msgid "Move &down"
+msgstr "a&şağı taşı"
+
+#: globalPlugins/browserNav/quickJump.py:1623
+#: globalPlugins/browserNav/quickJump.py:2000
+msgid "&Sort"
+msgstr "&Sırala"
+
+#: globalPlugins/browserNav/quickJump.py:1640
+#: globalPlugins/browserNav/quickJump.py:1825
+msgid "Disabled"
+msgstr "Devre dışı"
+
+#: globalPlugins/browserNav/quickJump.py:1732
+msgid "Edit site configuration"
+msgstr "Site yapılandırmasını düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1760
+msgid "&URL"
+msgstr "&URL"
+
+#: globalPlugins/browserNav/quickJump.py:1764
+msgid "&Match type"
+msgstr "&Eşleşme türü"
+
+#: globalPlugins/browserNav/quickJump.py:1774
+#: globalPlugins/browserNav/quickJump.py:1992
+msgid "Edit &bookmarks"
+msgstr "&Yer imlerini düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1778
+msgid "&Focus mode"
+msgstr "&Odak kipi"
+
+#: globalPlugins/browserNav/quickJump.py:1790
+msgid "&Live region mode"
+msgstr "&Canlı bölge kipi"
+
+#: globalPlugins/browserNav/quickJump.py:1802
+msgid "Debug &beep mode"
+msgstr "Hata ayıklama ve bip kipi"
+
+#: globalPlugins/browserNav/quickJump.py:1814
+msgid "Perform autoClick on page load automatically:"
+msgstr "Sayfa yüklendiğinde otomatik olarak OtoTıkla:"
+
+#: globalPlugins/browserNav/quickJump.py:1832
+msgid "Delay before initial autoClick in milliseconds:"
+msgstr "Milisaniye cinsinden ilk otomatik tıklamadan önceki gecikme:"
+
+#: globalPlugins/browserNav/quickJump.py:1839
+msgid "Enable recurrent auto click"
+msgstr "Tekrarlayan otomatik tıklamayı etkinleştir"
+
+#: globalPlugins/browserNav/quickJump.py:1844
+msgid "Delay between recurring autoClicks  in milliseconds:"
+msgstr "Milisaniye cinsinden yinelenen otomatik tıklamalar arasındaki gecikme:"
+
+#: globalPlugins/browserNav/quickJump.py:1867
+msgid "You must specify blank domain in order to match all sites."
+msgstr "Tüm sitelerle eşleşmesi için alanı boş bırakmalısınız"
+
+#: globalPlugins/browserNav/quickJump.py:1870
+msgid "You must specify non-empty string as domain"
+msgstr "Alan bölümü  boş olmamalı"
+
+#: globalPlugins/browserNav/quickJump.py:1874
+msgid "Wrong domain format. An example is: en.wikipedia.com "
+msgstr "Yanlış alan biçimi. Bir örnek: en.wikipedia.com"
+
+#: globalPlugins/browserNav/quickJump.py:1888
+#, python-format
+msgid "This site is a duplicate of another existing site %s"
+msgstr "Bu site, mevcut başka bir sitenin %s kopyası"
+
+#: globalPlugins/browserNav/quickJump.py:1893
+msgid "Site Entry Error"
+msgstr "Site Giriş Hatası"
+
+#: globalPlugins/browserNav/quickJump.py:1960
+msgid "BrowserNav QuickSearch websites and bookmarks"
+msgstr "BrowserNav ÇabukArama web siteleri ve yer imleri"
+
+#: globalPlugins/browserNav/quickJump.py:1971
+msgid "&Sites"
+msgstr "&Siteler"
+
+#: globalPlugins/browserNav/quickJump.py:1981
+msgid "Domain"
+msgstr "Alan adı"
+
+#: globalPlugins/browserNav/quickJump.py:1982
+msgid "Type"
+msgstr "Tür"
+
+#: globalPlugins/browserNav/quickJump.py:1990
+msgid "&Edit site"
+msgstr "&Siteyi düzenle"
+
+#: globalPlugins/browserNav/quickJump.py:1994
+msgid "&Remove site"
+msgstr "Siteyi kaldı&r"
+
+#~ msgid "Browser marks regexp"
+#~ msgstr "Tarayıcı işaretleri düzenli ifade"
+
+#~ msgid "BrowserNav..."
+#~ msgstr "BrowserNav..."
+
+#~ msgid "Time out while waiting for selection to appear."
+#~ msgstr "Seçimin görünmesini beklerken zaman aşımı."
+
+#~ msgid "Timed out during Control+V stage"
+#~ msgstr "Control + V aşamasında zaman aşımı"
 
 #~ msgid ""
-#~ "Indentation Navigation addon.\n"
-#~ "It allows NVDA users to navigate by indentation level or offset of lines "
-#~ "or paragraphs.\n"
-#~ "In browsers it allows to quickly find paragraphs with the same offset "
-#~ "from the left edge of the screen, such as first level comments in a "
-#~ "hierarchical tree of comments.\n"
-#~ "Also while editing source code in many programming languages, it allows "
-#~ "to jump between the lines of the same indentation level, as well as "
-#~ "quickly find lines with greater or lesser indentation level."
+#~ "No previous browser mark. To configure browser marks, go to BrowserNav "
+#~ "settings."
 #~ msgstr ""
-#~ "Complemento de navegación por sangría.\n"
-#~ "Permite a los usuarios de NVDA navegar por nivel de sangría o "
-#~ "desplazamiento de líneas y párrafos.\n"
-#~ "En los navegadores, permite encontrar párrafos rápidamente con el mismo "
-#~ "desplazamiento desde el borde izquierdo de la pantalla, como los "
-#~ "comentarios de primer nivel en una vista jerárquica de comentarios.\n"
-#~ "Además, al editar el código fuente de muchos lenguajes de programación, "
-#~ "permite saltar entre líneas con el mismo nivel de sangría, así como "
-#~ "encontrar líneas con más o menos nivel de sangría."
+#~ "Geride tarayıcı işareti yok. Tarayıcı işaretlerini yapılandırmak için "
+#~ "BrowserNav ayarlarına gidin."
+
+#~ msgid "IndentNav"
+#~ msgstr "IndentNav"
