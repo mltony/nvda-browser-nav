@@ -57,7 +57,7 @@ from . addonConfig import *
 from . beeper import *
 from . import quickJump
 
-import winsdk
+from .pywinsdk.relative import winsdk
 
 
 
