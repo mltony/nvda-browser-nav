@@ -57,6 +57,8 @@ from . addonConfig import *
 from . beeper import *
 from . import quickJump
 
+import winsdk
+
 
 
 debug = False
