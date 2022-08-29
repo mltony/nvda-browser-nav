@@ -1625,10 +1625,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
             try:
                 data = api.getClipData()
-                if data != controlCharacter:
-                    return data
             except PermissionError:
-                pass
+                wx.Yield()
+                continue
+            if data != controlCharacter:
+                # Sleep for testing - otherwise clipboard history doesn't even notice new item
+                #time.sleep(1)
+                core.callLater(1000, clipboard.deleteEntryFromClipboardHistory, data)
+                return data
             wx.Yield()
             time.sleep(10/1000)
 
