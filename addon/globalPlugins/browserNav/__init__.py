@@ -1,5 +1,5 @@
 #A part of the BrowserNav addon for NVDA
-#Copyright (C) 2017-2021 Tony Malykh
+#Copyright (C) 2017-2022 Tony Malykh
 #This file is covered by the GNU General Public License.
 #See the file LICENSE  for more details.
 
@@ -56,9 +56,7 @@ from wx.stc import StyledTextCtrl
 from . addonConfig import *
 from . beeper import *
 from . import quickJump
-
-from .pywinsdk.relative import winsdk
-
+from . import clipboard
 
 
 debug = False
@@ -1605,7 +1603,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         lastException = None
         for i in range(10):
             try:
-                api.copyToClip(text)
+                clipboard.ephemeralCopyToClip(text)
                 return
             except PermissionError as e:
                 lastException = e
