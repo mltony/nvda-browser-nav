@@ -25,6 +25,7 @@ try:
     ROLE_TREEVIEW = controlTypes.ROLE_TREEVIEW
     ROLE_TOOLBAR = controlTypes.ROLE_TOOLBAR
     ROLE_BUTTON = controlTypes.ROLE_BUTTON
+    ROLE_HEADING = controlTypes.ROLE_HEADING
     ROLE_LINK = controlTypes.ROLE_LINK
     ROLE_GRAPHIC = controlTypes.ROLE_GRAPHIC
 except AttributeError:
@@ -48,5 +49,6 @@ except AttributeError:
     ROLE_TOOLBAR = controlTypes.Role.TOOLBAR
     ROLE_BUTTON = controlTypes.Role.BUTTON
     ROLE_LINK = controlTypes.Role.LINK
+    ROLE_HEADING = controlTypes.Role.HEADING
     ROLE_GRAPHIC = controlTypes.Role.GRAPHIC
 

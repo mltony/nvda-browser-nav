@@ -125,7 +125,7 @@ class DebugBeepMode(Enum):
     ON_FOCUS = 1
     ON_AUTO_CLICK = 2
     ON_LIVE_REGION = 3
-    
+
 debugBeepModeNames = {
     DebugBeepMode.NO_BEEPS: _("No beeps"),
     DebugBeepMode.ON_FOCUS: _("Beep on every focus event"),
@@ -181,7 +181,8 @@ class QJAttribute(QJImmutable):
         self,
         d=None,
         role=None,
-        userString=None
+        heading=None,
+        userString=None,
     ):
         if d is not None:
             object.__setattr__(self, 'attribute', ParagraphAttribute(d['attribute']))
@@ -214,6 +215,9 @@ class QJAttribute(QJImmutable):
         elif role is not None:
             object.__setattr__(self, 'attribute', ParagraphAttribute.ROLE)
             object.__setattr__(self, 'value', role)
+        elif heading is not None:
+            object.__setattr__(self, 'attribute', ParagraphAttribute.HEADING)
+            object.__setattr__(self, 'value', heading)
         else:
             raise Exception("Impossible!")
 
@@ -667,10 +671,10 @@ def asyncAutoclick(self, asyncAutoclickCounterLocal, site):
         except AttributeError:
             return
         autoClick(
-            self, 
-            gesture=None, 
-            category=category, 
-            site=site, 
+            self,
+            gesture=None,
+            category=category,
+            site=site,
             automated=True
         )
         if site.autoClickContinuous:
@@ -794,7 +798,7 @@ def findApplicableBookmarks(config=None, url=None, category=None, site=None):
         and bookmark.enabled
     ]
     return tuple(bookmarks)
-    
+
 @functools.lru_cache()
 def findApplicableBookmarksOrderedByOffset(*args, **kwargs):
     bookmarks = findApplicableBookmarks(*args, **kwargs)
@@ -811,11 +815,18 @@ def extractAttributesSet(textInfo):
         if not isinstance(field, textInfos.FieldCommand):
             continue
         elif field.command == 'controlStart':
+            role = None
             try:
                 role = field.field['role']
                 result.add(QJAttribute(role=role))
             except KeyError:
                 pass
+            if role == controlTypes.Role.HEADING:
+                try:
+                    level = field.field['level']
+                    result.add(QJAttribute(heading=level))
+                except KeyError:
+                    pass
         elif field.command == 'formatChange':
             for key, pAttr in [
                 ("level", ParagraphAttribute.HEADING),
@@ -846,14 +857,19 @@ def extractDefaultAttributeMatches(textInfo):
     result = [
         QJAttributeMatch(userString=attr.asString()).asDict()
         for attr in attrs
-        if attr.attribute == ParagraphAttribute.ROLE
-        and attr.value in {
-            ROLE_BUTTON,
-            ROLE_LINK,
-            ROLE_EDITABLETEXT,
-            ROLE_GRAPHIC,
-            ROLE_MENUBUTTON,
-        }
+        if (
+            attr.attribute == ParagraphAttribute.ROLE
+            and attr.value in {
+                ROLE_BUTTON,
+                ROLE_HEADING,
+                ROLE_LINK,
+                ROLE_EDITABLETEXT,
+                ROLE_GRAPHIC,
+                ROLE_MENUBUTTON,
+            }
+        ) or (
+            attr.attribute == ParagraphAttribute.HEADING
+        )
     ]
     return result
 
@@ -861,7 +877,7 @@ def moveParagraph(textInfo, offset):
     result = textInfo.move(textInfos.UNIT_PARAGRAPH, offset)
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
     return result
-    
+
 def shouldSkipClutter(textInfo, allBookmarks):
     if 0 in allBookmarks:
         bookmarks0 = allBookmarks[0]
@@ -891,7 +907,7 @@ def moveParagraphWithSkipClutter(self, textInfo, offset):
             continue
         offset -= direction
     return direction * distance
-        
+
 
 def quickJump(self, gesture, category, direction, errorMsg):
     oldSelection = self.selection
@@ -913,7 +929,7 @@ def quickJump(self, gesture, category, direction, errorMsg):
         distance += 1
         if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
             adjustedDistance += 1
-        
+
         for match in matchTextAndAttributes(bookmarks, textInfo, distance=adjustedDistance*direction):
             bookmark = match.bookmark
             if len(bookmark.message) > 0:
@@ -1066,7 +1082,7 @@ def getIndentFunc(textInfo, documentHolder, future):
         future.set(x)
     except Exception as e:
         future.setException(e)
-    
+
 def scanLevelsThreadFunc(self, config, future, bookmarks):
     #mylog("sltf begin")
     futures = []
@@ -1096,7 +1112,7 @@ def scanLevelsThreadFunc(self, config, future, bookmarks):
                 innerFuture = utils.Future()
                 utils.threadPool.add_task(getIndentFunc, thisInfo, documentHolder, innerFuture)
                 futures.append(innerFuture)
-                
+
             distance += 1
             result = moveParagraph(textInfo, direction)
             if result == 0:
@@ -1112,8 +1128,8 @@ def scanLevelsThreadFunc(self, config, future, bookmarks):
     except Exception as e:
         #mylog("sltf fail")
         future.setException(e)
-        
-    
+
+
 def scanLevels(self, bookmarks):
     global globalConfig, hierarchicalCache
     config = globalConfig
@@ -1137,7 +1153,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
         return endOfDocument(_('No hierarchical quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     try:
         levelsInfo = hierarchicalCache[self][globalConfig].get()
-        
+
     except KeyError:
         levelsInfo = None
         scanLevels(self, bookmarks)
@@ -1160,7 +1176,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
             endOfDocument(errorMsg)
             return
         distance += 1
-        
+
         if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
             adjustedDistance += 1
         #mylog("hqj->matchTextAndAttributes2")
@@ -1169,7 +1185,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
             offset = utils.getGeckoParagraphIndent(textInfo, documentHolder)
             #mylog(f"offset={offset}")
             if (
-                levelsInfo is None 
+                levelsInfo is None
                 or level is None
                 or (
                     offset in levelsInfo.offsets
