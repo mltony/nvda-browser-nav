@@ -794,7 +794,16 @@ def findApplicableBookmarks(config=None, url=None, category=None, site=None):
         and bookmark.enabled
     ]
     return tuple(bookmarks)
-
+    
+@functools.lru_cache()
+def findApplicableBookmarksOrderedByOffset(*args, **kwargs):
+    bookmarks = findApplicableBookmarks(*args, **kwargs)
+    result = {}
+    for bookmark in bookmarks:
+        l = result.get(bookmark.offset, [])
+        l.append(bookmark)
+        result[bookmark.offset] = l
+    return {k:tuple(v) for k,v in result.items()}
 def extractAttributesSet(textInfo):
     result = set()
     fields = textInfo.getTextWithFields()
@@ -853,9 +862,24 @@ def moveParagraph(textInfo, offset):
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
     return result
     
-    
+def shouldSkipClutter(textInfo, allBookmarks):
+    if 0 in allBookmarks:
+        bookmarks0 = allBookmarks[0]
+        if len(list(matchTextAndAttributes(bookmarks0, textInfo))) > 0:
+            return True
+    for _offset, bookmarks in allBookmarks.items():
+        offset = -_offset
+        if offset == 0:
+            continue
+        t = textInfo.copy()
+        code = moveParagraph(t, offset)
+        if code == offset:
+            if len(list(matchTextAndAttributes(bookmarks, t))) > 0:
+                return True
+    return False
+
 def moveParagraphWithSkipClutter(self, textInfo, offset):
-    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
+    bookmarks = findApplicableBookmarksOrderedByOffset(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
     direction = 1 if offset > 0 else -1
     distance = 0
     while offset != 0:
@@ -863,7 +887,7 @@ def moveParagraphWithSkipClutter(self, textInfo, offset):
         if code == 0:
             return 0
         distance += 1
-        if len(list(matchTextAndAttributes(bookmarks, textInfo))) > 0:
+        if shouldSkipClutter(textInfo, bookmarks):
             continue
         offset -= direction
     return direction * distance
@@ -909,7 +933,7 @@ def quickJump(self, gesture, category, direction, errorMsg):
             return
 
 def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
-    bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
+    bookmarks = findApplicableBookmarksOrderedByOffset(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
     skipped = False
     oldInfo=self.makeTextInfo(posConstant)
     info=oldInfo.copy()
@@ -926,12 +950,10 @@ def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=tex
         expandInfo = info.copy()
         expandInfo.expand(unit)
         expandText = expandInfo.text
-        if len(list(matchTextAndAttributes(bookmarks, expandInfo))) > 0:
+        if shouldSkipClutter(expandInfo, bookmarks):
             skipped = True
             continue
         break
-
-
     selection = info.copy()
     info.expand(unit)
     speech.speakTextInfo(info, unit=unit, reason=REASON_CARET)
@@ -1615,9 +1637,6 @@ class EditBookmarkDialog(wx.Dialog):
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
         } else self.messageTextCtrl.Enable()
-        self.offsetEdit.Disable() if category in {
-            BookmarkCategory.SKIP_CLUTTER,
-        } else self.offsetEdit.Enable()
 
     def onOk(self,evt):
         bookmark = self.make()
