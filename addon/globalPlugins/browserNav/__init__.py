@@ -1631,7 +1631,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             if data != controlCharacter:
                 # Sleep for testing - otherwise clipboard history doesn't even notice new item
                 #time.sleep(1)
-                core.callLater(1000, clipboard.deleteEntryFromClipboardHistory, data)
+                #core.callLater(1000, clipboard.deleteEntryFromClipboardHistory, data)
+                result = clipboard.deleteEntryFromClipboardHistory(data, maxEntries=1)
+                if result:
+                    core.callLater(1000, tones.beep, 1000, 1000)
                 return data
             wx.Yield()
             time.sleep(10/1000)
