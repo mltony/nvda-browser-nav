@@ -1458,6 +1458,7 @@ class EditBookmarkDialog(wx.Dialog):
                 'offset': 0,
             })
         self.snippet = self.bookmark.snippet
+        self.cursorLine, self.cursorColumn = 0,0
 
       # Translators: pattern
         patternLabelText = _("&Pattern")
@@ -1667,12 +1668,18 @@ class EditBookmarkDialog(wx.Dialog):
         
     def OnEditScriptClick(self,evt):
         snippet = self.snippet
+        cursorLine, cursorColumn = self.cursorLine, self.cursorColumn
         def onTextComplete(result, text, hasChanged, cursorLine, cursorColumn, keystroke):
-            tones.beep(500, 50)
             if result == wx.ID_OK:
+                tones.beep(500, 50)
                 self.snippet = text
-        d = EditTextDialog(self, snippet, 0, 0, onTextComplete)
+                self.cursorLine, self.cursorColumn = cursorLine, cursorColumn
+                
+        title = _("Editing script for %s")
+        title = title % self.bookmark.getDisplayName()
+        d = EditTextDialog(self, snippet, cursorLine, cursorColumn, onTextComplete, title=title)
         result = d.ShowModal()
+        
 
         
 

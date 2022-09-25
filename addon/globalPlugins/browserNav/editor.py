@@ -54,11 +54,12 @@ import wx
 from wx.stc import StyledTextCtrl
 
 class EditTextDialog(wx.Dialog):
-    def __init__(self, parent, text, cursorLine, cursorColumn, onTextComplete):
+    def __init__(self, parent, text, cursorLine, cursorColumn, onTextComplete, title=None):
         self.tabValue = "    "
-        # Translators: Title of calibration dialog
-        title_string = _("Edit text")
-        super(EditTextDialog, self).__init__(parent, title=title_string)
+        if title is None:
+            # Translators: Title of calibration dialog
+            title = _("Edit text")
+        super(EditTextDialog, self).__init__(parent, title=title)
         text = text.replace("\r\n", "\n").replace("\r", "\n")
         self.text = text
         self.originalText = text
