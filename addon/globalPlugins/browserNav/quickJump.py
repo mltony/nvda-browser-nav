@@ -36,6 +36,7 @@ addonHandler.initTranslation()
 sonifyTextInfo = None # Due to import error we set this value from __init__
 from . beeper import *
 from . import utils
+from .editor import EditTextDialog
 
 
 try:
@@ -324,7 +325,7 @@ class QJBookmark(QJImmutable):
         ]))
         object.__setattr__(self, 'message', d['message'])
         object.__setattr__(self, 'offset', d['offset'])
-        object.__setattr__(self, 'offset', d.get('snippet', '')])
+        object.__setattr__(self, 'snippet', d.get('snippet', ''))
 
     def asDict(self):
         return {
@@ -1456,6 +1457,7 @@ class EditBookmarkDialog(wx.Dialog):
                 'message': "",
                 'offset': 0,
             })
+        self.snippet = self.bookmark.snippet
 
       # Translators: pattern
         patternLabelText = _("&Pattern")
@@ -1545,6 +1547,11 @@ class EditBookmarkDialog(wx.Dialog):
         self.availableAttributesListBox.control.Bind(wx.EVT_CHAR, self.onChar)
         if paragraphInfo is None:
             self.availableAttributesListBox.control.Disable()
+            
+      # Edit script button
+        self.editScriptButton = sHelper.addItem (wx.Button (self, label = _("Edit &script in new window; press Control+Enter when Done.")))
+        self.editScriptButton.Bind(wx.EVT_BUTTON, self.OnEditScriptClick)
+
 
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
@@ -1610,6 +1617,7 @@ class EditBookmarkDialog(wx.Dialog):
             ],
             'message': self.messageTextCtrl.Value,
             'offset': self.offsetEdit.Value,
+            'snippet':self.snippet,
         })
         return bookmark
 
@@ -1656,6 +1664,17 @@ class EditBookmarkDialog(wx.Dialog):
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
         } else self.messageTextCtrl.Enable()
+        
+    def OnEditScriptClick(self,evt):
+        snippet = self.snippet
+        def onTextComplete(result, text, hasChanged, cursorLine, cursorColumn, keystroke):
+            tones.beep(500, 50)
+            if result == wx.ID_OK:
+                self.snippet = text
+        d = EditTextDialog(self, snippet, 0, 0, onTextComplete)
+        result = d.ShowModal()
+
+        
 
     def onOk(self,evt):
         bookmark = self.make()
