@@ -1,5 +1,5 @@
 #A part of the BrowserNav addon for NVDA
-#Copyright (C) 2017-2021 Tony Malykh
+#Copyright (C) 2017-2022 Tony Malykh
 #This file is covered by the GNU General Public License.
 #See the file LICENSE  for more details.
 
@@ -310,6 +310,7 @@ class QJBookmark(QJImmutable):
     attributes: Tuple[QJAttributeMatch]
     message: str
     offset: int
+    snippet: str
 
     def __init__(self, d):
         object.__setattr__(self, 'enabled', d['enabled'])
@@ -323,6 +324,7 @@ class QJBookmark(QJImmutable):
         ]))
         object.__setattr__(self, 'message', d['message'])
         object.__setattr__(self, 'offset', d['offset'])
+        object.__setattr__(self, 'offset', d.get('snippet', '')])
 
     def asDict(self):
         return {
@@ -337,6 +339,7 @@ class QJBookmark(QJImmutable):
             ],
             'message': self.message,
             'offset': self.offset,
+            'snippet': self.snippet,
         }
 
     def getDisplayName(self):
