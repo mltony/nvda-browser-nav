@@ -5,7 +5,6 @@
 
 import api
 from collections import namedtuple, defaultdict
-from .constants import *
 from contextlib import ExitStack
 import controlTypes
 from controlTypes import OutputReason
@@ -19,7 +18,10 @@ import globalVars
 import gui
 from gui import guiHelper, nvdaControls
 from gui.settingsDialogs import SettingsPanel
+import itertools
 import json
+from logHandler import log
+import math
 import os
 import re
 import textInfos
@@ -34,9 +36,12 @@ import addonHandler
 addonHandler.initTranslation()
 
 sonifyTextInfo = None # Due to import error we set this value from __init__
+
+from .constants import *
 from . beeper import *
 from . import utils
 from .editor import EditTextDialog
+from .paragraph import Paragraph
 
 
 try:
@@ -48,7 +53,7 @@ except AttributeError:
 
 debug = False
 if debug:
-    f = open("C:\\Users\\tony\\drp\\2.txt", "w", encoding='utf-8')
+    f = open("C:\\Users\\tony\\od\\2.txt", "w", encoding='utf-8')
     def mylog(s):
         if debug:
             print(str(s), file=f)
@@ -58,7 +63,11 @@ else:
         pass
 
 
+class QuickJumpScriptException(Exception):
+    pass
 
+class QuickJumpMatchPerformedException(Exception):
+    pass
 
 class BookmarkCategory(Enum):
     QUICK_JUMP = 1
@@ -301,7 +310,7 @@ class QJAttributeMatch(QJImmutable):
         else:
             return self.attribute not in attributes
 
-
+EMPTY_PYTHON_LINE_REGEXP = re.compile("^\s*(#.*)?$")
 class QJBookmark(QJImmutable):
     enabled: bool
     category: BookmarkCategory
@@ -326,6 +335,14 @@ class QJBookmark(QJImmutable):
         object.__setattr__(self, 'message', d['message'])
         object.__setattr__(self, 'offset', d['offset'])
         object.__setattr__(self, 'snippet', d.get('snippet', ''))
+        compileError = None
+        bytecode = None
+        try:
+            bytecode = compile(self.snippet, "<bookmark>", "exec")
+        except Exception as e:
+            compileError = e
+        object.__setattr__(self, 'bytecode', bytecode)
+        object.__setattr__(self, 'compileError', compileError)
 
     def asDict(self):
         return {
@@ -347,6 +364,13 @@ class QJBookmark(QJImmutable):
         if self.name is not None and len(self.name) > 0:
             return self.name
         return self.pattern
+
+    def isSnippetEmpty(self):
+        for line in self.snippet.splitlines():
+            if not EMPTY_PYTHON_LINE_REGEXP.search(line.rstrip("\r\n")):
+                return False
+        return True
+
 
     def __hash__(self):
         return id(self)
@@ -784,7 +808,7 @@ def matchTextAndAttributes(bookmarks, textInfo, distance=None):
             yield m
 
 @functools.lru_cache()
-def findApplicableBookmarks(config=None, url=None, category=None, site=None):
+def findApplicableBookmarks(config=None, url=None, category=None, site=None, withoutOffsetOnly=False):
     if (url is not None) == (site is not None):
         raise Exception("Must specify either URL or site, but not both.")
     if url is not None:
@@ -801,6 +825,8 @@ def findApplicableBookmarks(config=None, url=None, category=None, site=None):
         )
         and bookmark.enabled
     ]
+    if withoutOffsetOnly:
+        bookmarks = [b for b in bookmarks if b.offset == 0 and b.isSnippetEmpty()]
     return tuple(bookmarks)
 
 @functools.lru_cache()
@@ -883,11 +909,18 @@ def moveParagraph(textInfo, offset):
     return result
 
 def shouldSkipClutter(textInfo, allBookmarks):
-    if 0 in allBookmarks:
-        bookmarks0 = allBookmarks[0]
-        if len(list(matchTextAndAttributes(bookmarks0, textInfo))) > 0:
-            return True
-    for _offset, bookmarks in allBookmarks.items():
+    if isinstance(allBookmarks, (list, tuple)):
+        bookmarks0 = allBookmarks
+        bookmarksOther = {}
+    else:
+        try:
+            bookmarks0 = allBookmarks[0]
+        except KeyError:
+            bookmarksZero = []
+        bookmarksOther = allBookmarks
+    if len(list(matchTextAndAttributes(bookmarks0, textInfo))) > 0:
+        return True
+    for _offset, bookmarks in bookmarksOther.items():
         offset = -_offset
         if offset == 0:
             continue
@@ -898,8 +931,8 @@ def shouldSkipClutter(textInfo, allBookmarks):
                 return True
     return False
 
-def moveParagraphWithSkipClutter(self, textInfo, offset):
-    bookmarks = findApplicableBookmarksOrderedByOffset(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
+def moveParagraphWithSkipClutter(self, textInfo, offset, skipClutterBookmarks=None):
+    bookmarks = skipClutterBookmarks or findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER, withoutOffsetOnly=True)
     direction = 1 if offset > 0 else -1
     distance = 0
     while offset != 0:
@@ -912,17 +945,131 @@ def moveParagraphWithSkipClutter(self, textInfo, offset):
         offset -= direction
     return direction * distance
 
+safe_builtins = {
+    s: __builtins__[s]
+    for s in "abs all any ascii bin chr dir divmod format hash hex id isinstance issubclass iter len max min next oct ord pow repr round sorted sum None Ellipsis NotImplemented False True bool bytearray bytes complex dict enumerate filter float frozenset int list map object range reversed set slice str tuple type zip BaseException Exception TypeError StopAsyncIteration StopIteration GeneratorExit SystemExit KeyboardInterrupt ImportError ModuleNotFoundError OSError EnvironmentError IOError WindowsError EOFError RuntimeError RecursionError NotImplementedError NameError UnboundLocalError AttributeError SyntaxError IndentationError TabError LookupError IndexError KeyError ValueError UnicodeError UnicodeEncodeError UnicodeDecodeError UnicodeTranslateError AssertionError ArithmeticError FloatingPointError OverflowError ZeroDivisionError SystemError ReferenceError MemoryError BufferError ConnectionError BlockingIOError BrokenPipeError ChildProcessError ConnectionAbortedError ConnectionRefusedError ConnectionResetError FileExistsError FileNotFoundError IsADirectoryError NotADirectoryError InterruptedError PermissionError ProcessLookupError TimeoutError".split()
+}
+execGlobals = {
+    '__builtins__': safe_builtins,
+    'Paragraph': Paragraph,
+    'itertools': itertools,
+    'math': math,
+    'log': log,
+    'operator': operator,
+    'print': log.info,
+    're': re,
+}
+def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks):
+    """
+        This function is called to either apply offset, or evaluate script after we matched a paragraph using primary regex and style.
+        Returns tuple
+            0-th element represents matched textInfo or None if there was no match.
+            1-st element is either string or textInfo to announce prior to match, or None if nothing to announce.
+    """
+    bookmark = match.bookmark
+    if bookmark.isSnippetEmpty():
+        offset = bookmark.offset
+        if offset == 0:
+            textInfo.collapse()
+            textInfo.move(textInfos.UNIT_CHARACTER, match.start)
+            textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
+        else:
+            result = moveParagraphWithSkipClutter(None, textInfo, offset, skipClutterBookmarks=skipClutterBookmarks)
+            if result == offset:
+                return (textInfo, bookmark.message)
+
+    else:
+        if bookmark.offset != 0:
+            e = QuickJumpScriptException(f"Please set offset to 0 for bookmark '{bookmark.getDisplayName()}' in order to execute script.")
+            log.error(e)
+            raise e
+        if bookmark.compileError is not None:
+            e = QuickJumpScriptException(f"Failed to compile snippet for  bookmark '{bookmark.getDisplayName()}'.", e)
+            log.error(e)
+            raise e
+        p = Paragraph(textInfo)
+        _offset = None
+        _message = None
+        def match(offset=None, message=None):
+            nonlocal _offset, _message
+            if offset is None:
+                offset = 0
+            _offset = offset
+            _message = message
+            raise QuickJumpMatchPerformedException
+        execLocals = {
+            'p': p,
+            'match': match,
+        }
+        try:
+            exec(bookmark.bytecode, execGlobals, execLocals)
+        except QuickJumpMatchPerformedException:
+            if not (
+                _offset is None
+                or isinstance(_offset, int)
+                or isinstance(_offset, textInfos.TextInfo)
+                or isinstance(_offset, Paragraph)
+            ):
+                e = QuickJumpScriptException(f"First argument of match() function (offset) must be either None, or int, or textInfo, or Paragraph, but got: {type(_offset)}. Please fix your quickJump script for bookmark {bookmark.getDisplayName()}.")
+                log.error(e)
+                raise e
+
+            if not (
+                _message is None
+                or isinstance(_message, str)
+                or isinstance(_message, textInfos.TextInfo)
+                or isinstance(_message, Paragraph)
+            ):
+                e = QuickJumpScriptException(f"Second argument of match() function (message) must be either None, or string, or textInfo, or Paragraph, but got: {type(_message)}. Please fix your quickJump script for bookmark {bookmark.getDisplayName()}.")
+                log.error(e)
+                raise e
+
+            if _offset is None:
+                _offset = 0
+            elif isinstance(_offset, Paragraph):
+                _offset = _offset.textInfo
+            if isinstance(_message, str) and len(_message) == 0:
+                _message = None
+            elif isinstance(_message, Paragraph):
+                _message = _message.textInfo
+
+            if _message is not None and len(bookmark.message) > 0:
+                e = QuickJumpScriptException(f"Second argument of match() function (message) is not empty, while bookmark message is also set. Please either clear bookmark message, or change your script to not return any message. Error in bookmark {bookmark.getDisplayName()}.")
+                log.error(e)
+                raise e
+
+            message = _message or bookmark.message
+
+            if isinstance(_offset, int):
+                result = moveParagraphWithSkipClutter(None, textInfo, _offset, skipClutterBookmarks=skipClutterBookmarks)
+                if result == offset:
+                    return (textInfo, message)
+            else:
+                return (_offset, message)
+        except Exception as e:
+            e2 = QuickJumpScriptException(f"Exception while running script for bookmark '{bookmark.getDisplayName()}'.", e)
+            log.error(e2)
+            raise e2
+    return (None, None)
+
+def matchAndScript(bookmarks, skipClutterBookmarks, textInfo):
+    for match in matchTextAndAttributes(bookmarks, textInfo):
+        result, message = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks)
+        if result  is not None:
+            return result, message
+    return None, None
 
 def quickJump(self, gesture, category, direction, errorMsg):
     oldSelection = self.selection
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
-    skipClutterBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.SKIP_CLUTTER)
+    skipClutterBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.SKIP_CLUTTER, withoutOffsetOnly=True)
     if len(bookmarks) == 0:
         return endOfDocument(_('No quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
     textInfo.collapse()
     textInfo.expand(textInfos.UNIT_PARAGRAPH)
+    originalParagraph = textInfo.copy()
     distance = 0
     adjustedDistance = 0
     while True:
@@ -934,16 +1081,8 @@ def quickJump(self, gesture, category, direction, errorMsg):
         if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
             adjustedDistance += 1
 
-        for match in matchTextAndAttributes(bookmarks, textInfo, distance=adjustedDistance*direction):
-            bookmark = match.bookmark
-            if len(bookmark.message) > 0:
-                ui.message(bookmark.message)
-            if bookmark.offset == 0:
-                textInfo.collapse()
-                textInfo.move(textInfos.UNIT_CHARACTER, match.start)
-                textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
-            else:
-                moveParagraphWithSkipClutter(self, textInfo, bookmark.offset)
+        matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks, textInfo)
+        if matchInfo is not None:
             textInfo.updateCaret()
             speech.speakTextInfo(textInfo, reason=REASON_CARET)
             textInfo.collapse()
@@ -1548,7 +1687,7 @@ class EditBookmarkDialog(wx.Dialog):
         self.availableAttributesListBox.control.Bind(wx.EVT_CHAR, self.onChar)
         if paragraphInfo is None:
             self.availableAttributesListBox.control.Disable()
-            
+
       # Edit script button
         self.editScriptButton = sHelper.addItem (wx.Button (self, label = _("Edit &script in new window; press Control+Enter when Done.")))
         self.editScriptButton.Bind(wx.EVT_BUTTON, self.OnEditScriptClick)
@@ -1565,7 +1704,7 @@ class EditBookmarkDialog(wx.Dialog):
 
         self.onCategory(None)
 
-    def make(self):
+    def make(self, snippet=None):
         patternMatch = list(PatternMatch)[self.matchModeCategory.control.GetSelection()]
         pattern = self.patternTextCtrl.Value
         pattern = pattern.rstrip("\r\n")
@@ -1618,7 +1757,7 @@ class EditBookmarkDialog(wx.Dialog):
             ],
             'message': self.messageTextCtrl.Value,
             'offset': self.offsetEdit.Value,
-            'snippet':self.snippet,
+            'snippet':snippet or self.snippet,
         })
         return bookmark
 
@@ -1665,23 +1804,38 @@ class EditBookmarkDialog(wx.Dialog):
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
         } else self.messageTextCtrl.Enable()
-        
+
     def OnEditScriptClick(self,evt):
-        snippet = self.snippet
-        cursorLine, cursorColumn = self.cursorLine, self.cursorColumn
+        _snippet = self.snippet
+        _cursorLine, _cursorColumn = self.cursorLine, self.cursorColumn
+        _good = False
+        _cancel = False
         def onTextComplete(result, text, hasChanged, cursorLine, cursorColumn, keystroke):
+            nonlocal _good, _cancel, _snippet, _cursorLine, _cursorColumn
             if result == wx.ID_OK:
-                tones.beep(500, 50)
-                self.snippet = text
-                self.cursorLine, self.cursorColumn = cursorLine, cursorColumn
-                
+                _cursorLine, _cursorColumn = cursorLine, cursorColumn
+                _snippet = text
+                tempRule = self.make(snippet=text)
+                if tempRule.compileError is None:
+                    tones.beep(500, 50)
+                    _good = True
+                else:
+                    gui.messageBox(str(tempRule.compileError), _("Script compilation failed "), wx.OK|wx.ICON_WARNING, self)
+                    _good = False
+            else:
+                _cancel = Tru
+
         title = _("Editing script for %s")
         title = title % self.bookmark.getDisplayName()
-        d = EditTextDialog(self, snippet, cursorLine, cursorColumn, onTextComplete, title=title)
-        result = d.ShowModal()
-        
+        while not _good and not _cancel:
+            d = EditTextDialog(self, _snippet, _cursorLine, _cursorColumn, onTextComplete, title=title)
+            result = d.ShowModal()
+        if _good:
+            self.snippet = _snippet
+            self.cursorLine, self.cursorColumn = _cursorLine, _cursorColumn
 
-        
+
+
 
     def onOk(self,evt):
         bookmark = self.make()
