@@ -41,7 +41,7 @@ from .constants import *
 from . beeper import *
 from . import utils
 from .editor import EditTextDialog
-from .paragraph import Paragraph
+from .paragraph import Paragraph, EndOfDocumentException
 
 
 try:
@@ -310,6 +310,38 @@ class QJAttributeMatch(QJImmutable):
         else:
             return self.attribute not in attributes
 
+def indentPythonCode(code, level):
+    result = []
+    for line in code.splitlines():
+        line = line.rstrip("\r\n")
+        indentLength = len(line) - len(line.lstrip(' \t'))
+        indentStr = line[:indentLength]
+        line = line[indentLength:]
+        indentStr = indentStr.replace('\t', '    ')
+        indent = len(indentStr)
+        result.append(' ' * (indent + level) + (line))
+    return "\n".join(result)
+
+PYTHOS_SCRIPT_TEMPLATE = indentPythonCode("""
+    def quickJumpScript(p=p, match=match):
+    {indentedCode}
+
+
+    result = quickJumpScript()
+    if isinstance(result, tuple):
+        match(*result)
+    elif isinstance(result, dict):
+        match(**result)
+    elif result is not None:
+        match(result)
+""".lstrip(), -4)
+
+def wrapPythonCode(code):
+    return PYTHOS_SCRIPT_TEMPLATE.format(
+        indentedCode=indentPythonCode(code, 4)
+    )
+
+
 EMPTY_PYTHON_LINE_REGEXP = re.compile("^\s*(#.*)?$")
 class QJBookmark(QJImmutable):
     enabled: bool
@@ -337,10 +369,15 @@ class QJBookmark(QJImmutable):
         object.__setattr__(self, 'snippet', d.get('snippet', ''))
         compileError = None
         bytecode = None
-        try:
-            bytecode = compile(self.snippet, "<bookmark>", "exec")
-        except Exception as e:
-            compileError = e
+        if not self.isSnippetEmpty():
+            try:
+                bytecode = compile(wrapPythonCode(self.snippet), "<bookmark>", "exec")
+            except Exception as e:
+                compileError = e
+                tones.beep(500, 50)
+                log.info("asdf")
+                #log.info(wrapPythonCode(self.snippet))
+                log.error(e)
         object.__setattr__(self, 'bytecode', bytecode)
         object.__setattr__(self, 'compileError', compileError)
 
@@ -967,7 +1004,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks):
             1-st element is either string or textInfo to announce prior to match, or None if nothing to announce.
     """
     bookmark = match.bookmark
-    if bookmark.isSnippetEmpty():
+    if bookmark.bytecode is None:
         offset = bookmark.offset
         if offset == 0:
             textInfo.collapse()
@@ -984,7 +1021,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks):
             log.error(e)
             raise e
         if bookmark.compileError is not None:
-            e = QuickJumpScriptException(f"Failed to compile snippet for  bookmark '{bookmark.getDisplayName()}'.", e)
+            e = QuickJumpScriptException(f"Failed to compile snippet for  bookmark '{bookmark.getDisplayName()}'.", bookmark.compileError)
             log.error(e)
             raise e
         p = Paragraph(textInfo)
@@ -1004,6 +1041,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks):
         try:
             exec(bookmark.bytecode, execGlobals, execLocals)
         except QuickJumpMatchPerformedException:
+            # Script called match function!
             if not (
                 _offset is None
                 or isinstance(_offset, int)
@@ -1046,6 +1084,9 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks):
                     return (textInfo, message)
             else:
                 return (_offset, message)
+        except EndOfDocumentException:
+            # This probably indicates no match.
+            pass # will return None, None
         except Exception as e:
             e2 = QuickJumpScriptException(f"Exception while running script for bookmark '{bookmark.getDisplayName()}'.", e)
             log.error(e2)
@@ -1058,6 +1099,18 @@ def matchAndScript(bookmarks, skipClutterBookmarks, textInfo):
         if result  is not None:
             return result, message
     return None, None
+
+def isMatchInRightDirection(oldSelection, direction, textInfo):
+    origin = oldSelection.copy()
+    origin.collapse(end=direction>0)
+    origin.expand(textInfos.UNIT_PARAGRAPH)
+    origin.collapse(end=direction>0)
+    if direction > 0:
+        origin.move(textInfos.UNIT_CHARACTER, -1)
+    cmp = origin.compareEndPoints(textInfo, "startToStart")
+    log.info(f"cmp={cmp}, direction={direction}, textInfo={textInfo.text}")
+    return direction * cmp < 0
+
 
 def quickJump(self, gesture, category, direction, errorMsg):
     oldSelection = self.selection
@@ -1083,6 +1136,10 @@ def quickJump(self, gesture, category, direction, errorMsg):
 
         matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks, textInfo)
         if matchInfo is not None:
+            if not isMatchInRightDirection(oldSelection, direction, matchInfo):
+                continue
+            textInfo = matchInfo
+            utils.speakMessage(message)
             textInfo.updateCaret()
             speech.speakTextInfo(textInfo, reason=REASON_CARET)
             textInfo.collapse()
@@ -1823,7 +1880,7 @@ class EditBookmarkDialog(wx.Dialog):
                     gui.messageBox(str(tempRule.compileError), _("Script compilation failed "), wx.OK|wx.ICON_WARNING, self)
                     _good = False
             else:
-                _cancel = Tru
+                _cancel = True
 
         title = _("Editing script for %s")
         title = title % self.bookmark.getDisplayName()

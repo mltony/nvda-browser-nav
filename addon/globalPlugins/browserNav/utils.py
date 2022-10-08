@@ -10,6 +10,8 @@ import _ctypes
 from enum import Enum
 import IAccessibleHandler
 from queue import Queue
+import speech
+import textInfos
 import threading
 from threading import Thread
 from threading import Lock, Condition
@@ -18,6 +20,7 @@ import tones
 import types
 from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import weakref
+import ui
 import winUser
 
 class FakeObjectForWeakMemoize:
@@ -362,3 +365,14 @@ class NVDA2021Role(Enum):
     REGION = 151
     FIGURE = 152
     MARKED_CONTENT = 153
+
+def speakMessage(message):
+    if message is None:
+        return
+    if isinstance(message, str):
+        ui.message(message)
+    elif isinstance(message, textInfos.TextInfo):
+        speech.speakTextInfo(message, reason=controlTypes.OutputReason.CARET)
+    else:
+        raise RuntimeError(f"speakMessage got unsupported argument of type {type(message)}.")
+    
