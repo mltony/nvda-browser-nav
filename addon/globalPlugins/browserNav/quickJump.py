@@ -374,10 +374,6 @@ class QJBookmark(QJImmutable):
                 bytecode = compile(wrapPythonCode(self.snippet), "<bookmark>", "exec")
             except Exception as e:
                 compileError = e
-                tones.beep(500, 50)
-                log.info("asdf")
-                #log.info(wrapPythonCode(self.snippet))
-                log.error(e)
         object.__setattr__(self, 'bytecode', bytecode)
         object.__setattr__(self, 'compileError', compileError)
 
