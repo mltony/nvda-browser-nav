@@ -951,12 +951,17 @@ def shouldSkipClutter(textInfo, allBookmarks):
         except KeyError:
             bookmarksZero = []
         bookmarksOther = allBookmarks
-    if len(list(matchTextAndAttributes(bookmarks0, textInfo))) > 0:
-        return True
+    for match in matchTextAndAttributes(bookmarks0, textInfo):
+        scriptMatch, message = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=[])
+        if scriptMatch is not None:
+            return True
     for _offset, bookmarks in bookmarksOther.items():
         offset = -_offset
         if offset == 0:
             continue
+        for bookmark in bookmarks:
+            if bookmark.bytecode is not None:
+                raise QuickJumpScriptException(f"Illegal SkipClutter bookmark '{bookmark.getDisplayName()}' has both non-empty script and non-zero offset.")
         t = textInfo.copy()
         code = moveParagraph(t, offset)
         if code == offset:
@@ -992,7 +997,7 @@ execGlobals = {
     'print': log.info,
     're': re,
 }
-def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks):
+def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
     """
         This function is called to either apply offset, or evaluate script after we matched a paragraph using primary regex and style.
         Returns tuple
@@ -1076,7 +1081,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks):
 
             if isinstance(_offset, int):
                 result = moveParagraphWithSkipClutter(None, textInfo, _offset, skipClutterBookmarks=skipClutterBookmarks)
-                if result == offset:
+                if result == _offset:
                     return (textInfo, message)
             else:
                 return (_offset, message)
@@ -1104,7 +1109,6 @@ def isMatchInRightDirection(oldSelection, direction, textInfo):
     if direction > 0:
         origin.move(textInfos.UNIT_CHARACTER, -1)
     cmp = origin.compareEndPoints(textInfo, "startToStart")
-    log.info(f"cmp={cmp}, direction={direction}, textInfo={textInfo.text}")
     return direction * cmp < 0
 
 
