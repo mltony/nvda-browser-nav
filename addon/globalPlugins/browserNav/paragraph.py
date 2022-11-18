@@ -59,3 +59,6 @@ class Paragraph(baseObject.AutoPropertyObject):
             ])
         except ValueError:
             return None
+            
+    def find(self, s, backward=False):
+        pass

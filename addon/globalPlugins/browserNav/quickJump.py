@@ -821,14 +821,18 @@ def matchAllWidthCompositeRegex(bookmarks, text):
 def matchTextAndAttributes(bookmarks, textInfo, distance=None):
     text = textInfo.text
     text = text.rstrip("\r\n")
-    #mylog(f"matchTextAndAttributes '{text}'")
+    mylog(f"matchTextAndAttributes '{text}'")
     matches = matchAllWidthCompositeRegex(bookmarks, text)
     attrs = None
     for m in matches:
         bookmark = m.bookmark
+        mylog(f"bookmark={bookmark.getDisplayName()}")
+        mylog(f"bookmark has {len(bookmark.attributes)} attribute filters.")
+        mylog(f"Bookmark is snippet empty: {bookmark.isSnippetEmpty()}")
         if distance is not None and bookmark.offset * distance < 0:
             # offset is in the opposite direction to current movement direction
             if abs(distance) <= abs(bookmark.offset):
+                mylog("# We don't want to hit the anchor of current bookmark again")
                 # We don't want to hit the anchor of current bookmark again
                 continue
         if len(bookmark.attributes) > 0:
@@ -838,7 +842,10 @@ def matchTextAndAttributes(bookmarks, textInfo, distance=None):
             am.matches(attrs)
             for am in bookmark.attributes
         ]):
+            mylog("Yield!")
             yield m
+        mylog("Didn't match attributes")
+    mylog("Done matchTextAndAttributes")
 
 @functools.lru_cache()
 def findApplicableBookmarks(config=None, url=None, category=None, site=None, withoutOffsetOnly=False):
@@ -1005,12 +1012,15 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
             1-st element is either string or textInfo to announce prior to match, or None if nothing to announce.
     """
     bookmark = match.bookmark
+    mylog(f"q has bytecode {bookmark.bytecode is not None}")
     if bookmark.bytecode is None:
         offset = bookmark.offset
+        mylog(f"q offset={offset}")
         if offset == 0:
             textInfo.collapse()
             textInfo.move(textInfos.UNIT_CHARACTER, match.start)
             textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
+            return (textInfo, bookmark.message)
         else:
             result = moveParagraphWithSkipClutter(None, textInfo, offset, skipClutterBookmarks=skipClutterBookmarks)
             if result == offset:
@@ -1021,6 +1031,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
             e = QuickJumpScriptException(f"Please set offset to 0 for bookmark '{bookmark.getDisplayName()}' in order to execute script.")
             log.error(e)
             raise e
+        mylog(f"q compileError present: {bookmark.compileError is not None}")
         if bookmark.compileError is not None:
             e = QuickJumpScriptException(f"Failed to compile snippet for  bookmark '{bookmark.getDisplayName()}'.", bookmark.compileError)
             log.error(e)
@@ -1098,6 +1109,7 @@ def matchAndScript(bookmarks, skipClutterBookmarks, textInfo):
     for match in matchTextAndAttributes(bookmarks, textInfo):
         result, message = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks)
         if result  is not None:
+            mylog("Result is not None :(")
             return result, message
     return None, None
 
