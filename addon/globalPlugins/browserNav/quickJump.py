@@ -1212,43 +1212,15 @@ def autoClick(self, gesture, category, site=None, automated=False):
     focusableErrorMsg = None
     focusables = []
     while True:
-        for match in matchTextAndAttributes(bookmarks, textInfo):
-            mylog(f"Autoclick Match {distance} {textInfo.text}")
-            bookmark = match.bookmark
-            thisInfo = textInfo.copy()
-            if bookmark.offset == 0:
-                thisInfo.collapse()
-                thisInfo.move(textInfos.UNIT_CHARACTER, match.start)
-                thisInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
-            else:
-                moveParagraph(thisInfo, bookmark.offset)
+        matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
+        if matchInfo is not None:
+            thisInfo = matchInfo
+            mylog(f"Autoclick Match {distance} {thisInfo.text}")
             focusable = thisInfo.focusableNVDAObjectAtStart
             if focusable.role in {ROLE_DOCUMENT, ROLE_DIALOG}:
                 if focusableErrorMsg is None:
                     mylog("Bookmark points to non-focusable NVDA object, cannot click it.")
                     focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
-            elif bookmark.offset == 0:
-                # Double check that NBDAObject is good - to avoid some race condition as often time the document is still updating.
-                # TODO: we need to come up with some algorithm to double-check when offset is not zero.
-                try:
-                    startOffset, endOffset = thisInfo._getOffsetsFromNVDAObject(focusable)
-                except LookupError:
-                    mylog("LookupError! skipping this match.")
-                    continue
-                controlInfo = thisInfo.copy()
-                controlInfo._startOffset = startOffset
-                controlInfo._endOffset = endOffset
-                controlInfo.collapse()
-                controlInfo.expand(textInfos.UNIT_PARAGRAPH)
-                matches = len(list(matchTextAndAttributes((bookmark,), controlInfo))) > 0
-                if matches:
-                    mylog("Verification successful!")
-                    focusables.append(focusable)
-                    if message is None and len(bookmark.message) > 0:
-                        message = bookmark.message
-                else:
-                    mylog("Verification failed:")
-                    mylog(controlInfo.text)
             else:
                 mylog("Verification skipped since offset is non-zero")
                 focusables.append(focusable)
@@ -1772,7 +1744,6 @@ class EditBookmarkDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
 
         self.onCategory(None)
-
     def make(self, snippet=None):
         patternMatch = list(PatternMatch)[self.matchModeCategory.control.GetSelection()]
         pattern = self.patternTextCtrl.Value
