@@ -53,11 +53,12 @@ except AttributeError:
 
 debug = False
 if debug:
-    f = open("C:\\Users\\tony\\od\\2.txt", "w", encoding='utf-8')
     def mylog(s):
         if debug:
+            f = open("C:\\Users\\tony\\od\\2.txt", "a", encoding='utf-8')
             print(str(s), file=f)
             f.flush()
+            f.close()
 else:
     def mylog(s):
         pass
@@ -977,16 +978,23 @@ def shouldSkipClutter(textInfo, allBookmarks):
     return False
 
 def moveParagraphWithSkipClutter(self, textInfo, offset, skipClutterBookmarks=None):
-    bookmarks = skipClutterBookmarks or findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER, withoutOffsetOnly=True)
+    """
+        This function has been disabled.
+        Passing skip clutter bookmarks and properly accounting for them
+        turns out to be a huge headache.
+        Adjusting offsets can now be done via scripting.
+    """
+    #bookmarks = skipClutterBookmarks or findApplicableBookmarks(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER, withoutOffsetOnly=True)
+    bookmarks = ()
     direction = 1 if offset > 0 else -1
     distance = 0
     while offset != 0:
         code = moveParagraph(textInfo, direction)
         if code == 0:
             return 0
-        distance += 1
         if shouldSkipClutter(textInfo, bookmarks):
             continue
+        distance += 1
         offset -= direction
     return direction * distance
 
@@ -1012,6 +1020,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
             1-st element is either string or textInfo to announce prior to match, or None if nothing to announce.
     """
     bookmark = match.bookmark
+    textInfo = textInfo.copy()
     mylog(f"q has bytecode {bookmark.bytecode is not None}")
     if bookmark.bytecode is None:
         offset = bookmark.offset
@@ -1022,7 +1031,9 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
             textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
             return (textInfo, bookmark.message)
         else:
+            mylog("q3")
             result = moveParagraphWithSkipClutter(None, textInfo, offset, skipClutterBookmarks=skipClutterBookmarks)
+            mylog(f"q4 {result}")
             if result == offset:
                 return (textInfo, bookmark.message)
 
@@ -1106,11 +1117,15 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
     return (None, None)
 
 def matchAndScript(bookmarks, skipClutterBookmarks, textInfo):
+    mylog("matchAndScript start")
     for match in matchTextAndAttributes(bookmarks, textInfo):
+        mylog("q1")
         result, message = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks)
+        mylog("q2")
         if result  is not None:
-            mylog("Result is not None :(")
+            mylog("matchAndScript Result is not None :(")
             return result, message
+    mylog("matchAndScript Result is  None :(")
     return None, None
 
 def isMatchInRightDirection(oldSelection, direction, textInfo):
@@ -1212,7 +1227,7 @@ def autoClick(self, gesture, category, site=None, automated=False):
     focusableErrorMsg = None
     focusables = []
     while True:
-        matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
+        matchInfo, thisMessage = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
         if matchInfo is not None:
             thisInfo = matchInfo
             mylog(f"Autoclick Match {distance} {thisInfo.text}")
@@ -1224,8 +1239,8 @@ def autoClick(self, gesture, category, site=None, automated=False):
             else:
                 mylog("Verification skipped since offset is non-zero")
                 focusables.append(focusable)
-                if message is None and len(bookmark.message) > 0:
-                    message = bookmark.message
+                if message is None and thisMessage  is not None and len(thisMessage) > 0:
+                    message = thisMessage
         distance += 1
         result = moveParagraph(textInfo, 1)
         if result == 0:
@@ -1273,8 +1288,6 @@ def scanLevelsThreadFunc(self, config, future, bookmarks):
     direction = 1
     try:
         category = BookmarkCategory.HIERARCHICAL
-        #url = getUrl(self)
-        #bookmarks = findApplicableBookmarks(config, url, category)
         mylog(f"sltf bookmarks={len(bookmarks)} url=?")
         if len(bookmarks) == 0:
             future.set([])
@@ -1287,14 +1300,12 @@ def scanLevelsThreadFunc(self, config, future, bookmarks):
         distance = 0
         #mylog(f"loop:sltf->matchTextAndAttributes({len(bookmarks)})")
         while True:
-            for match in matchTextAndAttributes(bookmarks, textInfo, distance=distance*direction):
-                bookmark = match.bookmark
-                thisInfo = textInfo.copy()
-                # Here we don't move to the actual text within the paragraph, nor do we respect bookmark.offset parameter.
-                # We compute x indent of the paragraph where we matched the pattern.
+            matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
+            if matchInfo is not None:
+                # We compute x screen coordinate of the match
                 # Computing it in thread pool for performance reasons.
                 innerFuture = utils.Future()
-                utils.threadPool.add_task(getIndentFunc, thisInfo, documentHolder, innerFuture)
+                utils.threadPool.add_task(getIndentFunc, matchInfo, documentHolder, innerFuture)
                 futures.append(innerFuture)
 
             distance += 1
@@ -1337,7 +1348,6 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
         return endOfDocument(_('No hierarchical quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     try:
         levelsInfo = hierarchicalCache[self][globalConfig].get()
-
     except KeyError:
         levelsInfo = None
         scanLevels(self, bookmarks)
@@ -1361,13 +1371,20 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
             return
         distance += 1
 
-        if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
-            adjustedDistance += 1
+        #if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
+        #    adjustedDistance += 1
         #mylog("hqj->matchTextAndAttributes2")
-        for match in matchTextAndAttributes(bookmarks, textInfo, distance=adjustedDistance*direction):
-            bookmark = match.bookmark
-            offset = utils.getGeckoParagraphIndent(textInfo, documentHolder)
-            #mylog(f"offset={offset}")
+        mylog("HQJ calling matchAndScript")
+        mylog(f"asdf {textInfo.text}")
+        matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks, textInfo)
+        mylog(f"asdf2 {textInfo.text}")
+        if matchInfo is not None:
+            if not isMatchInRightDirection(oldSelection, direction, matchInfo):
+                continue
+            thisInfo = matchInfo
+            offset = utils.getGeckoParagraphIndent(thisInfo, documentHolder)
+            mylog(f"thisInfo={thisInfo.text}")
+            mylog(f"offset={offset}")
             if (
                 levelsInfo is None
                 or level is None
@@ -1376,7 +1393,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
                     and levelsInfo.offsets.index(offset) == level
                 )
             ):
-                #mylog("Perfect")
+                mylog("Perfect")
                 if (
                     level is None
                     and levelsInfo is not None
@@ -1384,25 +1401,19 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
                 ):
                     announceLevel = levelsInfo.offsets.index(offset) + 1
                     ui.message(_("Level {announceLevel}").format(announceLevel=announceLevel))
-                if len(bookmark.message) > 0:
-                    ui.message(bookmark.message)
-                if bookmark.offset == 0:
-                    textInfo.collapse()
-                    textInfo.move(textInfos.UNIT_CHARACTER, match.start)
-                    textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
-                else:
-                    moveParagraphWithSkipClutter(self, textInfo, bookmark.offset)
-                textInfo.updateCaret()
-                speech.speakTextInfo(textInfo, reason=REASON_CARET)
-                textInfo.collapse()
-                self._set_selection(textInfo)
-                self.selection = textInfo
+                if message is not None and len(message) > 0:
+                    ui.message(message)
+                thisInfo.updateCaret()
+                speech.speakTextInfo(thisInfo, reason=REASON_CARET)
+                thisInfo.collapse()
+                self._set_selection(thisInfo)
+                self.selection = thisInfo
                 sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
                 return
             elif offset not in levelsInfo.offsets:
                 # Something must have happened that current level is not recorded in the previous scan. Rescan after this script.
                 mylog("offset not in levelsInfo")
-                scanLevels(self)
+                scanLevels(self, bookmarks)
                 endOfDocument(_("BrowserNav error: inconsistent indents in the document. Recomputing indents, please try again."))
                 return
             elif levelsInfo.offsets.index(offset) > level:
