@@ -41,7 +41,7 @@ from .constants import *
 from . beeper import *
 from . import utils
 from .editor import EditTextDialog
-from .paragraph import Paragraph, EndOfDocumentException
+from .paragraph import Paragraph, EndOfDocumentException, textInfoRange
 
 
 try:
@@ -1005,6 +1005,8 @@ safe_builtins = {
 execGlobals = {
     '__builtins__': safe_builtins,
     'Paragraph': Paragraph,
+    'EndOfDocumentException': EndOfDocumentException,
+    'textInfoRange': textInfoRange,
     'itertools': itertools,
     'math': math,
     'log': log,

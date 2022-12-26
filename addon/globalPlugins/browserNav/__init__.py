@@ -353,68 +353,6 @@ class EditBoxUpdateError(Exception):
     def __init__(self, *args, **kwargs):
         super(EditBoxUpdateError, self).__init__(*args, **kwargs)
 
-
-
-class GoToLineDialog(wx.Dialog):
-    def __init__(self, parent, lineNum):
-        # Translators: Title of Go To Line dialog
-        title_string = _("Go to line")
-        super(GoToLineDialog, self).__init__(parent, title=title_string)
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
-        sHelper = gui.guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
-        #sHelper = gui.guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
-        self.lineNumEdit = gui.guiHelper.LabeledControlHelper(self, _("Go to line:"), wx.TextCtrl).control
-        self.lineNumEdit.Value = str(lineNum)
-        sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
-        self.Bind(wx.EVT_BUTTON, self.onOk, id=wx.ID_OK)
-        self.lineNumEdit.SetFocus()
-        self.lineNumEdit.SetSelection(-1,-1)
-
-    def onOk(self, evt):
-        strVal = self.lineNumEdit.Value
-        try:
-            result = int(strVal)
-            if result <= 0:
-                raise ValueError()
-            self.result = result
-        except ValueError:
-            gui.messageBox(_("Line number must be a positive integer!"),
-                _("Wrong line number"),
-                style=wx.OK |  wx.CENTER | wx.ICON_ERROR
-            )
-            self.lineNumEdit.SetFocus()
-            self.lineNumEdit.SetSelection(-1,-1)
-            return
-        self.EndModal(wx.ID_OK)
-
-lastRegexSearch = ""
-class RegexSearchDialog(wx.Dialog):
-    def __init__(self, parent):
-        title_string = _("Regex search")
-        super(RegexSearchDialog, self).__init__(parent, title=title_string)
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
-        sHelper = gui.guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
-        self.strEdit = gui.guiHelper.LabeledControlHelper(self, _("Go to line:"), wx.TextCtrl).control
-        self.strEdit.Value = lastRegexSearch
-        sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
-        self.Bind(wx.EVT_BUTTON, self.onOk, id=wx.ID_OK)
-        self.strEdit.SetFocus()
-
-    def onOk(self, evt):
-        strVal = self.strEdit.Value
-        try:
-            r = re.compile(strVal)
-        except re.error:
-            gui.messageBox(_("Invalid regular expression"),
-                _("Wrong regex"),
-                style=wx.OK |  wx.CENTER | wx.ICON_ERROR
-            )
-            self.strEdit.SetFocus()
-            return
-        self.EndModal(wx.ID_OK)
-        global lastRegexSearch
-        lastRegexSearch = strVal
-
 jupyterUpdateInProgress = False
 
 originalExecuteGesture = None
