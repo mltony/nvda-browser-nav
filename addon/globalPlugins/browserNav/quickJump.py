@@ -1145,7 +1145,6 @@ def quickJump(self, gesture, category, direction, errorMsg):
     oldSelection = self.selection
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
-    skipClutterBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.SKIP_CLUTTER, withoutOffsetOnly=True)
     if len(bookmarks) == 0:
         return endOfDocument(_('No quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
@@ -1160,10 +1159,9 @@ def quickJump(self, gesture, category, direction, errorMsg):
             endOfDocument(errorMsg)
             return
         distance += 1
-        if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
-            adjustedDistance += 1
+        adjustedDistance += 1
 
-        matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks, textInfo)
+        matchInfo, message = matchAndScript(bookmarks, [], textInfo)
         if matchInfo is not None:
             if not isMatchInRightDirection(oldSelection, direction, matchInfo):
                 continue
@@ -1372,13 +1370,11 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
             endOfDocument(errorMsg)
             return
         distance += 1
-
-        #if len(list(matchTextAndAttributes(skipClutterBookmarks, textInfo))) == 0:
-        #    adjustedDistance += 1
+        adjustedDistance += 1
         #mylog("hqj->matchTextAndAttributes2")
         mylog("HQJ calling matchAndScript")
         mylog(f"asdf {textInfo.text}")
-        matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks, textInfo)
+        matchInfo, message = matchAndScript(bookmarks, [], textInfo)
         mylog(f"asdf2 {textInfo.text}")
         if matchInfo is not None:
             if not isMatchInRightDirection(oldSelection, direction, matchInfo):
