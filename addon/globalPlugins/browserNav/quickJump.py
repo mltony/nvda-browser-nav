@@ -41,7 +41,7 @@ from .constants import *
 from . beeper import *
 from . import utils
 from .editor import EditTextDialog
-from .paragraph import Paragraph, EndOfDocumentException, textInfoRange
+from .paragraph import Paragraph, NotFoundError, textInfoRange
 
 
 try:
@@ -1005,7 +1005,7 @@ safe_builtins = {
 execGlobals = {
     '__builtins__': safe_builtins,
     'Paragraph': Paragraph,
-    'EndOfDocumentException': EndOfDocumentException,
+    'NotFoundError': NotFoundError,
     'textInfoRange': textInfoRange,
     'itertools': itertools,
     'math': math,
@@ -1109,9 +1109,9 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
                     return (textInfo, message)
             else:
                 return (_offset, message)
-        except EndOfDocumentException:
-            # This probably indicates no match.
-            pass # will return None, None
+        #except NotFoundError:
+        #    # This probably indicates no match.
+        #    pass # will return None, None
         except Exception as e:
             e2 = QuickJumpScriptException(f"Exception while running script for bookmark '{bookmark.getDisplayName()}'.", e)
             log.error(e2)

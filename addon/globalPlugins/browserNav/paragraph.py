@@ -9,7 +9,7 @@ import textInfos
 
 from . import quickJump
 
-class EndOfDocumentException(RuntimeError):
+class NotFoundError(RuntimeError):
     pass
     
 def textInfoRange(info1, info2):
@@ -39,12 +39,12 @@ class Paragraph(baseObject.AutoPropertyObject):
             # Special handling if we're at home position
             # offset must be positive, and to get to the first paragraph we don't have to move anywhere, so adjusting offset
             if offset < 0:
-                raise EndOfDocumentException()
+                raise NotFoundError()
             elif offset > 0:
                 offset -= 1
         result = info.move(textInfos.UNIT_PARAGRAPH, offset)
         if result != offset:
-            raise EndOfDocumentException()
+            raise NotFoundError()
         return Paragraph(info)
 
     def _get_next(self):
@@ -101,7 +101,7 @@ class Paragraph(baseObject.AutoPropertyObject):
             info.move(len(text), unit=TextInfos.UNIT_CHARACTER, endpoint='end')
             return info
         else:
-            raise EndOfDocumentException()
+            raise NotFoundError()
             
     def findRegexp(self, regexp, caseSensitive=False,reverse=False):
         if isinstance(regexp, str):
@@ -125,7 +125,7 @@ class Paragraph(baseObject.AutoPropertyObject):
         try:
             return next(gen)
         except StopIteration:
-            raise EndOfDocumentException()
+            raise NotFoundError()
             
     def _get_PreviousHeading(self):
         return self.findQuickNav(itemType="heading", reverse=True)
