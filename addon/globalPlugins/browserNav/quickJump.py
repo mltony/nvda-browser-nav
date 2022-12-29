@@ -18,6 +18,7 @@ import globalVars
 import gui
 from gui import guiHelper, nvdaControls
 from gui.settingsDialogs import SettingsPanel
+import inputCore
 import itertools
 import json
 from logHandler import log
@@ -694,6 +695,35 @@ def getUrl(self, onlyFromCache=False):
     else:
         return url
         #future.set(url)
+        
+@functools.lru_cache()
+def getBookmarksWithKeystrokesForUrl(url, config, keystroke, category=None):
+    sites = findSites(url, config)
+    result = []
+    for site in sites:
+        for bookmark in getBookmarksWithKeystrokesForSite(site).get(keystroke, []):
+            if category is None or category == bookmark.category:
+                result.append(bookmark)
+    return result
+
+@functools.lru_cache()
+def getBookmarksWithKeystrokesForSite(site):
+    extractKeystrokeFunc = lambda b: b.keystroke or "default"
+    return {
+        keystroke: list(grouper)
+        for keystroke, grouper in itertools.groupby(
+            sorted(
+                [
+                    bookmark
+                    for bookmark in site.bookmarks
+                    if bookmark.enabled
+                ],
+                key=extractKeystrokeFunc,
+            ),
+            key_func=extractKeystrokeFunc,
+        )
+    }
+
 
 originalShouldPassThrough = None
 def newShouldPassThrough(self, obj, reason= None):
@@ -777,6 +807,41 @@ def pre_event_treeInterceptor_gainFocus(self):
                 asyncAutoclickCounter += 1
                 utils.executeAsynchronously(asyncAutoclick(self, asyncAutoclickCounter, site))
     return original_event_treeInterceptor_gainFocus(self)
+
+def getKeystrokeFromGesture(gesture):
+    keystroke = gesture.normalizedIdentifiers[-1].split(':')[1]
+    return keystroke
+    
+
+originalGetAlternativeScript = None
+def postGetAlternativeScript(self,gesture,script):
+    #tones.beep(500, 50)
+    result = originalGetAlternativeScript(self,gesture,script)
+    keystroke = getKeystrokeFromGesture(gesture)
+    url = getUrl(self, onlyFromCache=True)
+    mylog(f"{keystroke} >> {url}")
+    bookmarks = getBookmarksWithKeystrokesForUrl(url, globalConfig, keystroke)
+    if len(bookmarks) == 0:
+        return result
+    return lambda self,gesture: tones.beep(1000, 100)
+    if False:
+        mylog(f"haha result={result}")
+        import inspect
+        import api
+        #if gesture.displayName in ['6', '8', 'NVDA+0']:
+        if 'alt' not in gesture.displayName.lower():
+            api.qqq = result
+        import browseMode
+        #if result is None or isinstance(result.__self__, browseMode.BrowseModeTreeInterceptor) :
+        #<bound method BrowseModeTreeInterceptor.script_elementsList of <NVDAObjects.IAccessible.chromium.ChromeVBuf object at 0x0B3E7BF0>>
+
+        if result is None or "bound method BrowseModeTreeInterceptor." in str(result):
+            #tones.beep(500, 50)
+            pass
+        if gesture.displayName in ['6', '8', 'NVDA+0']:
+            return self.script_editJupyter
+        return result
+    
 @functools.lru_cache()
 def getRegexForBookmark(rule):
     if rule.patternMatch == PatternMatch.EXACT:
@@ -1666,6 +1731,7 @@ class EditBookmarkDialog(wx.Dialog):
             })
         self.snippet = self.bookmark.snippet
         self.cursorLine, self.cursorColumn = 0,0
+        self.keystroke = self.bookmark.keystroke
 
       # Translators: pattern
         patternLabelText = _("&Pattern")
@@ -1684,7 +1750,7 @@ class EditBookmarkDialog(wx.Dialog):
             ],
         )
         self.matchModeCategory.control.SetSelection(list(PatternMatch).index(self.bookmark.patternMatch))
-      # Translators:  Category radio buttons
+      # Translators:  Category combo box
         categoryText = _("&Category:")
         self.categoryComboBox = guiHelper.LabeledControlHelper(
             self,
@@ -1694,6 +1760,10 @@ class EditBookmarkDialog(wx.Dialog):
         )
         self.categoryComboBox.control.Bind(wx.EVT_CHOICE,self.onCategory)
         self.categoryComboBox.control.SetSelection(list(BookmarkCategory).index(self.bookmark.category))
+      # Translators:  Custom keystroke button
+        self.customeKeystrokeButton = sHelper.addItem (wx.Button (self, label = _("Custom &Keystroke")))
+        self.customeKeystrokeButton.Bind(wx.EVT_BUTTON, self.OnCustomKeystrokeClick)
+        self.updateCustomKeystrokeButtonLabel()
       # Translators: site  comboBox
         labelText=_("&Site this bookmark belongs to:")
         self.siteComboBox=guiHelper.LabeledControlHelper(
@@ -1771,7 +1841,8 @@ class EditBookmarkDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
 
         self.onCategory(None)
-    def make(self, snippet=None):
+
+    def make(self, snippet=None, quiet=False):
         patternMatch = list(PatternMatch)[self.matchModeCategory.control.GetSelection()]
         pattern = self.patternTextCtrl.Value
         pattern = pattern.rstrip("\r\n")
@@ -1799,7 +1870,7 @@ class EditBookmarkDialog(wx.Dialog):
             gui.messageBox(errorMsg, _("Bookmark Entry Error"), wx.OK|wx.ICON_WARNING, self)
             self.attributesTextCtrl.SetFocus()
             return
-        if self.getCategory() == BookmarkCategory.SKIP_CLUTTER:
+        if  self.getCategory() == BookmarkCategory.SKIP_CLUTTER and not quiet:
             result = gui.messageBox(
                 _("Warning: you are about to create or update a skip clutter bookmark. If your pattern is too generic, it might hide significant part of your website. For example, if you specify a single whitespace as pattern and substring match, then all paragraphs containing at least a single whitespace would disappear. Please make sure you understand how skip clutter works and how to undo this change if you have to. Would you like to continue?"),
                 _("Bookmark Entry warning"),
@@ -1882,7 +1953,7 @@ class EditBookmarkDialog(wx.Dialog):
             if result == wx.ID_OK:
                 _cursorLine, _cursorColumn = cursorLine, cursorColumn
                 _snippet = text
-                tempRule = self.make(snippet=text)
+                tempRule = self.make(snippet=text, quiet=True)
                 if tempRule.compileError is None:
                     tones.beep(500, 50)
                     _good = True
@@ -1901,8 +1972,39 @@ class EditBookmarkDialog(wx.Dialog):
             self.snippet = _snippet
             self.cursorLine, self.cursorColumn = _cursorLine, _cursorColumn
 
+    def updateCustomKeystrokeButtonLabel(self):
+        keystroke = self.keystroke
+        self.customeKeystrokeButton.SetLabel(_("Custom &Keystroke: %s") % (keystroke if keystroke else _("None")))
 
+    def OnCustomKeystrokeClick(self,evt):
+        if inputCore.manager._captureFunc:
+            # don't add while already in process of adding.
+            return
+        def addGestureCaptor(gesture: inputCore.InputGesture):
+            if gesture.isModifier:
+                return False
+            inputCore.manager._captureFunc = None
+            wx.CallAfter(self._addCaptured, gesture)
+            return False
+        inputCore.manager._captureFunc = addGestureCaptor
+        core.callLater(50, ui.message, _("Press desired keystroke now"))
+        
+    blackListedKeystrokes = "escape enter numpadenter space nvda+space nvda+n nvda+q nvda+j j tab uparrow downarrow leftarrow rightarrow home end control+home control+end delete".split()
 
+    def _addCaptured(self, gesture):
+        api.g = gesture
+        g = getKeystrokeFromGesture(gesture)
+        if g in ["escape", "delete"]:
+            self.keystroke = None
+            msg = _("Keystroke reset to default")
+        elif g  in self.blackListedKeystrokes:
+            msg = _("Invalid keystroke %s: cannot overload essential  NVDA keystrokes!") % g
+        else:
+            self.keystroke = g
+            msg = None
+        if msg:
+            core.callLater(50, ui.message, msg)
+        self.updateCustomKeystrokeButtonLabel()
 
     def onOk(self,evt):
         bookmark = self.make()
