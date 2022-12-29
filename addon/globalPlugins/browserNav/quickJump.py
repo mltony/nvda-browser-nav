@@ -80,6 +80,17 @@ class BookmarkCategory(Enum):
     QUICK_CLICK_3 = 7
     HIERARCHICAL = 8
 
+BookmarkCategoryShortNames = {
+    BookmarkCategory.QUICK_JUMP: _('QuickJump'),
+    BookmarkCategory.QUICK_JUMP_2: _('QuickJump2'),
+    BookmarkCategory.QUICK_JUMP_3: _('QuickJump3'),
+    BookmarkCategory.SKIP_CLUTTER: _('SkipClutter'),
+    BookmarkCategory.QUICK_CLICK: _('QuickClick'),
+    BookmarkCategory.QUICK_CLICK_2: _('QuickClick2'),
+    BookmarkCategory.QUICK_CLICK_3: _('QuickClick3'),
+    BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
+}
+
 BookmarkCategoryNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump - assigned to J by default'),
     BookmarkCategory.QUICK_JUMP_2: _('QuickJump2'),
@@ -354,6 +365,8 @@ class QJBookmark(QJImmutable):
     message: str
     offset: int
     snippet: str
+    alsoUseDefaultQuickJump: bool
+    keystroke: str
 
     def __init__(self, d):
         object.__setattr__(self, 'enabled', d['enabled'])
@@ -377,6 +390,9 @@ class QJBookmark(QJImmutable):
                 compileError = e
         object.__setattr__(self, 'bytecode', bytecode)
         object.__setattr__(self, 'compileError', compileError)
+        object.__setattr__(self, 'alsoUseDefaultQuickJump', d.get('alsoUseDefaultQuickJump', False))
+        object.__setattr__(self, 'keystroke', d.get('keystroke', None))
+        
 
     def asDict(self):
         return {
@@ -392,6 +408,8 @@ class QJBookmark(QJImmutable):
             'message': self.message,
             'offset': self.offset,
             'snippet': self.snippet,
+            'alsoUseDefaultQuickJump': self.alsoUseDefaultQuickJump,
+            'keystroke': self.keystroke,
         }
 
     def getDisplayName(self):
@@ -1216,7 +1234,7 @@ def autoClick(self, gesture, category, site=None, automated=False):
     if len(bookmarks) == 0:
         return endOfDocument(
             _('No {category} bookmarks configured for current website. Please add {category} bookmarks in BrowserNav settings in NVDA settings window.').format(
-                category=BookmarkCategoryNames[category],
+                category=BookmarkCategoryShortNames[category],
             )
         )
     textInfo = self.makeTextInfo(textInfos.POSITION_ALL)
@@ -1597,7 +1615,7 @@ def makeBookmarkSubmenu(self, frame):
             menuStr = _("Edit bookmark {bookmark} of category {category} that doesn't match formatting for current paragraph from site {site}")
         menuStr = menuStr.format(
             bookmark=bookmark.getDisplayName(),
-            category=BookmarkCategoryNames[bookmark.category],
+            category=BookmarkCategoryShortNames[bookmark.category],
             site=site.getDisplayName()
         )
         item = menu.Append(wx.ID_ANY, menuStr)
@@ -1952,7 +1970,7 @@ class BookmarksListDialog(
         elif column == 2:
             return patterMatchNames[bookmark.patternMatch]
         elif column == 3:
-            return BookmarkCategoryNames[bookmark.category]
+            return BookmarkCategoryShortNames[bookmark.category]
         elif column == 4:
             return _('Enabled') if bookmark.enabled else _('Disabled')
         else:
@@ -2139,7 +2157,7 @@ class EditSiteDialog(wx.Dialog):
             self,
             text,
             wx.Choice,
-            choices=[BookmarkCategoryNames.get(option, _("Disabled"))  for option in self.autoClickOptions],
+            choices=[BookmarkCategoryShortNames.get(option, _("Disabled"))  for option in self.autoClickOptions],
         )
         self.autoClickComboBox.control.Bind(wx.EVT_CHOICE,self.onAutoClickCombo)
         self.autoClickComboBox.control.SetSelection(self.autoClickOptions.index(
