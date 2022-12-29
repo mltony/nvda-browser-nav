@@ -661,6 +661,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.newShouldPassThrough
         quickJump.original_event_treeInterceptor_gainFocus = browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.pre_event_treeInterceptor_gainFocus
+        quickJump.originalGetAlternativeScript = browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript
+        browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript = quickJump.postGetAlternativeScript
+
         quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
@@ -681,6 +684,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = originalTableScriptHelper
         cursorManager.CursorManager._set_selection = original_set_selection
         browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.original_event_gainFocus
+        browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript = originalGetAlternativeScript
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.originalShouldPassThrough
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.original_event_treeInterceptor_gainFocus
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.originalReportLiveRegion

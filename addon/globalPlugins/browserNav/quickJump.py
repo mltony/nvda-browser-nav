@@ -52,7 +52,7 @@ except AttributeError:
 
 
 
-debug = False
+debug = True
 if debug:
     def mylog(s):
         if debug:
@@ -720,7 +720,7 @@ def getBookmarksWithKeystrokesForSite(site):
                 ],
                 key=extractKeystrokeFunc,
             ),
-            key_func=extractKeystrokeFunc,
+            key=extractKeystrokeFunc,
         )
     }
 
@@ -819,11 +819,11 @@ def postGetAlternativeScript(self,gesture,script):
     result = originalGetAlternativeScript(self,gesture,script)
     keystroke = getKeystrokeFromGesture(gesture)
     url = getUrl(self, onlyFromCache=True)
-    mylog(f"{keystroke} >> {url}")
     bookmarks = getBookmarksWithKeystrokesForUrl(url, globalConfig, keystroke)
+    mylog(f"{keystroke} >> {url} b={len(bookmarks)}")
     if len(bookmarks) == 0:
         return result
-    return lambda self,gesture: tones.beep(1000, 100)
+    return lambda gesture: tones.beep(1000, 100)
     if False:
         mylog(f"haha result={result}")
         import inspect
@@ -1896,6 +1896,7 @@ class EditBookmarkDialog(wx.Dialog):
             'message': self.messageTextCtrl.Value,
             'offset': self.offsetEdit.Value,
             'snippet':snippet or self.snippet,
+            'keystroke': self.keystroke,
         })
         return bookmark
 
