@@ -837,27 +837,10 @@ def postGetAlternativeScript(self,gesture,script):
     def keystroke_script(gesture):
         if len(quickJumpBookmarks) > 0:
             _quickJump(self, gesture, quickJumpBookmarks, direction=quickJumpDirection, errorMsg=_("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window."))
+    keystroke_script.__doc__ = _("BrowserNav temporary action configured only for this website.")
     if len(quickJumpBookmarks) > 0:
         return keystroke_script
     else:
-        return result
-    #return lambda gesture: tones.beep(1000, 100)
-    if False:
-        mylog(f"haha result={result}")
-        import inspect
-        import api
-        #if gesture.displayName in ['6', '8', 'NVDA+0']:
-        if 'alt' not in gesture.displayName.lower():
-            api.qqq = result
-        import browseMode
-        #if result is None or isinstance(result.__self__, browseMode.BrowseModeTreeInterceptor) :
-        #<bound method BrowseModeTreeInterceptor.script_elementsList of <NVDAObjects.IAccessible.chromium.ChromeVBuf object at 0x0B3E7BF0>>
-
-        if result is None or "bound method BrowseModeTreeInterceptor." in str(result):
-            #tones.beep(500, 50)
-            pass
-        if gesture.displayName in ['6', '8', 'NVDA+0']:
-            return self.script_editJupyter
         return result
     
 @functools.lru_cache()
@@ -1689,7 +1672,7 @@ def makeBookmarkSubmenu(self, frame):
         )
         return menu
 
-    bookmarks = findApplicableBookmarks(globalConfig, url, category=None)
+    bookmarks = findApplicableBookmarks(globalConfig, url, category=None, withDefaultKeystrokeOnly=False)
     matches = matchAllWidthCompositeRegex(bookmarks, text)
     attributes = extractAttributes(paragraphInfo)
 
@@ -1976,6 +1959,11 @@ class EditBookmarkDialog(wx.Dialog):
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
         } else self.messageTextCtrl.Enable()
+        self.customeKeystrokeButton.Disable() if category in {
+            BookmarkCategory.SKIP_CLUTTER,
+            BookmarkCategory.HIERARCHICAL,
+        } else self.customeKeystrokeButton.Enable()
+        
 
     def OnEditScriptClick(self,evt):
         _snippet = self.snippet
@@ -2033,6 +2021,8 @@ class EditBookmarkDialog(wx.Dialog):
             msg = _("Keystroke reset to default")
         elif g  in self.blackListedKeystrokes:
             msg = _("Invalid keystroke %s: cannot overload essential  NVDA keystrokes!") % g
+        elif self.bookmark.category.name.startswith('QUICK_JUMP') and 'shift+' in g:
+            msg = _("Invalid keystroke %s: Cannot use keystrokes with shift modifier for quickJump bookmarks!") % g
         else:
             self.keystroke = g
             msg = None
