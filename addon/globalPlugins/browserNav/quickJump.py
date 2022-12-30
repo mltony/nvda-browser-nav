@@ -809,21 +809,39 @@ def pre_event_treeInterceptor_gainFocus(self):
     return original_event_treeInterceptor_gainFocus(self)
 
 def getKeystrokeFromGesture(gesture):
-    keystroke = gesture.normalizedIdentifiers[-1].split(':')[1]
+    #keystroke = gesture.normalizedIdentifiers[-1].split(':')[1]
+    keystroke = gesture.identifiers[-1].split(':')[1]
     return keystroke
     
 
 originalGetAlternativeScript = None
 def postGetAlternativeScript(self,gesture,script):
-    #tones.beep(500, 50)
     result = originalGetAlternativeScript(self,gesture,script)
+    bookmarkExecuted = False
     keystroke = getKeystrokeFromGesture(gesture)
     url = getUrl(self, onlyFromCache=True)
     bookmarks = getBookmarksWithKeystrokesForUrl(url, globalConfig, keystroke)
     mylog(f"{keystroke} >> {url} b={len(bookmarks)}")
-    if len(bookmarks) == 0:
+    if '8' in keystroke:
+        import api
+        api.g=gesture
+    if "shift+" in keystroke:
+        quickJumpKeystroke = keystroke.replace('shift+', '')
+        quickJumpDirection = -1
+        quickJumpBookmarks = getBookmarksWithKeystrokesForUrl(url, globalConfig, quickJumpKeystroke)
+    else:
+        quickJumpDirection = 1
+        quickJumpBookmarks = bookmarks
+        
+    quickJumpBookmarks = tuple(b for b in quickJumpBookmarks if b.category.name.startswith("QUICK_JUMP"))
+    def keystroke_script(gesture):
+        if len(quickJumpBookmarks) > 0:
+            _quickJump(self, gesture, quickJumpBookmarks, direction=quickJumpDirection, errorMsg=_("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window."))
+    if len(quickJumpBookmarks) > 0:
+        return keystroke_script
+    else:
         return result
-    return lambda gesture: tones.beep(1000, 100)
+    #return lambda gesture: tones.beep(1000, 100)
     if False:
         mylog(f"haha result={result}")
         import inspect
@@ -932,7 +950,14 @@ def matchTextAndAttributes(bookmarks, textInfo, distance=None):
     mylog("Done matchTextAndAttributes")
 
 @functools.lru_cache()
-def findApplicableBookmarks(config=None, url=None, category=None, site=None, withoutOffsetOnly=False):
+def findApplicableBookmarks(
+        config=None, 
+        url=None, 
+        category=None, 
+        site=None, 
+        withoutOffsetOnly=False, 
+        withDefaultKeystrokeOnly=True
+):
     if (url is not None) == (site is not None):
         raise Exception("Must specify either URL or site, but not both.")
     if url is not None:
@@ -951,6 +976,8 @@ def findApplicableBookmarks(config=None, url=None, category=None, site=None, wit
     ]
     if withoutOffsetOnly:
         bookmarks = [b for b in bookmarks if b.offset == 0 and b.isSnippetEmpty()]
+    if withDefaultKeystrokeOnly:
+        bookmarks = [b for b in bookmarks if b.keystroke is None]
     return tuple(bookmarks)
 
 @functools.lru_cache()
@@ -1223,11 +1250,17 @@ def isMatchInRightDirection(oldSelection, direction, textInfo):
     cmp = origin.compareEndPoints(textInfo, "startToStart")
     return direction * cmp < 0
 
-
-def quickJump(self, gesture, category, direction, errorMsg):
-    oldSelection = self.selection
+def getBookmarksForCategory(self, category):
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
+    return bookmarks
+    
+def quickJump(self, gesture, category, direction, errorMsg):
+    bookmarks = getBookmarksForCategory(self, category)
+    return _quickJump(self, gesture, bookmarks, direction, errorMsg)
+
+def _quickJump(self, gesture, bookmarks, direction, errorMsg):
+    oldSelection = self.selection
     if len(bookmarks) == 0:
         return endOfDocument(_('No quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
