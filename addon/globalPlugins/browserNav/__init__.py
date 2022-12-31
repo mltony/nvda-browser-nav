@@ -1528,6 +1528,13 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 doc=_("Jump to previous hierarchical bookmark {levelStr}; please check browserNav configuration panel for hierarchical bookmark configuration.").format(
                     levelStr=levelStr
                 ))
+      # quick_speak
+        self.injectBrowseModeKeystroke(
+            "kb:Control+J",
+            "quickSpeak",
+            script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.QUICK_SPEAK),
+            doc=_("QuickSpeak  according to BrowserNav QuickSpeak bookmark; please check browserNav configuration panel for the list of bookmarks."))
+
       # Tabs
         # Example page with tabs:
         # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html

@@ -52,7 +52,7 @@ except AttributeError:
 
 
 
-debug = True
+debug = False
 if debug:
     def mylog(s):
         if debug:
@@ -80,7 +80,7 @@ class BookmarkCategory(Enum):
     QUICK_CLICK_2 = 6
     QUICK_CLICK_3 = 7
     HIERARCHICAL = 8
-    #QUICK_SPEAK = 9
+    QUICK_SPEAK = 9
 
 BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump'),
@@ -91,6 +91,7 @@ BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_CLICK_2: _('QuickClick2'),
     BookmarkCategory.QUICK_CLICK_3: _('QuickClick3'),
     BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
+    BookmarkCategory.QUICK_SPEAK: _('Quick speak'),
 }
 
 BookmarkCategoryNames = {
@@ -102,6 +103,7 @@ BookmarkCategoryNames = {
     BookmarkCategory.QUICK_CLICK_2: _('QuickClick2'),
     BookmarkCategory.QUICK_CLICK_3: _('QuickClick3'),
     BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
+    BookmarkCategory.QUICK_SPEAK: _('Quick speak'),
 }
 
 class URLMatch(Enum):
@@ -841,7 +843,7 @@ def postGetAlternativeScript(self,gesture,script):
         if len(quickJumpBookmarks) > 0:
             _quickJump(self, gesture, quickJumpBookmarks, direction=quickJumpDirection, errorMsg=_("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window."))
         if len(quickClikBookmarks) > 0:
-            _autoClick(self, gesture, quickClikBookmarks)
+            _autoClick(self, gesture, quickClikBookmarks, category=quickClikBookmarks[0].category)
     keystroke_script.__doc__ = _("BrowserNav temporary action configured only for this website.")
     if len(quickJumpBookmarks) + len(quickClikBookmarks) > 0:
         return keystroke_script
@@ -1316,9 +1318,19 @@ def autoClick(self, gesture, category, site=None, automated=False):
         bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
     else:
         bookmarks = findApplicableBookmarks(category=category, site=site)
-    return _autoClick(self, gesture, bookmarks, site, automated)
+    mylog(f"asdf {category}")
+    return _autoClick(self, gesture, bookmarks, site, automated, category=category)
 
-def _autoClick(self, gesture, bookmarks, site=None, automated=False):
+def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=None):
+    """
+        This function handles both quick_click and quick_speak bookmarks.
+    """
+    isSpeak = category == BookmarkCategory.QUICK_SPEAK
+    isClick = category.name.startswith("QUICK_CLICK")
+    if isSpeak == isClick:
+        raise RuntimeError(f"Invalid category {category.name}")
+
+    
     mylog(f"Autoclick Found {len(bookmarks)} bookmarks")
     if len(bookmarks) == 0:
         return endOfDocument(
@@ -1333,47 +1345,61 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False):
     message = None
     focusableErrorMsg = None
     focusables = []
+    textToSpeak = []
     while True:
         matchInfo, thisMessage = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
         if matchInfo is not None:
             thisInfo = matchInfo
-            mylog(f"Autoclick Match {distance} {thisInfo.text}")
-            focusable = thisInfo.focusableNVDAObjectAtStart
-            if focusable.role in {ROLE_DOCUMENT, ROLE_DIALOG}:
-                if focusableErrorMsg is None:
-                    mylog("Bookmark points to non-focusable NVDA object, cannot click it.")
-                    focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
+            if isClick:
+                mylog(f"Autoclick Match {distance} {thisInfo.text}")
+                focusable = thisInfo.focusableNVDAObjectAtStart
+                if focusable.role in {ROLE_DOCUMENT, ROLE_DIALOG}:
+                    if focusableErrorMsg is None:
+                        mylog("Bookmark points to non-focusable NVDA object, cannot click it.")
+                        focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
+                else:
+                    mylog("Verification skipped since offset is non-zero")
+                    focusables.append(focusable)
+                    if message is None and thisMessage  is not None and len(thisMessage) > 0:
+                        message = thisMessage
+            elif isSpeak:
+                if thisMessage is not None and len(thisMessage) > 0:
+                    textToSpeak.append(thisMessage)
+                textToSpeak.append(thisInfo.text)
             else:
-                mylog("Verification skipped since offset is non-zero")
-                focusables.append(focusable)
-                if message is None and thisMessage  is not None and len(thisMessage) > 0:
-                    message = thisMessage
+                error_hahaha
         distance += 1
         result = moveParagraph(textInfo, 1)
         if result == 0:
             break
-    numSuccessfulClicks = 0
-    for focusable in focusables:
-        try:
-            focusable.doAction()
-            numSuccessfulClicks += 1
-        except NotImplementedError as e:
-            # Not sure why this is occasionally thrown
-            pass
-    if numSuccessfulClicks == 0:
-        if not automated:
-            endOfDocument(focusableErrorMsg or _("No bookmarks matched!"))
-        return
-    if automated:
-        if site is not None and site.debugBeepMode == DebugBeepMode.ON_AUTO_CLICK:
-            tones.beep(500, 50)
-    else:
-        if message is not None:
-            ui.message(message)
+    if isClick:
+        numSuccessfulClicks = 0
+        for focusable in focusables:
+            try:
+                focusable.doAction()
+                numSuccessfulClicks += 1
+            except NotImplementedError as e:
+                # Not sure why this is occasionally thrown
+                pass
+        if numSuccessfulClicks == 0:
+            if not automated:
+                endOfDocument(focusableErrorMsg or _("No bookmarks matched!"))
+            return
+        if automated:
+            if site is not None and site.debugBeepMode == DebugBeepMode.ON_AUTO_CLICK:
+                tones.beep(500, 50)
         else:
-            ui.message(_("Clicked {n} objects.").format(
-                n=len(focusables)
-            ))
+            if message is not None:
+                ui.message(message)
+            else:
+                ui.message(_("Clicked {n} objects.").format(
+                    n=len(focusables)
+                ))
+    elif isSpeak:
+        textToSpeak = [s for s in textToSpeak if s is not None and len(s) > 0]
+        speech.speak(textToSpeak)
+    else:
+        error
 
 
 class HierarchicalLevelsInfo:
