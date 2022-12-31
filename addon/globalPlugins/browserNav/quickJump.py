@@ -80,6 +80,7 @@ class BookmarkCategory(Enum):
     QUICK_CLICK_2 = 6
     QUICK_CLICK_3 = 7
     HIERARCHICAL = 8
+    #QUICK_SPEAK = 9
 
 BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump'),
@@ -834,11 +835,15 @@ def postGetAlternativeScript(self,gesture,script):
         quickJumpBookmarks = bookmarks
         
     quickJumpBookmarks = tuple(b for b in quickJumpBookmarks if b.category.name.startswith("QUICK_JUMP"))
+    quickClikBookmarks = tuple(b for b in bookmarks if b.category.name.startswith("QUICK_CLICK"))
+    
     def keystroke_script(gesture):
         if len(quickJumpBookmarks) > 0:
             _quickJump(self, gesture, quickJumpBookmarks, direction=quickJumpDirection, errorMsg=_("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window."))
+        if len(quickClikBookmarks) > 0:
+            _autoClick(self, gesture, quickClikBookmarks)
     keystroke_script.__doc__ = _("BrowserNav temporary action configured only for this website.")
-    if len(quickJumpBookmarks) > 0:
+    if len(quickJumpBookmarks) + len(quickClikBookmarks) > 0:
         return keystroke_script
     else:
         return result
@@ -1311,6 +1316,9 @@ def autoClick(self, gesture, category, site=None, automated=False):
         bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
     else:
         bookmarks = findApplicableBookmarks(category=category, site=site)
+    return _autoClick(self, gesture, bookmarks, site, automated)
+
+def _autoClick(self, gesture, bookmarks, site=None, automated=False):
     mylog(f"Autoclick Found {len(bookmarks)} bookmarks")
     if len(bookmarks) == 0:
         return endOfDocument(
