@@ -667,8 +667,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
-
-
+        self.thread = threading.Thread(name="BrowserNav browser monitor thread", target = quickJump.browseMonitorThreadFunc, args =())
+        self.thread.start()
 
 
     def createMenu(self):
@@ -689,6 +689,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.original_event_treeInterceptor_gainFocus
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.originalReportLiveRegion
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
+        quickJump.browseMonitorThreadShutdownRequested = True
+        self.thread.join()
+        tones.beep(500, 50)
 
 
     def script_moveToNextSibling(self, gesture, selfself):

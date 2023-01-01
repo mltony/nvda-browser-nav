@@ -12,6 +12,7 @@ import copy
 import core
 import dataclasses
 from dataclasses import dataclass
+import diffHandler
 from enum import Enum
 import functools
 import globalVars
@@ -81,6 +82,7 @@ class BookmarkCategory(Enum):
     QUICK_CLICK_3 = 7
     HIERARCHICAL = 8
     QUICK_SPEAK = 9
+    QUICK_SPEAK_2 = 10
 
 BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump'),
@@ -92,6 +94,7 @@ BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_CLICK_3: _('QuickClick3'),
     BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
     BookmarkCategory.QUICK_SPEAK: _('Quick speak'),
+    BookmarkCategory.QUICK_SPEAK_2: _('Quick speak 2'),
 }
 
 BookmarkCategoryNames = {
@@ -104,6 +107,7 @@ BookmarkCategoryNames = {
     BookmarkCategory.QUICK_CLICK_3: _('QuickClick3'),
     BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
     BookmarkCategory.QUICK_SPEAK: _('Quick speak'),
+    BookmarkCategory.QUICK_SPEAK_2: _('Quick speak 2'),
 }
 
 class URLMatch(Enum):
@@ -446,6 +450,8 @@ class QJSite(QJImmutable):
     autoClickOnFocusDelay: int
     autoClickContinuous: bool
     autoClickContinuousDelay: int
+    autoSpeak: bool
+    autoSpeakCategory: BookmarkCategory
 
     def __init__(self, d):
         super().__init__()
@@ -464,6 +470,8 @@ class QJSite(QJImmutable):
         self.autoClickOnFocusDelay = d['autoClickOnFocusDelay']
         self.autoClickContinuous = d['autoClickContinuous']
         self.autoClickContinuousDelay = d['autoClickContinuousDelay']
+        self.autoSpeak = d.get('autoSpeak', False)
+        self.autoSpeakCategory = BookmarkCategory(d.get('autoSpeakCategory', BookmarkCategory.QUICK_SPEAK.value))
         self.freeze()
 
     def asDict(self):
@@ -480,6 +488,8 @@ class QJSite(QJImmutable):
             'autoClickOnFocusDelay': self.autoClickOnFocusDelay,
             'autoClickContinuous': self.autoClickContinuous,
             'autoClickContinuousDelay': self.autoClickContinuousDelay,
+            'autoSpeak': self.autoSpeak,
+            'autoSpeakCategory': self.autoSpeakCategory.value,
         }
 
 
@@ -795,9 +805,57 @@ def asyncAutoclick(self, asyncAutoclickCounterLocal, site):
         else:
             return
 
+def asyncBrowseMonitor(self):
+    """
+        This function is just for testing..
+        The idea was to spawn multiple async generators one for each browseMode objewct.
+        But there can bee too many of them at once. So for now switching to another design: we'll have only a single thread that would only monitor focused browseMode.
+    """
+    bref = weakref.ref(self)
+    del self
+    while True:
+        yield 1000
+        browse = bref()
+        try:
+            if browse is None:
+                tones.beep(2000, 2000)
+                return
+        finally:
+            del browse
+
+browseMonitorThreadShutdownRequested = False
+def browseMonitorThreadFunc():
+    try:
+        while not browseMonitorThreadShutdownRequested:
+            time.sleep(0.5)
+            focus = api.getFocusObject()
+            try:
+                browse = focus.treeInterceptor
+                if browse is None:
+                    continue
+            except AttributeError:
+                continue
+            url = getUrl(browse, onlyFromCache=True)
+            sites = findSites(url, globalConfig)
+            # TODO move autoClick logic to this thread as well
+            #autoClickSites = [site for site in sites if site.autoClickOnFocus]
+            autoSpeakSites = [site for site in sites if site.autoSpeak]
+            autoSpeakBookmarks = [b for s in sites for b in s.bookmarks if b.category == s.autoSpeakCategory]
+            if len(autoSpeakBookmarks) > 0:
+                try:
+                    _autoClick(browse, None, tuple(autoSpeakBookmarks), automated=True, category=autoSpeakBookmarks[0].category)
+                except OSError:
+                    pass
+    except Exception as e:
+        #mylog(e)
+        core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
+        raise e
+
 original_event_treeInterceptor_gainFocus = None
 def pre_event_treeInterceptor_gainFocus(self):
     if not self._hadFirstGainFocus:
+        #tones.beep(1000, 100)
+        #utils.executeAsynchronously(asyncBrowseMonitor(self))
         url = getUrl(self)
         sites = findSites(url, globalConfig)
         autoClickSites = [site for site in sites if site.autoClickOnFocus]
@@ -1321,6 +1379,7 @@ def autoClick(self, gesture, category, site=None, automated=False):
     mylog(f"asdf {category}")
     return _autoClick(self, gesture, bookmarks, site, automated, category=category)
 
+AutoSpeakTextCache = weakref.WeakKeyDictionary()
 def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=None):
     """
         This function handles both quick_click and quick_speak bookmarks.
@@ -1396,8 +1455,32 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
                     n=len(focusables)
                 ))
     elif isSpeak:
+        if automated:
+            # diffing against cached
+            oldText = AutoSpeakTextCache.get(self, None)
+            AutoSpeakTextCache[self] = textToSpeak
+            mylog("auto")
+            mylog(f"  old = {oldText}")
+            mylog(f"  new = {textToSpeak}")
+            if oldText is not None:
+                textToSpeak = diffHandler.prefer_dmp().diff(
+                    "\n".join(textToSpeak), 
+                    "\n".join(oldText)
+                )
+                mylog(f"  tts = {textToSpeak}")
+                #textToSpeak = [textToSpeak]
+        mylog(f"  tts1 = {textToSpeak}")
         textToSpeak = [s for s in textToSpeak if s is not None and len(s) > 0]
-        speech.speak(textToSpeak)
+        if len(textToSpeak) > 0:
+            mylog(f"  tts2 = {textToSpeak}")
+            textToSpeak = "\n".join(textToSpeak)
+            mylog(f"  calling speak {textToSpeak}")
+            #tones.beep(500, 50)
+            def speak():
+                speech.cancelSpeech()
+                speech.speakText(textToSpeak)
+            #core.callLater(0, speak)
+            wx.CallAfter(speak)
     else:
         error
 
@@ -2342,6 +2425,29 @@ class EditSiteDialog(wx.Dialog):
             min=1, max=10000,
             initial=self.site.autoClickContinuousDelay,
         )
+      # Translators: label for enable recurrent autoSpeak
+        if False:
+            Text = _("Enable recurrent auto speak of ")
+            self.autoSpeakCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+            self.autoSpeakCheckBox.Bind(wx.EVT_CHECKBOX,self.onRecurrent)
+            self.autoSpeakCheckBox.SetValue(self.site.autoSpeak)
+      # Translators:  autoSpeak combo box
+        text = _("Perform autoSpeak (live region) for:")
+        self.autoSpeakOptions = [
+            None,
+            BookmarkCategory.QUICK_SPEAK,
+            BookmarkCategory.QUICK_SPEAK_2,
+        ]
+        self.autoSpeakComboBox = guiHelper.LabeledControlHelper(
+            self,
+            text,
+            wx.Choice,
+            choices=[BookmarkCategoryShortNames.get(option, _("Disabled"))  for option in self.autoSpeakOptions],
+        )
+        self.autoSpeakComboBox.control.Bind(wx.EVT_CHOICE,self.onAutoSpeakCombo)
+        self.autoSpeakComboBox.control.SetSelection(self.autoClickOptions.index(
+            self.site.autoSpeakCategory if self.    site.autoSpeak else None
+        ))
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -2436,6 +2542,9 @@ class EditSiteDialog(wx.Dialog):
             else:
                 control.Enable()
         self.onRecurrent(event)
+        
+    def onAutoSpeakCombo(self, event):
+        pass
 
     def onRecurrent(self, event):
         enabled = self.recurrentCheckBox.Value
