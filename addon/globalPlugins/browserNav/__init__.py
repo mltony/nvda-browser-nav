@@ -1072,6 +1072,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             self.beeper.fancyBeep("AF#", length=100, left=20, right=20)
             return
         fg=winUser.getForegroundWindow()
+        if api.getFocusObject().appModule.productName == 'NVDA':
+            ui.message(_("Cannot edit in this window."))
+            return
         if isinstance(selfself, editableText.EditableText):
             obj = selfself
         elif not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
