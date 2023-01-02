@@ -840,7 +840,7 @@ def browseMonitorThreadFunc():
             # TODO move autoClick logic to this thread as well
             #autoClickSites = [site for site in sites if site.autoClickOnFocus]
             autoSpeakSites = [site for site in sites if site.autoSpeak]
-            autoSpeakBookmarks = [b for s in sites for b in s.bookmarks if b.category == s.autoSpeakCategory]
+            autoSpeakBookmarks = [b for s in autoSpeakSites for b in s.bookmarks if b.category == s.autoSpeakCategory]
             if len(autoSpeakBookmarks) > 0:
                 try:
                     _autoClick(browse, None, tuple(autoSpeakBookmarks), automated=True, category=autoSpeakBookmarks[0].category)
@@ -1463,7 +1463,7 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
             mylog(f"  old = {oldText}")
             mylog(f"  new = {textToSpeak}")
             if oldText is not None:
-                textToSpeak = diffHandler.prefer_dmp().diff(
+                textToSpeak = diffHandler.prefer_difflib().diff(
                     "\n".join(textToSpeak), 
                     "\n".join(oldText)
                 )
@@ -2512,6 +2512,9 @@ class EditSiteDialog(wx.Dialog):
             'autoClickOnFocusDelay': self.delayEdit.Value,
             'autoClickContinuous': self.recurrentCheckBox.Value,
             'autoClickContinuousDelay': self.recurrentDelayEdit.Value,
+            'autoSpeak': self.getAutoSpeakCombo() is not None,
+            'autoSpeakCategory': (self.getAutoSpeakCombo() or BookmarkCategory.QUICK_SPEAK).value,
+
         })
         return site
 
@@ -2542,7 +2545,10 @@ class EditSiteDialog(wx.Dialog):
             else:
                 control.Enable()
         self.onRecurrent(event)
-        
+
+    def getAutoSpeakCombo(self):
+        return self.autoSpeakOptions[self.autoSpeakComboBox.control.GetSelection()]
+
     def onAutoSpeakCombo(self, event):
         pass
 
