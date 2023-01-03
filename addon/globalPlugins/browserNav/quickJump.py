@@ -83,6 +83,7 @@ class BookmarkCategory(Enum):
     HIERARCHICAL = 8
     QUICK_SPEAK = 9
     QUICK_SPEAK_2 = 10
+    SCRIPT = 11
 
 BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump'),
@@ -95,6 +96,7 @@ BookmarkCategoryShortNames = {
     BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
     BookmarkCategory.QUICK_SPEAK: _('Quick speak'),
     BookmarkCategory.QUICK_SPEAK_2: _('Quick speak 2'),
+    BookmarkCategory.SCRIPT: _('Script'),
 }
 
 BookmarkCategoryNames = {
@@ -108,6 +110,7 @@ BookmarkCategoryNames = {
     BookmarkCategory.HIERARCHICAL: _('Hierarchical quick jump'),
     BookmarkCategory.QUICK_SPEAK: _('Quick speak'),
     BookmarkCategory.QUICK_SPEAK_2: _('Quick speak 2'),
+    BookmarkCategory.SCRIPT: _('Script: runs a custom Python script'),
 }
 
 class URLMatch(Enum):
@@ -896,14 +899,20 @@ def postGetAlternativeScript(self,gesture,script):
         
     quickJumpBookmarks = tuple(b for b in quickJumpBookmarks if b.category.name.startswith("QUICK_JUMP"))
     quickClikBookmarks = tuple(b for b in bookmarks if b.category.name.startswith("QUICK_CLICK"))
+    quickSpeakBookmarks = tuple(b for b in bookmarks if b.category.name.startswith("QUICK_SPEAK"))
+    scriptBookmarks = tuple(b for b in bookmarks if b.category.name.startswith("SCRIPT"))
     
     def keystroke_script(gesture):
         if len(quickJumpBookmarks) > 0:
             _quickJump(self, gesture, quickJumpBookmarks, direction=quickJumpDirection, errorMsg=_("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window."))
         if len(quickClikBookmarks) > 0:
             _autoClick(self, gesture, quickClikBookmarks, category=quickClikBookmarks[0].category)
+        if len(quickSpeakBookmarks) > 0:
+            _autoClick(self, gesture, quickSpeakBookmarks, category=quickSpeakBookmarks[0].category)
+        if len(scriptBookmarks) > 0:
+            _runScriptBookmarks(self, gesture, scriptBookmarks)
     keystroke_script.__doc__ = _("BrowserNav temporary action configured only for this website.")
-    if len(quickJumpBookmarks) + len(quickClikBookmarks) > 0:
+    if len(quickJumpBookmarks) + len(quickClikBookmarks) + len(quickSpeakBookmarks) + len(scriptBookmarks) > 0:
         return keystroke_script
     else:
         return result
@@ -1171,6 +1180,12 @@ execGlobals = {
     'operator': operator,
     'print': log.info,
     're': re,
+    'api': api,
+    'controlTypes': controlTypes,
+    'speech': speech,
+    'textInfos': textInfos,
+    'tones': tones,
+    'ui': ui,
 }
 def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
     """
@@ -1208,6 +1223,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
             log.error(e)
             raise e
         p = Paragraph(textInfo)
+        t = textInfo.copy()
         _offset = None
         _message = None
         def match(offset=None, message=None):
@@ -1219,6 +1235,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
             raise QuickJumpMatchPerformedException
         execLocals = {
             'p': p,
+            't': t,
             'match': match,
         }
         try:
@@ -1642,6 +1659,17 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
                     return
             else:
                 raise Exception("Impossible!")
+                
+def _runScriptBookmarks(self, gesture, bookmarks):
+    for bookmark in bookmarks:
+        textInfo = self.selection
+        match = BookmarkMatch(
+            bookmark=bookmark,
+            text=None,
+            start=0,
+            end=0,
+        )
+        runScriptAndApplyOffset(textInfo, match)
 
 def editOrCreateSite(self, site=None, url=None, domain=None):
     global globalConfig
@@ -2075,12 +2103,25 @@ class EditBookmarkDialog(wx.Dialog):
         self.messageTextCtrl.Disable() if category in {
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
+            BookmarkCategory.SCRIPT,
         } else self.messageTextCtrl.Enable()
         self.customeKeystrokeButton.Disable() if category in {
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
         } else self.customeKeystrokeButton.Enable()
         
+        self.patternTextCtrl.Disable() if category in {
+            BookmarkCategory.SCRIPT,
+        } else self.patternTextCtrl.Enable()
+        self.matchModeCategory.control.Disable() if category in {
+            BookmarkCategory.SCRIPT,
+        } else self.matchModeCategory.control.Enable()
+        self.offsetEdit.Disable() if category in {
+            BookmarkCategory.SCRIPT,
+        } else self.offsetEdit.Enable()
+        self.attributesTextCtrl.Disable() if category in {
+            BookmarkCategory.SCRIPT,
+        } else self.attributesTextCtrl.Enable()
 
     def OnEditScriptClick(self,evt):
         _snippet = self.snippet

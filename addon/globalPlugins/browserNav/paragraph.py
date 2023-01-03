@@ -98,7 +98,7 @@ class Paragraph(baseObject.AutoPropertyObject):
         info = self.textInfo.copy()
         info.collapse(end=not reverse)
         if info.find(text, caseSensitive=caseSensitive, reverse=reverse):
-            info.move(len(text), unit=TextInfos.UNIT_CHARACTER, endpoint='end')
+            info.move(textInfos.UNIT_CHARACTER, len(text), endPoint='end')
             return info
         else:
             raise NotFoundError()
