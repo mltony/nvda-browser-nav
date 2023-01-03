@@ -1233,6 +1233,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 self.startInjectingKeystrokes()
                 try:
                     shortTextMode = len(text) < 5
+                    if not shortTextMode:
+                        firstChar = text[0]
                   # Step 3.1. Select all and paste
                     if hasChanged:
                         self.copyToClip(text)
@@ -1247,31 +1249,76 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     kbdControlHome.send()
                     goToPosition(cursorLine, cursorColumn)
                   # Step 3.4: Wait for clipbord to be updated to make sure we can flush clipboard
-                    if  hasChanged and not shortTextMode:
-                        while True:
-                            yield 1
-                            if time.time() > timeout:
-                                raise EditBoxUpdateError(_("Timed out during single-character control+C stage"))
+                    if False:
+                        if  hasChanged and not shortTextMode:
+                            while True:
+                                yield 1
+                                if time.time() > timeout:
+                                    raise EditBoxUpdateError(_("Timed out during single-character control+C stage"))
+                                try:
+                                    newText = api.getClipData()
+                                except PermissionError:
+                                    continue
+                                if text != newText:
+                                    break
+                        else:
+                            # For very short texts just sleep a bit longer
+                            yield 100
+                finally:
+                    if False:
+                      # Step 3.3. Sleep for a bit more just to make sure things have propagated - in short text mode only.
+                      # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
+                      # or it will paste the original contents of clipboard.
+                        if  hasChanged and shortTextMode:
+                            core.callLater(
+                                500,
+                                self.endInjectingKeystrokes
+                            )
+                        else:
+                            self.endInjectingKeystrokes()
+                    def watchAndRestoreClipboard():
+                        if not hasChanged:
+                            return
+                        if shortTextMode:
+                            yield 1000
+                            self.endInjectingKeystrokes()
+                            return
+                        t0 = time.time()
+                        timeout = t0 + 3
+                        newLineRegexp = re.compile(r"[\r\n]+")
+                        while time.time() <= timeout:
+                            yield 20
                             try:
                                 newText = api.getClipData()
                             except PermissionError:
                                 continue
-                            if text != newText:
-                                break
-                    else:
-                        # For very short texts just sleep a bit longer
-                        yield 100
-                finally:
-                  # Step 3.3. Sleep for a bit more just to make sure things have propagated - in short text mode only.
-                  # Apparently if we don't sleep, then either the previous value with ` would be used sometimes,
-                  # or it will paste the original contents of clipboard.
-                    if  hasChanged and shortTextMode:
-                        core.callLater(
-                            500,
-                            self.endInjectingKeystrokes
-                        )
-                    else:
-                        self.endInjectingKeystrokes()
+                            if newText == text:
+                                # still same text in clipboard => wait a bit longer
+                                continue
+                            elif (
+                                newText == firstChar
+                                or (
+                                    newLineRegexp.match(firstChar) is not None
+                                    and newLineRegexp.match(newText) is not None
+                                )
+                            ):
+                                # Bingo! First char has appeared in clipboard. Restoring original clipboard state and exiting
+                                self.endInjectingKeystrokes()
+                                clipboard.deleteEntryFromClipboardHistory(firstChar, maxEntries=1)
+                                return
+                            else:
+                                # Something else found in clipboard - likely user has already copied something there. So just exit without restoring state
+                                log.error(f"asdf something else in clipboard!")
+                                log.error(f"text='{text}'")
+                                log.error(f"newText='{newText}'")
+                                log.error(f"firstChar='{firstChar}'")
+                                #api.newText=newText
+                                #api.firstChar=firstChar
+                                #api.text=text
+                                return
+                        log.error(f"asdf Timeout")
+                    executeAsynchronously(watchAndRestoreClipboard())
+                    
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
                     keystroke.send()
@@ -1280,7 +1327,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 tones.player.stop()
                 unblockAllKeys()
                 jupyterUpdateInProgress = False
-                self.copyToClip(text)
+                #self.copyToClip(text)
                 message = ("BrowserNav failed to update edit box.")
                 message += "\n" + str(e)
                 message += "\n" + _("Last edited text has been copied to the clipboard.")
@@ -1363,8 +1410,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 #time.sleep(1)
                 #core.callLater(1000, clipboard.deleteEntryFromClipboardHistory, data)
                 result = clipboard.deleteEntryFromClipboardHistory(data, maxEntries=1)
-                if result:
-                    core.callLater(1000, tones.beep, 1000, 1000)
+                #if result:
+                    #core.callLater(1000, tones.beep, 1000, 1000)
                 return data
             wx.Yield()
             time.sleep(10/1000)
