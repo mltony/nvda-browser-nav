@@ -43,8 +43,10 @@ from .constants import *
 from . beeper import *
 from . import utils
 from .editor import EditTextDialog
-from .paragraph import Paragraph, NotFoundError, textInfoRange
-
+from .paragraph import Paragraph, NotFoundError, ScriptError, textInfoRange, pump, retry, getFocusTextInfo, getFocusParagraph
+import types
+import ast
+import inspect
 
 try:
     REASON_CARET = controlTypes.REASON_CARET
@@ -346,24 +348,46 @@ def indentPythonCode(code, level):
     return "\n".join(result)
 
 PYTHOS_SCRIPT_TEMPLATE = indentPythonCode("""
-    def quickJumpScript(p=p, match=match):
+    def quickJumpScript(p=None, match=None):
     {indentedCode}
 
-
-    result = quickJumpScript()
-    if isinstance(result, tuple):
-        match(*result)
-    elif isinstance(result, dict):
-        match(**result)
-    elif result is not None:
-        match(result)
 """.lstrip(), -4)
 
 def wrapPythonCode(code):
     return PYTHOS_SCRIPT_TEMPLATE.format(
         indentedCode=indentPythonCode(code, 4)
     )
+    
+safe_builtins = {
+    s: __builtins__[s]
+    for s in "abs all any ascii bin chr dir divmod format hash hex id isinstance issubclass iter len max min next oct ord pow repr round sorted sum None Ellipsis NotImplemented False True bool bytearray bytes complex dict enumerate filter float frozenset int list map object range reversed set slice str tuple type zip BaseException Exception TypeError StopAsyncIteration StopIteration GeneratorExit SystemExit KeyboardInterrupt ImportError ModuleNotFoundError OSError EnvironmentError IOError WindowsError EOFError RuntimeError RecursionError NotImplementedError NameError UnboundLocalError AttributeError SyntaxError IndentationError TabError LookupError IndexError KeyError ValueError UnicodeError UnicodeEncodeError UnicodeDecodeError UnicodeTranslateError AssertionError ArithmeticError FloatingPointError OverflowError ZeroDivisionError SystemError ReferenceError MemoryError BufferError ConnectionError BlockingIOError BrokenPipeError ChildProcessError ConnectionAbortedError ConnectionRefusedError ConnectionResetError FileExistsError FileNotFoundError IsADirectoryError NotADirectoryError InterruptedError PermissionError ProcessLookupError TimeoutError".split()
+}
 
+execGlobals = {
+    '__builtins__': safe_builtins,
+    'Paragraph': Paragraph,
+    'NotFoundError': NotFoundError,
+    'ScriptError': ScriptError,
+    'ScriptError': ScriptError,
+    'pump': pump,
+    'retry': retry,
+    'getFocusTextInfo': getFocusTextInfo,
+    'getFocusParagraph': getFocusParagraph,
+    'textInfoRange': textInfoRange,
+    'itertools': itertools,
+    'math': math,
+    'log': log,
+    'operator': operator,
+    'print': log.info,
+    're': re,
+    'api': api,
+    'controlTypes': controlTypes,
+    'speech': speech,
+    'textInfos': textInfos,
+    'tones': tones,
+    'types': types,
+    'ui': ui,
+}
 
 EMPTY_PYTHON_LINE_REGEXP = re.compile("^\s*(#.*)?$")
 class QJBookmark(QJImmutable):
@@ -394,12 +418,20 @@ class QJBookmark(QJImmutable):
         object.__setattr__(self, 'snippet', d.get('snippet', ''))
         compileError = None
         bytecode = None
+        scriptFunc = None
         if not self.isSnippetEmpty():
+            execLocals = {}
             try:
-                bytecode = compile(wrapPythonCode(self.snippet), "<bookmark>", "exec")
-            except Exception as e:
+                compiled = compile(wrapPythonCode(self.snippet), "<bookmarkScript>", 'exec', ast.PyCF_ONLY_AST)
+                ast.increment_lineno(compiled, -1)
+                bytecode = compile(compiled, "<bookmarkScript>", 'exec', dont_inherit=True)
+                exec(bytecode, execGlobals, execLocals)
+                scriptFunc = execLocals['quickJumpScript']
+                #bytecode = compile(wrapPythonCode(self.snippet), "<bookmarkScript>", "exec")
+            except SyntaxError as e:
                 compileError = e
         object.__setattr__(self, 'bytecode', bytecode)
+        object.__setattr__(self, 'scriptFunc', scriptFunc)
         object.__setattr__(self, 'compileError', compileError)
         object.__setattr__(self, 'alsoUseDefaultQuickJump', d.get('alsoUseDefaultQuickJump', False))
         object.__setattr__(self, 'keystroke', d.get('keystroke', None))
@@ -839,6 +871,8 @@ def browseMonitorThreadFunc():
             except AttributeError:
                 continue
             url = getUrl(browse, onlyFromCache=True)
+            if url is None:
+                continue
             sites = findSites(url, globalConfig)
             # TODO move autoClick logic to this thread as well
             #autoClickSites = [site for site in sites if site.autoClickOnFocus]
@@ -884,6 +918,8 @@ def postGetAlternativeScript(self,gesture,script):
     bookmarkExecuted = False
     keystroke = getKeystrokeFromGesture(gesture)
     url = getUrl(self, onlyFromCache=True)
+    if url is None:
+        return
     bookmarks = getBookmarksWithKeystrokesForUrl(url, globalConfig, keystroke)
     mylog(f"{keystroke} >> {url} b={len(bookmarks)}")
     if '8' in keystroke:
@@ -1165,28 +1201,6 @@ def moveParagraphWithSkipClutter(self, textInfo, offset, skipClutterBookmarks=No
         offset -= direction
     return direction * distance
 
-safe_builtins = {
-    s: __builtins__[s]
-    for s in "abs all any ascii bin chr dir divmod format hash hex id isinstance issubclass iter len max min next oct ord pow repr round sorted sum None Ellipsis NotImplemented False True bool bytearray bytes complex dict enumerate filter float frozenset int list map object range reversed set slice str tuple type zip BaseException Exception TypeError StopAsyncIteration StopIteration GeneratorExit SystemExit KeyboardInterrupt ImportError ModuleNotFoundError OSError EnvironmentError IOError WindowsError EOFError RuntimeError RecursionError NotImplementedError NameError UnboundLocalError AttributeError SyntaxError IndentationError TabError LookupError IndexError KeyError ValueError UnicodeError UnicodeEncodeError UnicodeDecodeError UnicodeTranslateError AssertionError ArithmeticError FloatingPointError OverflowError ZeroDivisionError SystemError ReferenceError MemoryError BufferError ConnectionError BlockingIOError BrokenPipeError ChildProcessError ConnectionAbortedError ConnectionRefusedError ConnectionResetError FileExistsError FileNotFoundError IsADirectoryError NotADirectoryError InterruptedError PermissionError ProcessLookupError TimeoutError".split()
-}
-execGlobals = {
-    '__builtins__': safe_builtins,
-    'Paragraph': Paragraph,
-    'NotFoundError': NotFoundError,
-    'textInfoRange': textInfoRange,
-    'itertools': itertools,
-    'math': math,
-    'log': log,
-    'operator': operator,
-    'print': log.info,
-    're': re,
-    'api': api,
-    'controlTypes': controlTypes,
-    'speech': speech,
-    'textInfos': textInfos,
-    'tones': tones,
-    'ui': ui,
-}
 def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
     """
         This function is called to either apply offset, or evaluate script after we matched a paragraph using primary regex and style.
@@ -1197,7 +1211,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
     bookmark = match.bookmark
     textInfo = textInfo.copy()
     mylog(f"q has bytecode {bookmark.bytecode is not None}")
-    if bookmark.bytecode is None:
+    if bookmark.scriptFunc is None:
         offset = bookmark.offset
         mylog(f"q offset={offset}")
         if offset == 0:
@@ -1237,9 +1251,24 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
             'p': p,
             't': t,
             'match': match,
+            #'allowGeneratorScripts': bookmark.category == BookmarkCategory.SCRIPT,
         }
+        #thisExecGlobals = dict(**execGlobals)
         try:
-            exec(bookmark.bytecode, execGlobals, execLocals)
+            #exec(bookmark.bytecode, thisExecGlobals, execLocals)
+            scriptFunc = bookmark.scriptFunc
+            result = scriptFunc(p=p, match=match)
+            if isinstance(result, types.GeneratorType):
+                allowGeneratorScripts = bookmark.category == BookmarkCategory.SCRIPT
+                if not allowGeneratorScripts:
+                    raise RuntimeError("This script is a generator function; it is only allowed for bookmark type Script.")
+                utils.executeAsynchronously(result)
+            elif isinstance(result, tuple):
+                match(*result)
+            elif isinstance(result, dict):
+                match(**result)
+            elif result is not None:
+                match(result)
         except QuickJumpMatchPerformedException:
             # Script called match function!
             if not (
@@ -1284,13 +1313,14 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
                     return (textInfo, message)
             else:
                 return (_offset, message)
-        #except NotFoundError:
-        #    # This probably indicates no match.
-        #    pass # will return None, None
-        except Exception as e:
-            e2 = QuickJumpScriptException(f"Exception while running script for bookmark '{bookmark.getDisplayName()}'.", e)
-            log.error(e2)
-            raise e2
+        except ScriptError as e:
+            message = str(e)
+            log.error("ScriptError: {e}", e)
+            ui.message(message)
+        #except Exception as e:
+        #    e2 = QuickJumpScriptException(f"Exception while running script for bookmark '{bookmark.getDisplayName()}'.", e)
+        #    log.error(e2)
+        #    raise e
     return (None, None)
 
 def matchAndScript(bookmarks, skipClutterBookmarks, textInfo):
@@ -2008,7 +2038,10 @@ class EditBookmarkDialog(wx.Dialog):
         pattern = self.patternTextCtrl.Value
         pattern = pattern.rstrip("\r\n")
         errorMsg = None
-        if len(pattern) == 0:
+        if (
+            len(pattern) == 0
+            and  self.getCategory() != BookmarkCategory.SCRIPT
+        ):
             errorMsg = _('Pattern cannot be empty!')
         elif patternMatch == PatternMatch.REGEX:
             try:
