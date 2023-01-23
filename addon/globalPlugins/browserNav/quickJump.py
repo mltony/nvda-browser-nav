@@ -86,6 +86,7 @@ class BookmarkCategory(Enum):
     QUICK_SPEAK = 9
     QUICK_SPEAK_2 = 10
     SCRIPT = 11
+    NUMERIC_SCRIPT = 12
 
 BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump'),
@@ -99,6 +100,7 @@ BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_SPEAK: _('Quick speak'),
     BookmarkCategory.QUICK_SPEAK_2: _('Quick speak 2'),
     BookmarkCategory.SCRIPT: _('Script'),
+    BookmarkCategory.NUMERIC_SCRIPT: _('Numeric Script'),
 }
 
 BookmarkCategoryNames = {
@@ -113,6 +115,7 @@ BookmarkCategoryNames = {
     BookmarkCategory.QUICK_SPEAK: _('Quick speak'),
     BookmarkCategory.QUICK_SPEAK_2: _('Quick speak 2'),
     BookmarkCategory.SCRIPT: _('Script: runs a custom Python script'),
+    BookmarkCategory.NUMERIC_SCRIPT: _('Numeric Script - script that can consume a numeric argument by pressing Alt+digits'),
 }
 
 class URLMatch(Enum):
@@ -348,7 +351,7 @@ def indentPythonCode(code, level):
     return "\n".join(result)
 
 PYTHOS_SCRIPT_TEMPLATE = indentPythonCode("""
-    def quickJumpScript(p=None, match=None):
+    def quickJumpScript(p=None, t=None, match=None, level=None, modifiers=None):
     {indentedCode}
 
 """.lstrip(), -4)
@@ -1201,7 +1204,7 @@ def moveParagraphWithSkipClutter(self, textInfo, offset, skipClutterBookmarks=No
         offset -= direction
     return direction * distance
 
-def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
+def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=None, modifiers=None):
     """
         This function is called to either apply offset, or evaluate script after we matched a paragraph using primary regex and style.
         Returns tuple
@@ -1257,11 +1260,14 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None):
         try:
             #exec(bookmark.bytecode, thisExecGlobals, execLocals)
             scriptFunc = bookmark.scriptFunc
-            result = scriptFunc(p=p, match=match)
+            result = scriptFunc(p=p, t=t, match=match, level=level, modifiers=modifiers)
             if isinstance(result, types.GeneratorType):
-                allowGeneratorScripts = bookmark.category == BookmarkCategory.SCRIPT
+                allowGeneratorScripts = bookmark.category in [
+                    BookmarkCategory.SCRIPT,
+                    BookmarkCategory.NUMERIC_SCRIPT,
+                ]
                 if not allowGeneratorScripts:
-                    raise RuntimeError("This script is a generator function; it is only allowed for bookmark type Script.")
+                    raise RuntimeError("This script is a generator function; it is only allowed for bookmark type Script and Numeric Script.")
                 utils.executeAsynchronously(result)
             elif isinstance(result, tuple):
                 match(*result)
@@ -1602,6 +1608,24 @@ def scanLevels(self, bookmarks):
     return future
 
 def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg):
+    url = getUrl(self)
+    hierarchicalBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.HIERARCHICAL)
+    numericScriptBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.NUMERIC_SCRIPT)
+    if len(hierarchicalBookmarks) > 0:
+        if len(numericScriptBookmarks) > 0:
+            api.h = hierarchicalBookmarks
+            api.n = numericScriptBookmarks
+            api.url = url
+            ui.message(_("Both hierarchical and numeric script bookmarks are configured for this website. This is not supported; please disable either hierarchical or numeric script bookmarks."))
+        else:
+            return _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg)
+    else:
+        if len(numericScriptBookmarks) > 0:
+            return _numericScriptKeystroke(self, gesture, direction, level, numericScriptBookmarks)
+        else:
+            pass
+
+def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg):
     oldSelection = self.selection
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
@@ -1690,7 +1714,55 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
             else:
                 raise Exception("Impossible!")
                 
-def _runScriptBookmarks(self, gesture, bookmarks):
+
+numericScriptNumberEntryInProgress = False
+numericScriptEntries = []
+numericScriptModifiers = None
+def awaitNumberForNumericScript(self, bookmarks):
+    global numericScriptNumberEntryInProgress
+    if numericScriptNumberEntryInProgress:
+        raise RuntimeError("numericScriptNumberEntryInProgress is True")
+    numericScriptNumberEntryInProgress = True
+    try:
+        yield from utils.waitForModifiersToBeReleased(60)
+    finally:
+        numericScriptNumberEntryInProgress = False
+    _runScriptBookmarks(self, None, bookmarks, isNumeric=True)
+
+def _numericScriptKeystroke(self, gesture, direction, level, bookmarks):
+    global numericScriptEntries, numericScriptModifiers
+    
+    if numericScriptNumberEntryInProgress:
+        numericScriptEntries.append(level)
+        return
+    else:
+        numericScriptEntries = [level]
+        numericScriptModifiers = utils.getCurrentModifiers()
+        utils.executeAsynchronously(awaitNumberForNumericScript(self, bookmarks))
+    
+
+
+def _runScriptBookmarks(self, gesture, bookmarks, isNumeric=False):
+    level = None
+    modifiers = None
+    if isNumeric:
+        modifiers = numericScriptModifiers
+        levels = numericScriptEntries
+        if None in levels:
+            if len(levels) > 1:
+                ui.message(_("Cannot combine tilde with digits for numeric script!"))
+                return
+            level = None
+        else:
+            levels = [str((i+1)%10) for i in levels]
+            try:
+                level = int("".join(levels))
+            except ValueError:
+                ui.message(
+                    _("Invalid level for numeric script: '{level}'")
+                    .format(level = "".join(levels))
+                )
+                return
     for bookmark in bookmarks:
         textInfo = self.selection
         match = BookmarkMatch(
@@ -1699,7 +1771,7 @@ def _runScriptBookmarks(self, gesture, bookmarks):
             start=0,
             end=0,
         )
-        runScriptAndApplyOffset(textInfo, match)
+        runScriptAndApplyOffset(textInfo, match, level=level, modifiers=modifiers)
 
 def editOrCreateSite(self, site=None, url=None, domain=None):
     global globalConfig
@@ -2040,7 +2112,10 @@ class EditBookmarkDialog(wx.Dialog):
         errorMsg = None
         if (
             len(pattern) == 0
-            and  self.getCategory() != BookmarkCategory.SCRIPT
+            and  self.getCategory() not in {
+                BookmarkCategory.SCRIPT,
+                BookmarkCategory.NUMERIC_SCRIPT,
+            }
         ):
             errorMsg = _('Pattern cannot be empty!')
         elif patternMatch == PatternMatch.REGEX:
@@ -2137,17 +2212,21 @@ class EditBookmarkDialog(wx.Dialog):
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
             BookmarkCategory.SCRIPT,
+            BookmarkCategory.NUMERIC_SCRIPT,
         } else self.messageTextCtrl.Enable()
         self.customeKeystrokeButton.Disable() if category in {
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
+            BookmarkCategory.NUMERIC_SCRIPT,
         } else self.customeKeystrokeButton.Enable()
         
         self.patternTextCtrl.Disable() if category in {
             BookmarkCategory.SCRIPT,
+            BookmarkCategory.NUMERIC_SCRIPT,
         } else self.patternTextCtrl.Enable()
         self.matchModeCategory.control.Disable() if category in {
             BookmarkCategory.SCRIPT,
+            BookmarkCategory.NUMERIC_SCRIPT,
         } else self.matchModeCategory.control.Enable()
         self.offsetEdit.Disable() if category in {
             BookmarkCategory.SCRIPT,

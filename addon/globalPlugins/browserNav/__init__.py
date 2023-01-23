@@ -317,14 +317,8 @@ kbdLeft = fromNameSmart("LeftArrow")
 kbdRight = fromNameSmart("RightArrow")
 kbdUp = fromNameSmart("UpArrow")
 kbdDown = fromNameSmart("DownArrow")
-
-allModifiers = [
-    winUser.VK_LCONTROL, winUser.VK_RCONTROL,
-    winUser.VK_LSHIFT, winUser.VK_RSHIFT, winUser.VK_LMENU,
-    winUser.VK_RMENU, winUser.VK_LWIN, winUser.VK_RWIN,
-]
-
-def executeAsynchronously(gen):
+if False:
+  def executeAsynchronously(gen):
     """
     This function executes a generator-function in such a manner, that allows updates from the operating system to be processed during execution.
     For an example of such generator function, please see GlobalPlugin.script_editJupyter.
@@ -1187,16 +1181,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             blockAllKeys(timeoutSeconds)
             try:
               # step 1. wait for all modifiers to be released
-                while True:
-                    if time.time() > timeout:
-                        raise EditBoxUpdateError(_("Timed out during release modifiers stage"))
-                    status = [
-                        winUser.getKeyState(k) & 32768
-                        for k in allModifiers
-                    ]
-                    if not any(status):
-                        break
-                    yield 1
+                try:
+                    yield from utils.waitForModifiersToBeReleased(5)
+                except TimeoutError as e:
+                    raise EditBoxUpdateError(_("Timed out during release modifiers stage"), e)
               # Step 2: switch back to that browser window
                 while  winUser.getForegroundWindow() != fg:
                     if time.time() > timeout:
@@ -1322,7 +1310,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                                 #api.text=text
                                 return
                         log.error(f"asdf Timeout")
-                    executeAsynchronously(watchAndRestoreClipboard())
+                    utils.executeAsynchronously(watchAndRestoreClipboard())
                     
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
@@ -1343,7 +1331,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
         self.popupEditTextDialog(
             text, cursorLine, cursorColumn,
-            lambda result, text, hasChanged, cursorLine, cursorColumn, keystroke: executeAsynchronously(updateText(result, text, hasChanged, cursorLine, cursorColumn, keystroke))
+            lambda result, text, hasChanged, cursorLine, cursorColumn, keystroke: utils.executeAsynchronously(updateText(result, text, hasChanged, cursorLine, cursorColumn, keystroke))
         )
 
     def script_copyJupyterText(self, gesture, selfself):
@@ -1788,7 +1776,3 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 gesture,
             ),
             doc=_("Show BrowserNav popup menu."))
-
-
-
-
