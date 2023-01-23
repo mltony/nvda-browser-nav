@@ -922,7 +922,7 @@ def postGetAlternativeScript(self,gesture,script):
     keystroke = getKeystrokeFromGesture(gesture)
     url = getUrl(self, onlyFromCache=True)
     if url is None:
-        return
+        return result
     bookmarks = getBookmarksWithKeystrokesForUrl(url, globalConfig, keystroke)
     mylog(f"{keystroke} >> {url} b={len(bookmarks)}")
     if '8' in keystroke:
