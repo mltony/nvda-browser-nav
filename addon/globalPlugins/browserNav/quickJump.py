@@ -371,12 +371,12 @@ execGlobals = {
     'Paragraph': Paragraph,
     'NotFoundError': NotFoundError,
     'ScriptError': ScriptError,
-    'ScriptError': ScriptError,
     'pump': pump,
     'retry': retry,
     'getFocusTextInfo': getFocusTextInfo,
     'getFocusParagraph': getFocusParagraph,
     'textInfoRange': textInfoRange,
+    'ParagraphAttribute': ParagraphAttribute,
     'itertools': itertools,
     'math': math,
     'log': log,
@@ -1321,7 +1321,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
                 return (_offset, message)
         except ScriptError as e:
             message = str(e)
-            log.error("ScriptError: {e}", e)
+            log.error("ScriptError: {}", e)
             ui.message(message)
         #except Exception as e:
         #    e2 = QuickJumpScriptException(f"Exception while running script for bookmark '{bookmark.getDisplayName()}'.", e)

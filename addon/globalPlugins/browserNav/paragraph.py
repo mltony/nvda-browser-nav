@@ -50,7 +50,7 @@ def retry(func, count=5, delay=200):
 
 def getFocusTextInfo():
     focus  = api.getFocusObject()
-    if focus is None:
+    if focus is None or focus.treeInterceptor is None:
         raise ScriptError("Failed to find focused object; please retry.")
     return focus.treeInterceptor.makeTextInfo(textInfos.POSITION_SELECTION)
 
@@ -97,7 +97,10 @@ class Paragraph(baseObject.AutoPropertyObject):
         return self.textInfo.getTextWithFields()
 
     def _get_attributes(self):
-        return quickJump.extractAttributesSet(self.textInfo)
+        return {
+            attr.attribute: attr.value
+            for attr in quickJump.extractAttributesSet(self.textInfo)
+        }
 
     def _get_roles(self):
         return {
