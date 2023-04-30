@@ -1,3 +1,4 @@
+#-*- coding:utf-8 -*-
 #A part of the BrowserNav addon for NVDA
 #Copyright (C) 2017-2022 Tony Malykh
 #This file is covered by the GNU General Public License.
