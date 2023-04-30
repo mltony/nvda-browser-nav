@@ -56,7 +56,7 @@ except AttributeError:
 
 
 
-debug = True
+debug = False
 if debug:
     def mylog(s):
         if debug:
