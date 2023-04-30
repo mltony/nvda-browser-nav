@@ -13,6 +13,7 @@ import core
 import dataclasses
 from dataclasses import dataclass
 import diffHandler
+import difflib as dl
 from enum import Enum
 import functools
 import globalVars
@@ -55,7 +56,7 @@ except AttributeError:
 
 
 
-debug = False
+debug = True
 if debug:
     def mylog(s):
         if debug:
@@ -192,6 +193,16 @@ class ParagraphAttribute(Enum):
     BOLD = 'bold'
     ITALIC = 'italic'
 
+class AutoSpeakMode(Enum):
+    OFF = 'off'
+    PARAGRAPH_DIFF = 'paragraph_diff'
+    DIFF = 'diff'
+
+autoSpeakModeNames = {
+    AutoSpeakMode.OFF: _("AutoSpeak disabled"),
+    AutoSpeakMode.PARAGRAPH_DIFF: _("Speak changed paragraphs"),
+    AutoSpeakMode.DIFF: _("Speak only changed text within paragraph (diff)"),
+}
 class QJImmutable:
     def __init__(self):
         object.__setattr__(self, 'frozen', False)
@@ -360,7 +371,7 @@ def wrapPythonCode(code):
     return PYTHOS_SCRIPT_TEMPLATE.format(
         indentedCode=indentPythonCode(code, 4)
     )
-    
+
 safe_builtins = {
     s: __builtins__[s]
     for s in "abs all any ascii bin chr dir divmod format hash hex id isinstance issubclass iter len max min next oct ord pow repr round sorted sum None Ellipsis NotImplemented False True bool bytearray bytes complex dict enumerate filter float frozenset int list map object range reversed set slice str tuple type zip BaseException Exception TypeError StopAsyncIteration StopIteration GeneratorExit SystemExit KeyboardInterrupt ImportError ModuleNotFoundError OSError EnvironmentError IOError WindowsError EOFError RuntimeError RecursionError NotImplementedError NameError UnboundLocalError AttributeError SyntaxError IndentationError TabError LookupError IndexError KeyError ValueError UnicodeError UnicodeEncodeError UnicodeDecodeError UnicodeTranslateError AssertionError ArithmeticError FloatingPointError OverflowError ZeroDivisionError SystemError ReferenceError MemoryError BufferError ConnectionError BlockingIOError BrokenPipeError ChildProcessError ConnectionAbortedError ConnectionRefusedError ConnectionResetError FileExistsError FileNotFoundError IsADirectoryError NotADirectoryError InterruptedError PermissionError ProcessLookupError TimeoutError".split()
@@ -405,6 +416,8 @@ class QJBookmark(QJImmutable):
     snippet: str
     alsoUseDefaultQuickJump: bool
     keystroke: str
+    enableAutoSpeak: bool
+    autoSpeakMode: AutoSpeakMode
 
     def __init__(self, d):
         object.__setattr__(self, 'enabled', d['enabled'])
@@ -438,7 +451,8 @@ class QJBookmark(QJImmutable):
         object.__setattr__(self, 'compileError', compileError)
         object.__setattr__(self, 'alsoUseDefaultQuickJump', d.get('alsoUseDefaultQuickJump', False))
         object.__setattr__(self, 'keystroke', d.get('keystroke', None))
-        
+        object.__setattr__(self, 'enableAutoSpeak', d.get('enableAutoSpeak', False))
+        object.__setattr__(self, 'autoSpeakMode', AutoSpeakMode(d.get('autoSpeakMode', AutoSpeakMode.OFF.value)))
 
     def asDict(self):
         return {
@@ -456,6 +470,8 @@ class QJBookmark(QJImmutable):
             'snippet': self.snippet,
             'alsoUseDefaultQuickJump': self.alsoUseDefaultQuickJump,
             'keystroke': self.keystroke,
+            'enableAutoSpeak': self.enableAutoSpeak,
+            'autoSpeakMode': self.autoSpeakMode.value,
         }
 
     def getDisplayName(self):
@@ -746,7 +762,7 @@ def getUrl(self, onlyFromCache=False):
     else:
         return url
         #future.set(url)
-        
+
 @functools.lru_cache()
 def getBookmarksWithKeystrokesForUrl(url, config, keystroke, category=None):
     sites = findSites(url, config)
@@ -775,6 +791,21 @@ def getBookmarksWithKeystrokesForSite(site):
         )
     }
 
+@functools.lru_cache()
+def getAutoSpeakBookmarksForUrl(url, config):
+    sites = findSites(url, config)
+    results = [
+        bookmark
+        for site in sites
+        for bookmark in site.bookmarks
+        if bookmark.category in {
+            BookmarkCategory.QUICK_SPEAK,
+            BookmarkCategory.QUICK_SPEAK_2,
+        }
+        and bookmark.enabled
+        and bookmark.autoSpeakMode != AutoSpeakMode.OFF
+    ]
+    return tuple(results)
 
 originalShouldPassThrough = None
 def newShouldPassThrough(self, obj, reason= None):
@@ -861,8 +892,97 @@ def asyncBrowseMonitor(self):
         finally:
             del browse
 
+class AutoSpeakCacheEntry:
+    enabled: bool 
+    lines = None
+    
+    def __init__(self, lines):
+        self.lines = lines
+        self.enabled = True
+
 browseMonitorThreadShutdownRequested = False
+AutoSpeakCache = weakref.WeakKeyDictionary()
 def browseMonitorThreadFunc():
+    try:
+        while not browseMonitorThreadShutdownRequested:
+            time.sleep(0.5)
+            focus = api.getFocusObject()
+            try:
+                browse = focus.treeInterceptor
+                if browse is None:
+                    continue
+            except AttributeError:
+                continue
+            url = getUrl(browse, onlyFromCache=True)
+            if url is None:
+                continue
+            bookmarks = getAutoSpeakBookmarksForUrl(url, globalConfig)
+            try:
+                cacheEntry = AutoSpeakCache[browse]
+            except KeyError:
+                cacheEntry = {}
+                AutoSpeakCache[browse] = cacheEntry
+            processAutoSpeakEntry(browse, bookmarks, cacheEntry)
+    except Exception as e:
+        #mylog(e)
+        core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
+        raise e
+
+def processAutoSpeakEntry(browse, bookmarks, cacheEntry):
+    if len(bookmarks) == 0:
+        return
+    newLinesByBookmark = _autoClick(browse, gesture=None, category=BookmarkCategory.QUICK_SPEAK, bookmarks=bookmarks,  automated=True)
+    for bookmark in bookmarks:
+        textToSpeak = newLinesByBookmark.get(bookmark, [])
+        try:
+            cachedLines = cacheEntry[bookmark]
+        except KeyError:
+            cachedLines = AutoSpeakCacheEntry([])
+            cacheEntry[bookmark] = cachedLines
+        processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines)
+
+def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
+    if not cachedLines.enabled:
+        return
+    if False:
+        api.c = cachedLines
+        api.t = textToSpeak
+        mylog(f'asdf {cachedLines.lines == textToSpeak}')
+        mylog(f"l={len(cachedLines.lines)}")
+        if len(cachedLines.lines)>0:
+            mylog(f" 0={cachedLines.lines[0]}")
+        mylog(f"l={len(textToSpeak)}")
+        if len(textToSpeak) > 0:
+            mylog(f" 0={textToSpeak[0]}")
+        
+    if False:
+        if cachedLines.lines == textToSpeak:
+            tones.beep(500, 50)
+        else:
+            tones.beep(1000, 100)
+    
+    for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak):
+        mylog(f"asdf {line}")
+        line = line[1:]
+        def speak():
+            speech.cancelSpeech()
+            speech.speakText(line)
+        wx.CallAfter(speak)
+        #core.callLater(1000, speak)
+    cachedLines.lines = textToSpeak
+    
+def diffAndExtractInterestingLines(s1, s2):
+    mode = '0'
+    for line in dl.context_diff(s1, s2):
+        if line.startswith('***'):
+            mode = 'i' # ignore
+        elif line.startswith('---'):
+            mode = 'a' # attention
+        elif mode == 'a' and len(line) > 0 and line[0] in {'!', '+'}:
+            yield line
+    
+
+def browseMonitorThreadFuncBakDelete():
     try:
         while not browseMonitorThreadShutdownRequested:
             time.sleep(0.5)
@@ -891,6 +1011,7 @@ def browseMonitorThreadFunc():
         core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
         raise e
 
+
 original_event_treeInterceptor_gainFocus = None
 def pre_event_treeInterceptor_gainFocus(self):
     if not self._hadFirstGainFocus:
@@ -913,7 +1034,7 @@ def getKeystrokeFromGesture(gesture):
     #keystroke = gesture.normalizedIdentifiers[-1].split(':')[1]
     keystroke = gesture.identifiers[-1].split(':')[1]
     return keystroke
-    
+
 
 originalGetAlternativeScript = None
 def postGetAlternativeScript(self,gesture,script):
@@ -935,12 +1056,12 @@ def postGetAlternativeScript(self,gesture,script):
     else:
         quickJumpDirection = 1
         quickJumpBookmarks = bookmarks
-        
+
     quickJumpBookmarks = tuple(b for b in quickJumpBookmarks if b.category.name.startswith("QUICK_JUMP"))
     quickClikBookmarks = tuple(b for b in bookmarks if b.category.name.startswith("QUICK_CLICK"))
     quickSpeakBookmarks = tuple(b for b in bookmarks if b.category.name.startswith("QUICK_SPEAK"))
     scriptBookmarks = tuple(b for b in bookmarks if b.category.name.startswith("SCRIPT"))
-    
+
     def keystroke_script(gesture):
         if len(quickJumpBookmarks) > 0:
             _quickJump(self, gesture, quickJumpBookmarks, direction=quickJumpDirection, errorMsg=_("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window."))
@@ -955,7 +1076,7 @@ def postGetAlternativeScript(self,gesture,script):
         return keystroke_script
     else:
         return result
-    
+
 @functools.lru_cache()
 def getRegexForBookmark(rule):
     if rule.patternMatch == PatternMatch.EXACT:
@@ -1019,18 +1140,18 @@ def matchAllWidthCompositeRegex(bookmarks, text):
 def matchTextAndAttributes(bookmarks, textInfo, distance=None):
     text = textInfo.text
     text = text.rstrip("\r\n")
-    mylog(f"matchTextAndAttributes '{text}'")
+    #mylog(f"matchTextAndAttributes '{text}'")
     matches = matchAllWidthCompositeRegex(bookmarks, text)
     attrs = None
     for m in matches:
         bookmark = m.bookmark
-        mylog(f"bookmark={bookmark.getDisplayName()}")
-        mylog(f"bookmark has {len(bookmark.attributes)} attribute filters.")
-        mylog(f"Bookmark is snippet empty: {bookmark.isSnippetEmpty()}")
+        #mylog(f"bookmark={bookmark.getDisplayName()}")
+        #mylog(f"bookmark has {len(bookmark.attributes)} attribute filters.")
+        #mylog(f"Bookmark is snippet empty: {bookmark.isSnippetEmpty()}")
         if distance is not None and bookmark.offset * distance < 0:
             # offset is in the opposite direction to current movement direction
             if abs(distance) <= abs(bookmark.offset):
-                mylog("# We don't want to hit the anchor of current bookmark again")
+                #mylog("# We don't want to hit the anchor of current bookmark again")
                 # We don't want to hit the anchor of current bookmark again
                 continue
         if len(bookmark.attributes) > 0:
@@ -1040,18 +1161,18 @@ def matchTextAndAttributes(bookmarks, textInfo, distance=None):
             am.matches(attrs)
             for am in bookmark.attributes
         ]):
-            mylog("Yield!")
+            #mylog("Yield!")
             yield m
-        mylog("Didn't match attributes")
-    mylog("Done matchTextAndAttributes")
+        #mylog("Didn't match attributes")
+    #mylog("Done matchTextAndAttributes")
 
 @functools.lru_cache()
 def findApplicableBookmarks(
-        config=None, 
-        url=None, 
-        category=None, 
-        site=None, 
-        withoutOffsetOnly=False, 
+        config=None,
+        url=None,
+        category=None,
+        site=None,
+        withoutOffsetOnly=False,
         withDefaultKeystrokeOnly=True
 ):
     if (url is not None) == (site is not None):
@@ -1330,16 +1451,16 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
     return (None, None)
 
 def matchAndScript(bookmarks, skipClutterBookmarks, textInfo):
-    mylog("matchAndScript start")
+    #mylog("matchAndScript start")
     for match in matchTextAndAttributes(bookmarks, textInfo):
-        mylog("q1")
+        #mylog("q1")
         result, message = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks)
-        mylog("q2")
+        #mylog("q2")
         if result  is not None:
-            mylog("matchAndScript Result is not None :(")
-            return result, message
-    mylog("matchAndScript Result is  None :(")
-    return None, None
+            #mylog("matchAndScript Result is not None :(")
+            return result, message, match
+    #mylog("matchAndScript Result is  None :(")
+    return None, None, None
 
 def isMatchInRightDirection(oldSelection, direction, textInfo):
     origin = oldSelection.copy()
@@ -1355,7 +1476,7 @@ def getBookmarksForCategory(self, category):
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
     return bookmarks
-    
+
 def quickJump(self, gesture, category, direction, errorMsg):
     bookmarks = getBookmarksForCategory(self, category)
     return _quickJump(self, gesture, bookmarks, direction, errorMsg)
@@ -1378,7 +1499,7 @@ def _quickJump(self, gesture, bookmarks, direction, errorMsg):
         distance += 1
         adjustedDistance += 1
 
-        matchInfo, message = matchAndScript(bookmarks, [], textInfo)
+        matchInfo, message, dummyMatch = matchAndScript(bookmarks, [], textInfo)
         if matchInfo is not None:
             if not isMatchInRightDirection(oldSelection, direction, matchInfo):
                 continue
@@ -1442,7 +1563,7 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
     if isSpeak == isClick:
         raise RuntimeError(f"Invalid category {category.name}")
 
-    
+
     mylog(f"Autoclick Found {len(bookmarks)} bookmarks")
     if len(bookmarks) == 0:
         return endOfDocument(
@@ -1458,8 +1579,9 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
     focusableErrorMsg = None
     focusables = []
     textToSpeak = []
+    textToSpeakByBookmark = {}
     while True:
-        matchInfo, thisMessage = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
+        matchInfo, thisMessage, match = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
         if matchInfo is not None:
             thisInfo = matchInfo
             if isClick:
@@ -1475,9 +1597,18 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
                     if message is None and thisMessage  is not None and len(thisMessage) > 0:
                         message = thisMessage
             elif isSpeak:
+                entries = []
                 if thisMessage is not None and len(thisMessage) > 0:
-                    textToSpeak.append(thisMessage)
-                textToSpeak.append(thisInfo.text)
+                    entries.append(thisMessage)
+                entries.append(thisInfo.text)
+                textToSpeak.extend(entries)
+                try:
+                    ttsb = textToSpeakByBookmark[match.bookmark]
+                except KeyError:
+                    ttsb = []
+                    textToSpeakByBookmark[match.bookmark] = ttsb
+                ttsb.extend(entries)
+                    
             else:
                 error_hahaha
         distance += 1
@@ -1509,19 +1640,7 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
                 ))
     elif isSpeak:
         if automated:
-            # diffing against cached
-            oldText = AutoSpeakTextCache.get(self, None)
-            AutoSpeakTextCache[self] = textToSpeak
-            mylog("auto")
-            mylog(f"  old = {oldText}")
-            mylog(f"  new = {textToSpeak}")
-            if oldText is not None:
-                textToSpeak = diffHandler.prefer_difflib().diff(
-                    "\n".join(textToSpeak), 
-                    "\n".join(oldText)
-                )
-                mylog(f"  tts = {textToSpeak}")
-                #textToSpeak = [textToSpeak]
+            return textToSpeakByBookmark
         mylog(f"  tts1 = {textToSpeak}")
         textToSpeak = [s for s in textToSpeak if s is not None and len(s) > 0]
         if len(textToSpeak) > 0:
@@ -1569,7 +1688,7 @@ def scanLevelsThreadFunc(self, config, future, bookmarks):
         distance = 0
         #mylog(f"loop:sltf->matchTextAndAttributes({len(bookmarks)})")
         while True:
-            matchInfo, message = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
+            matchInfo, message, dummyMatch = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
             if matchInfo is not None:
                 # We compute x screen coordinate of the match
                 # Computing it in thread pool for performance reasons.
@@ -1661,7 +1780,7 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
         #mylog("hqj->matchTextAndAttributes2")
         mylog("HQJ calling matchAndScript")
         mylog(f"asdf {textInfo.text}")
-        matchInfo, message = matchAndScript(bookmarks, [], textInfo)
+        matchInfo, message, dummyMatch = matchAndScript(bookmarks, [], textInfo)
         mylog(f"asdf2 {textInfo.text}")
         if matchInfo is not None:
             if not isMatchInRightDirection(oldSelection, direction, matchInfo):
@@ -1713,7 +1832,7 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
                     return
             else:
                 raise Exception("Impossible!")
-                
+
 
 numericScriptNumberEntryInProgress = False
 numericScriptEntries = []
@@ -1731,7 +1850,7 @@ def awaitNumberForNumericScript(self, bookmarks):
 
 def _numericScriptKeystroke(self, gesture, direction, level, bookmarks):
     global numericScriptEntries, numericScriptModifiers
-    
+
     if numericScriptNumberEntryInProgress:
         numericScriptEntries.append(level)
         return
@@ -1739,7 +1858,7 @@ def _numericScriptKeystroke(self, gesture, direction, level, bookmarks):
         numericScriptEntries = [level]
         numericScriptModifiers = utils.getCurrentModifiers()
         utils.executeAsynchronously(awaitNumberForNumericScript(self, bookmarks))
-    
+
 
 
 def _runScriptBookmarks(self, gesture, bookmarks, isNumeric=False):
@@ -2088,6 +2207,22 @@ class EditBookmarkDialog(wx.Dialog):
         self.availableAttributesListBox.control.Bind(wx.EVT_CHAR, self.onChar)
         if paragraphInfo is None:
             self.availableAttributesListBox.control.Disable()
+      # enable Autospeak checkbox
+        if False:
+            labelText = _("Automatically detect and speak changes to this bookmark")
+            self.autoSpeakEnabledCheckBox=sHelper.addItem(wx.CheckBox(self,label=labelText))
+            self.autoSpeakEnabledCheckBox.SetValue(self.bookmark.enableAutoSpeak)
+      # Translators:  AutospeakMode comboBox
+        labelText = _("AutoSpeak mode")
+        self.autoSpeakModeComboBox = guiHelper.LabeledControlHelper(
+            self,
+            labelText,
+            wx.Choice,
+            choices=[autoSpeakModeNames[i] for i in AutoSpeakMode],
+        )
+        self.autoSpeakModeComboBox.control.Bind(wx.EVT_CHOICE,self.onAutoSpeakMode)
+        self.autoSpeakModeComboBox.control.SetSelection(list(AutoSpeakMode).index(self.bookmark.autoSpeakMode))
+
 
       # Edit script button
         self.editScriptButton = sHelper.addItem (wx.Button (self, label = _("Edit &script in new window; press Control+Enter when Done.")))
@@ -2166,6 +2301,8 @@ class EditBookmarkDialog(wx.Dialog):
             'offset': self.offsetEdit.Value,
             'snippet':snippet or self.snippet,
             'keystroke': self.keystroke,
+            #'enableAutoSpeak': self.autoSpeakEnabledCheckBox.Value,
+            'autoSpeakMode': self.getAutoSpeakMode(),
         })
         return bookmark
 
@@ -2219,7 +2356,7 @@ class EditBookmarkDialog(wx.Dialog):
             BookmarkCategory.HIERARCHICAL,
             BookmarkCategory.NUMERIC_SCRIPT,
         } else self.customeKeystrokeButton.Enable()
-        
+
         self.patternTextCtrl.Disable() if category in {
             BookmarkCategory.SCRIPT,
             BookmarkCategory.NUMERIC_SCRIPT,
@@ -2234,6 +2371,17 @@ class EditBookmarkDialog(wx.Dialog):
         self.attributesTextCtrl.Disable() if category in {
             BookmarkCategory.SCRIPT,
         } else self.attributesTextCtrl.Enable()
+        self.autoSpeakModeComboBox.control.Enable() if category in {
+            BookmarkCategory.QUICK_SPEAK,
+            BookmarkCategory.QUICK_SPEAK_2,
+        } else self.autoSpeakModeComboBox.control.Disable()
+
+    def getAutoSpeakMode(self):
+        result = list(AutoSpeakMode)[self.autoSpeakModeComboBox.control.GetSelection()]
+        return result
+
+    def onAutoSpeakMode(self, event):
+        tones.beep(500, 50)
 
     def OnEditScriptClick(self,evt):
         _snippet = self.snippet
@@ -2280,7 +2428,7 @@ class EditBookmarkDialog(wx.Dialog):
             return False
         inputCore.manager._captureFunc = addGestureCaptor
         core.callLater(50, ui.message, _("Press desired keystroke now"))
-        
+
     blackListedKeystrokes = "escape enter numpadenter space nvda+space nvda+n nvda+q nvda+j j tab uparrow downarrow leftarrow rightarrow home end control+home control+end delete".split()
 
     def _addCaptured(self, gesture):
@@ -2585,22 +2733,23 @@ class EditSiteDialog(wx.Dialog):
             self.autoSpeakCheckBox.Bind(wx.EVT_CHECKBOX,self.onRecurrent)
             self.autoSpeakCheckBox.SetValue(self.site.autoSpeak)
       # Translators:  autoSpeak combo box
-        text = _("Perform autoSpeak (live region) for:")
-        self.autoSpeakOptions = [
-            None,
-            BookmarkCategory.QUICK_SPEAK,
-            BookmarkCategory.QUICK_SPEAK_2,
-        ]
-        self.autoSpeakComboBox = guiHelper.LabeledControlHelper(
-            self,
-            text,
-            wx.Choice,
-            choices=[BookmarkCategoryShortNames.get(option, _("Disabled"))  for option in self.autoSpeakOptions],
-        )
-        self.autoSpeakComboBox.control.Bind(wx.EVT_CHOICE,self.onAutoSpeakCombo)
-        self.autoSpeakComboBox.control.SetSelection(self.autoClickOptions.index(
-            self.site.autoSpeakCategory if self.    site.autoSpeak else None
-        ))
+        if False:
+            text = _("Perform autoSpeak (live region) for:")
+            self.autoSpeakOptions = [
+                None,
+                BookmarkCategory.QUICK_SPEAK,
+                BookmarkCategory.QUICK_SPEAK_2,
+            ]
+            self.autoSpeakComboBox = guiHelper.LabeledControlHelper(
+                self,
+                text,
+                wx.Choice,
+                choices=[BookmarkCategoryShortNames.get(option, _("Disabled"))  for option in self.autoSpeakOptions],
+            )
+            self.autoSpeakComboBox.control.Bind(wx.EVT_CHOICE,self.onAutoSpeakCombo)
+            self.autoSpeakComboBox.control.SetSelection(self.autoClickOptions.index(
+                self.site.autoSpeakCategory if self.    site.autoSpeak else None
+            ))
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -2665,8 +2814,8 @@ class EditSiteDialog(wx.Dialog):
             'autoClickOnFocusDelay': self.delayEdit.Value,
             'autoClickContinuous': self.recurrentCheckBox.Value,
             'autoClickContinuousDelay': self.recurrentDelayEdit.Value,
-            'autoSpeak': self.getAutoSpeakCombo() is not None,
-            'autoSpeakCategory': (self.getAutoSpeakCombo() or BookmarkCategory.QUICK_SPEAK).value,
+            #'autoSpeak': self.getAutoSpeakCombo() is not None,
+            #'autoSpeakCategory': (self.getAutoSpeakCombo() or BookmarkCategory.QUICK_SPEAK).value,
 
         })
         return site
