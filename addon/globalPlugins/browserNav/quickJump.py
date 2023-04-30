@@ -2175,7 +2175,8 @@ class EditBookmarkDialog(wx.Dialog):
         newSite = self.config.sites[self.siteComboBox.control.GetSelection()]
         if newSite != self.oldSite:
             result = gui.messageBox(
-                _("Warning: you are about to move this bookmark to site %s. This bookmark will disappear from the old site %s. Would you like to proceed?") % (newSite.getDisplayName(), self.oldSite.getDisplayName()),
+                _("Warning: you are about to move this bookmark to site %(new_site)s. "
+                "This bookmark will disappear from the old site %(old_site)s. Would you like to proceed?") % {"new_site": newSite.getDisplayName(), "old_site": self.oldSite.getDisplayName()},
                 _("Bookmark Entry warning"),
                 wx.YES|wx.NO|wx.ICON_WARNING,
                 self
