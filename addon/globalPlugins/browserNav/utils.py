@@ -370,7 +370,8 @@ def speakMessage(message):
     if message is None:
         return
     if isinstance(message, str):
-        ui.message(message)
+        if not speech.isBlank(message):
+            ui.message(message)
     elif isinstance(message, textInfos.TextInfo):
         speech.speakTextInfo(message, reason=controlTypes.OutputReason.CARET)
     else:
