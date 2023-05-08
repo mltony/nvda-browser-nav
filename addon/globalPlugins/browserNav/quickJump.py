@@ -196,12 +196,19 @@ class ParagraphAttribute(Enum):
 class AutoSpeakMode(Enum):
     OFF = 'off'
     PARAGRAPH_DIFF = 'paragraph_diff'
-    DIFF = 'diff'
+    WORD_DIFF = 'word_diff'
+    CHIME_ON_ADD = 'chime_on_add'
+    CHIME_ON_REMOVE = 'chime_on_remove'
+    CHIME_ON_CHANGE = 'chime_on_change'
 
 autoSpeakModeNames = {
     AutoSpeakMode.OFF: _("AutoSpeak disabled"),
     AutoSpeakMode.PARAGRAPH_DIFF: _("Speak changed paragraphs"),
-    AutoSpeakMode.DIFF: _("Speak only changed text within paragraph (diff)"),
+    AutoSpeakMode.WORD_DIFF: _("Speak only changed words (diff)"),
+    AutoSpeakMode.CHIME_ON_ADD: _("Play chime when bookmark appears on the page"),
+    AutoSpeakMode.CHIME_ON_REMOVE: _("Play chime when bookmark disappears from the page"),
+    AutoSpeakMode.CHIME_ON_CHANGE: _("Play chime when text matched by bookmark changes"),
+
 }
 class QJImmutable:
     def __init__(self):
@@ -418,6 +425,7 @@ class QJBookmark(QJImmutable):
     keystroke: str
     enableAutoSpeak: bool
     autoSpeakMode: AutoSpeakMode
+    builtInWavFile: str
 
     def __init__(self, d):
         object.__setattr__(self, 'enabled', d['enabled'])
@@ -453,6 +461,7 @@ class QJBookmark(QJImmutable):
         object.__setattr__(self, 'keystroke', d.get('keystroke', None))
         object.__setattr__(self, 'enableAutoSpeak', d.get('enableAutoSpeak', False))
         object.__setattr__(self, 'autoSpeakMode', AutoSpeakMode(d.get('autoSpeakMode', AutoSpeakMode.OFF.value)))
+        object.__setattr__(self, 'builtInWavFile', d.get('builtInWavFile', None))
 
     def asDict(self):
         return {
@@ -472,6 +481,7 @@ class QJBookmark(QJImmutable):
             'keystroke': self.keystroke,
             'enableAutoSpeak': self.enableAutoSpeak,
             'autoSpeakMode': self.autoSpeakMode.value,
+            'builtInWavFile': self.builtInWavFile,
         }
 
     def getDisplayName(self):
@@ -2114,7 +2124,6 @@ class EditBookmarkDialog(wx.Dialog):
         self.snippet = self.bookmark.snippet
         self.cursorLine, self.cursorColumn = 0,0
         self.keystroke = self.bookmark.keystroke
-
       # Translators: pattern
         patternLabelText = _("&Pattern")
         self.patternTextCtrl=sHelper.addLabeledControl(patternLabelText, wx.TextCtrl)
@@ -2222,8 +2231,26 @@ class EditBookmarkDialog(wx.Dialog):
         )
         self.autoSpeakModeComboBox.control.Bind(wx.EVT_CHOICE,self.onAutoSpeakMode)
         self.autoSpeakModeComboBox.control.SetSelection(list(AutoSpeakMode).index(self.bookmark.autoSpeakMode))
-
-
+      # Translators: built in wav category  combo box
+        biwCategoryLabelText=_("Chime &category:")
+        self.biwCategory=guiHelper.LabeledControlHelper(
+            self,
+            biwCategoryLabelText,
+            wx.Choice,
+            choices=self.getBiwCategories(),
+        )
+        self.biwCategory.control.Bind(wx.EVT_CHOICE,self.onBiwCategory)
+        
+      # Translators: built in wav file combo box
+        biwListLabelText=_("C&hime:")
+        self.biwList=guiHelper.LabeledControlHelper(
+            self,
+            biwListLabelText,
+            wx.Choice,
+            choices=[],
+        )
+        self.biwList.control.Bind(wx.EVT_CHOICE,self.onBiw)
+        self.setBiw(self.bookmark.builtInWavFile)
       # Edit script button
         self.editScriptButton = sHelper.addItem (wx.Button (self, label = _("Edit &script in new window; press Control+Enter when Done.")))
         self.editScriptButton.Bind(wx.EVT_BUTTON, self.OnEditScriptClick)
@@ -2239,6 +2266,7 @@ class EditBookmarkDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
 
         self.onCategory(None)
+        self.onAutoSpeakMode(None)
 
     def make(self, snippet=None, quiet=False):
         patternMatch = list(PatternMatch)[self.matchModeCategory.control.GetSelection()]
@@ -2303,6 +2331,7 @@ class EditBookmarkDialog(wx.Dialog):
             'keystroke': self.keystroke,
             #'enableAutoSpeak': self.autoSpeakEnabledCheckBox.Value,
             'autoSpeakMode': self.getAutoSpeakMode(),
+            'builtInWavFile': self.getBiw(),
         })
         return bookmark
 
@@ -2382,6 +2411,14 @@ class EditBookmarkDialog(wx.Dialog):
         return result
 
     def onAutoSpeakMode(self, event):
+        asm = self.getAutoSpeakMode()
+        biwControls = [
+            self.biwCategory,
+            self.biwList,
+        ]
+        [biw.control.Enable() for biw in biwControls] if (
+            asm.value.startswith("chime")
+        ) else [biw.control.Disable() for biw in biwControls]
         tones.beep(500, 50)
 
     def OnEditScriptClick(self,evt):
@@ -2448,6 +2485,63 @@ class EditBookmarkDialog(wx.Dialog):
         if msg:
             core.callLater(50, ui.message, msg)
         self.updateCustomKeystrokeButtonLabel()
+        
+    def getBiwCategories(self):
+        soundsPath = utils.getSoundsPath()
+        return [o for o in os.listdir(soundsPath)
+            if os.path.isdir(os.path.join(soundsPath,o))
+        ]
+
+    def getBuiltInWaveFilesInCategory(self):
+        soundsPath = utils.getSoundsPath()
+        category = self.getBiwCategory()
+        ext = ".wav"
+        return [o for o in os.listdir(os.path.join(soundsPath, category))
+            if not os.path.isdir(os.path.join(soundsPath,o))
+                and o.lower().endswith(ext)
+        ]
+
+    def getBuiltInWaveFiles(self):
+        soundsPath = utils.getSoundsPath()
+        result = []
+        for dirName, subdirList, fileList in os.walk(soundsPath, topdown=True):
+            relDirName = dirName[len(soundsPath):]
+            if len(relDirName) > 0 and relDirName[0] == "\\":
+                relDirName = relDirName[1:]
+            for fileName in fileList:
+                if fileName.lower().endswith(".wav"):
+                    result.append(os.path.join(relDirName, fileName))
+        return result
+
+    def getBiw(self):
+        return os.path.join(
+            self.getBiwCategory(),
+            self.getBuiltInWaveFilesInCategory()[self.biwList.control.GetSelection()]
+        )
+
+    def setBiw(self, biw):
+        if biw is None:
+            return
+        category, biwFile = os.path.split(biw)
+        categoryIndex = self.getBiwCategories().index(category)
+        self.biwCategory.control.SetSelection(categoryIndex)
+        self.onBiwCategory(None)
+        biwIndex = self.getBuiltInWaveFilesInCategory().index(biwFile)
+        self.biwList.control.SetSelection(biwIndex)
+
+    def onBiw(self, evt):
+        soundsPath = utils.getSoundsPath()
+        biw = self.getBiw()
+        fullPath = os.path.join(soundsPath, biw)
+        nvwave.playWaveFile(fullPath)
+
+    def getBiwCategory(self):
+        return   self.getBiwCategories()[self.biwCategory.control.GetSelection()]
+
+    def onBiwCategory(self, evt):
+        soundsPath = utils.getSoundsPath()
+        category = self.getBiwCategory()
+        self.biwList.control.SetItems(self.getBuiltInWaveFilesInCategory())
 
     def onOk(self,evt):
         bookmark = self.make()

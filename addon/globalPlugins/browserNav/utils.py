@@ -9,6 +9,7 @@ import core
 import _ctypes
 from enum import Enum
 import IAccessibleHandler
+import os
 from queue import Queue
 import speech
 import textInfos
@@ -404,3 +405,11 @@ def waitForModifiersToBeReleased(timeoutSecs=1):
         if not any(status):
             return
         yield 1
+
+def getSoundsPath():
+    globalPluginPath = os.path.abspath(os.path.dirname(__file__))
+    addonPath = os.path.split(
+        os.path.split(globalPluginPath)[0]
+    )[0]
+    soundsPath = os.path.join(addonPath, "sounds")
+    return soundsPath
