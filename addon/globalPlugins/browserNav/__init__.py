@@ -1072,9 +1072,13 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             self.beeper.fancyBeep("AF#", length=100, left=20, right=20)
             return
         fg=winUser.getForegroundWindow()
-        if api.getFocusObject().appModule.productName == 'NVDA':
+        focus = api.getFocusObject()
+        appName = focus.appModule.appName
+        if appName == 'nvda':
             ui.message(_("Cannot edit in this window."))
             return
+        fastChromeMode = appName == 'chrome'
+        slowFirefoxMode = appName == 'firefox'
         if isinstance(selfself, editableText.EditableText):
             obj = selfself
         elif not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
@@ -1194,34 +1198,35 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     winUser.setFocus(fg)
                     yield 1
               # Step 2.1: Ensure that the browser window is fully focused.
-                # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
-                obj.setFocus()
-                #step21timeout = time.time() + 1 # Leave 1 second for this step
-                goodCounter = 0
-                roles = []
-                kbdControlHome.send()
-                while True:
-                    if time.time() > timeout:
-                        raise EditBoxUpdateError(_("Timed out during switch to window stage"))
-                    focus = api.getFocusObject()
-                    roles.append(focus.role)
-                    if focus.role in [
-                        ROLE_PANE,
-                        ROLE_FRAME,
-                        ROLE_DOCUMENT,
-                    ]:
-                        # All good, Firefox is burning cpu, keep sleeping!
-                        yield 10
-                        goodCounter = 0
-                        continue
-                    elif focus.role == ROLE_EDITABLETEXT:
-                        goodCounter += 1
-                        if goodCounter > 10:
-                            tones.beep(1000, 100)
-                            break
-                        yield 10
-                    else:
-                        raise EditBoxUpdateError(_("Error during switch to window stage, focused element role is %d") % focus.role)
+                if slowFirefoxMode:
+                    # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
+                    obj.setFocus()
+                    #step21timeout = time.time() + 1 # Leave 1 second for this step
+                    goodCounter = 0
+                    roles = []
+                    kbdControlHome.send()
+                    while True:
+                        if time.time() > timeout:
+                            raise EditBoxUpdateError(_("Timed out during switch to window stage"))
+                        focus = api.getFocusObject()
+                        roles.append(focus.role)
+                        if focus.role in [
+                            ROLE_PANE,
+                            ROLE_FRAME,
+                            ROLE_DOCUMENT,
+                        ]:
+                            # All good, Firefox is burning cpu, keep sleeping!
+                            yield 10
+                            goodCounter = 0
+                            continue
+                        elif focus.role == ROLE_EDITABLETEXT:
+                            goodCounter += 1
+                            if goodCounter > 10:
+                                tones.beep(1000, 100)
+                                break
+                            yield 10
+                        else:
+                            raise EditBoxUpdateError(_("Error during switch to window stage, focused element role is %d") % focus.role)
 
               # Step 3: start sending keys
                 self.startInjectingKeystrokes()
