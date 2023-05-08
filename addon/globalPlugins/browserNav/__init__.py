@@ -1297,8 +1297,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                                 )
                             ):
                                 # Bingo! First char has appeared in clipboard. Restoring original clipboard state and exiting
-                                self.endInjectingKeystrokes()
                                 clipboard.deleteEntryFromClipboardHistory(firstChar, maxEntries=1)
+                                self.endInjectingKeystrokes()
                                 return
                             else:
                                 # Something else found in clipboard - likely user has already copied something there. So just exit without restoring state
@@ -1403,7 +1403,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 # Sleep for testing - otherwise clipboard history doesn't even notice new item
                 #time.sleep(1)
                 #core.callLater(1000, clipboard.deleteEntryFromClipboardHistory, data)
-                result = clipboard.deleteEntryFromClipboardHistory(data, maxEntries=1)
+                #result = clipboard.deleteEntryFromClipboardHistory(data, maxEntries=1)
                 #if result:
                     #core.callLater(1000, tones.beep, 1000, 1000)
                 return data
