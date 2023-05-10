@@ -970,27 +970,68 @@ def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
             tones.beep(500, 50)
         else:
             tones.beep(1000, 100)
-    
-    for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak):
-        mylog(f"asdf {line}")
-        line = line[1:]
-        def speak():
-            speech.cancelSpeech()
-            speech.speakText(line)
-        wx.CallAfter(speak)
-        #core.callLater(1000, speak)
+    firstUtterance = True
+    if bookmark.autoSpeakMode == AutoSpeakMode.PARAGRAPH_DIFF:
+        for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak):
+        
+            if line[0] in "!+":
+                line = line[1:]
+                def speak(firstUtterance):
+                    if firstUtterance:
+                        speech.cancelSpeech()
+                    speech.speakText(line)
+                wx.CallAfter(speak, firstUtterance)
+    elif bookmark.autoSpeakMode.value.startswith("chime"):
+        filterByType = {
+            AutoSpeakMode.CHIME_ON_ADD: "+",
+            AutoSpeakMode.CHIME_ON_REMOVE: "-",
+            AutoSpeakMode.CHIME_ON_CHANGE: "+-!"
+        }
+        filter = filterByType[bookmark.autoSpeakMode]
+        passes = any(line[0] in filter for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak))
+        if passes:
+            playBiw(bookmark)
+        
+
     cachedLines.lines = textToSpeak
     
 def diffAndExtractInterestingLines(s1, s2):
     mode = '0'
     for line in dl.context_diff(s1, s2):
         if line.startswith('***'):
-            mode = 'i' # ignore
+            mode = 'old'
         elif line.startswith('---'):
-            mode = 'a' # attention
-        elif mode == 'a' and len(line) > 0 and line[0] in {'!', '+'}:
+            mode = 'new'
+        elif mode == 'new' and len(line) > 0 and line[0] in {'!', '+'}:
             yield line
+        elif mode == 'old' and len(line) > 0 and line[0] in {'-'}:
+            yield line
+
+def playBiw(bookmark):
+    volume = 100.0
+    absPath = os.path.join(
+        utils.getSoundsPath(),
+        bookmark.builtInWavFile,
+    )
+    f = wave.open(absPath,"r")
+    if f.getsampwidth() != 2:
+        bits = f.getsampwidth() * 8
+        raise RuntimeError(f"We only support 16-bit encoded wav files. '{fileName}' is encoded with {bits} bits per sample.")
+    buf =  f.readframes(f.getnframes())
+    bufSize = len(buf)
+    n = bufSize//2
+    unpacked = struct.unpack(f"<{n}h", buf)
+    unpacked = list(unpacked)
+    for i in range(n):
+        unpacked[i] = int(unpacked[i] * volume/100)
+    packed = struct.pack(f"<{n}h", *unpacked)
+    buf = packed
+    fileWavePlayer = nvwave.WavePlayer(channels=f.getnchannels(), samplesPerSec=f.getframerate(),bitsPerSample=f.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+    fileWavePlayer.stop()
+    fileWavePlayer.feed(buf)
+    fileWavePlayer.idle()
     
+
 
 def browseMonitorThreadFuncBakDelete():
     try:
@@ -2419,7 +2460,6 @@ class EditBookmarkDialog(wx.Dialog):
         [biw.control.Enable() for biw in biwControls] if (
             asm.value.startswith("chime")
         ) else [biw.control.Disable() for biw in biwControls]
-        tones.beep(500, 50)
 
     def OnEditScriptClick(self,evt):
         _snippet = self.snippet
