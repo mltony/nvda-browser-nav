@@ -516,6 +516,7 @@ class QJSite(QJImmutable):
     autoClickContinuousDelay: int
     autoSpeak: bool
     autoSpeakCategory: BookmarkCategory
+    suppressDescription: bool
 
     def __init__(self, d):
         super().__init__()
@@ -536,6 +537,7 @@ class QJSite(QJImmutable):
         self.autoClickContinuousDelay = d['autoClickContinuousDelay']
         self.autoSpeak = d.get('autoSpeak', False)
         self.autoSpeakCategory = BookmarkCategory(d.get('autoSpeakCategory', BookmarkCategory.QUICK_SPEAK.value))
+        self.suppressDescription = d.get('suppressDescription', False)
         self.freeze()
 
     def asDict(self):
@@ -554,6 +556,7 @@ class QJSite(QJImmutable):
             'autoClickContinuousDelay': self.autoClickContinuousDelay,
             'autoSpeak': self.autoSpeak,
             'autoSpeakCategory': self.autoSpeakCategory.value,
+            'suppressDescription': self.suppressDescription,
         }
 
 
@@ -1030,38 +1033,16 @@ def playBiw(bookmark):
     fileWavePlayer.stop()
     fileWavePlayer.feed(buf)
     fileWavePlayer.idle()
-    
 
-
-def browseMonitorThreadFuncBakDelete():
+originalBrowseModeReport = None
+def preBrowseModeReport(self,readUnit=None):
+    originalValue = config.conf["presentation"]["reportObjectDescriptions"]
+    config.conf["presentation"]["reportObjectDescriptions"] = False
     try:
-        while not browseMonitorThreadShutdownRequested:
-            time.sleep(0.5)
-            focus = api.getFocusObject()
-            try:
-                browse = focus.treeInterceptor
-                if browse is None:
-                    continue
-            except AttributeError:
-                continue
-            url = getUrl(browse, onlyFromCache=True)
-            if url is None:
-                continue
-            sites = findSites(url, globalConfig)
-            # TODO move autoClick logic to this thread as well
-            #autoClickSites = [site for site in sites if site.autoClickOnFocus]
-            autoSpeakSites = [site for site in sites if site.autoSpeak]
-            autoSpeakBookmarks = [b for s in autoSpeakSites for b in s.bookmarks if b.category == s.autoSpeakCategory]
-            if len(autoSpeakBookmarks) > 0:
-                try:
-                    _autoClick(browse, None, tuple(autoSpeakBookmarks), automated=True, category=autoSpeakBookmarks[0].category)
-                except OSError:
-                    pass
-    except Exception as e:
-        #mylog(e)
-        core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
-        raise e
-
+        result = originalBrowseModeReport(self,readUnit=None)
+    finally:
+        config.conf["presentation"]["reportObjectDescriptions"] = originalValue
+    return result
 
 original_event_treeInterceptor_gainFocus = None
 def pre_event_treeInterceptor_gainFocus(self):
@@ -2885,6 +2866,10 @@ class EditSiteDialog(wx.Dialog):
             self.autoSpeakComboBox.control.SetSelection(self.autoClickOptions.index(
                 self.site.autoSpeakCategory if self.    site.autoSpeak else None
             ))
+      # Translators: label for enable recurrent auto click checkbox
+        Text = _("Suppress descriptions")
+        self.suppressDescriptionsCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.suppressDescriptionsCheckBox.SetValue(self.site.suppressDescriptions)
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -2951,7 +2936,7 @@ class EditSiteDialog(wx.Dialog):
             'autoClickContinuousDelay': self.recurrentDelayEdit.Value,
             #'autoSpeak': self.getAutoSpeakCombo() is not None,
             #'autoSpeakCategory': (self.getAutoSpeakCombo() or BookmarkCategory.QUICK_SPEAK).value,
-
+            'suppressDescriptions': self.suppressDescriptionsCheckBox.Value,
         })
         return site
 

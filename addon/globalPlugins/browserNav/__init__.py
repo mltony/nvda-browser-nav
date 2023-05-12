@@ -663,6 +663,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
         quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
+        quickJump.originalBrowseModeReport = browseMode.TextInfoQuickNavItem.report
+        browseMode.TextInfoQuickNavItem.report = quickJump.preBrowseModeReport
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
         self.thread = threading.Thread(name="BrowserNav browser monitor thread", target = quickJump.browseMonitorThreadFunc, args =())
         self.thread.start()
@@ -1302,7 +1304,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                                 )
                             ):
                                 # Bingo! First char has appeared in clipboard. Restoring original clipboard state and exiting
-                                clipboard.deleteEntryFromClipboardHistory(firstChar, maxEntries=1)
+                                result = clipboard.deleteEntryFromClipboardHistory(firstChar, maxEntries=1)
                                 if result:
                                     core.callLater(1000, tones.beep, 100, 1000)
                                 self.endInjectingKeystrokes()
@@ -1313,9 +1315,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                                 log.error(f"text='{text}'")
                                 log.error(f"newText='{newText}'")
                                 log.error(f"firstChar='{firstChar}'")
-                                #api.newText=newText
-                                #api.firstChar=firstChar
-                                #api.text=text
                                 return
                         log.error(f"asdf Timeout")
                     utils.executeAsynchronously(watchAndRestoreClipboard())
