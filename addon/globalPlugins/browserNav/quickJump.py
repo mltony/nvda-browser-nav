@@ -731,6 +731,16 @@ def getDebugBeepModes(url, config):
         for site in sites
     }
 
+def getSuppressDescription(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return False
+    mode = max([
+        site.suppressDescription
+        for site in sites
+    ])
+    return mode
+
 def getUrlFromObject(object):
     while object is not None:
         try:
@@ -1036,8 +1046,11 @@ def playBiw(bookmark):
 
 originalBrowseModeReport = None
 def preBrowseModeReport(self,readUnit=None):
+    url = getUrl(self.document)
+    suppress = getSuppressDescription(url, globalConfig)
     originalValue = config.conf["presentation"]["reportObjectDescriptions"]
-    config.conf["presentation"]["reportObjectDescriptions"] = False
+    if suppress:
+        config.conf["presentation"]["reportObjectDescriptions"] = False
     try:
         result = originalBrowseModeReport(self,readUnit=None)
     finally:
@@ -2868,8 +2881,8 @@ class EditSiteDialog(wx.Dialog):
             ))
       # Translators: label for enable recurrent auto click checkbox
         Text = _("Suppress descriptions")
-        self.suppressDescriptionsCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
-        self.suppressDescriptionsCheckBox.SetValue(self.site.suppressDescriptions)
+        self.suppressDescriptionCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.suppressDescriptionCheckBox.SetValue(self.site.suppressDescription)
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -2936,7 +2949,7 @@ class EditSiteDialog(wx.Dialog):
             'autoClickContinuousDelay': self.recurrentDelayEdit.Value,
             #'autoSpeak': self.getAutoSpeakCombo() is not None,
             #'autoSpeakCategory': (self.getAutoSpeakCombo() or BookmarkCategory.QUICK_SPEAK).value,
-            'suppressDescriptions': self.suppressDescriptionsCheckBox.Value,
+            'suppressDescription': self.suppressDescriptionCheckBox.Value,
         })
         return site
 
