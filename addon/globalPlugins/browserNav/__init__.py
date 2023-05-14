@@ -619,8 +619,8 @@ def browserNavPopup(selfself,gesture):
     try:
         frame = wx.Frame(None, -1,"Fake popup frame", pos=(1, 1),size=(1, 1))
         menu = wx.Menu()
-        menu.AppendMenu(wx.ID_ANY, '&Bookmark', quickJump.makeBookmarkSubmenu(self, frame))
-        menu.AppendMenu(wx.ID_ANY, '&Website', quickJump.makeWebsiteSubmenu(self, frame))
+        menu.AppendMenu(wx.ID_ANY, _("&Bookmark"), quickJump.makeBookmarkSubmenu(self, frame))
+        menu.AppendMenu(wx.ID_ANY, _("&Website"), quickJump.makeWebsiteSubmenu(self, frame))
         frame.Bind(
             wx.EVT_MENU_CLOSE,
             lambda evt: frame.Close()
