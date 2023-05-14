@@ -1052,7 +1052,7 @@ def preBrowseModeReport(self,readUnit=None):
     if suppress:
         config.conf["presentation"]["reportObjectDescriptions"] = False
     try:
-        result = originalBrowseModeReport(self,readUnit=None)
+        result = originalBrowseModeReport(self,readUnit)
     finally:
         config.conf["presentation"]["reportObjectDescriptions"] = originalValue
     return result
