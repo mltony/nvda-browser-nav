@@ -40,7 +40,6 @@ def ephemeralCopyToClipAndRestore(text: str):
         
 TEXT_FORMAT = "Text"
 def deleteEntryFromClipboardHistory(textToDelete, maxEntries=10):
-    return
     from .pywinsdk.relative import winsdk
     from .pywinsdk.relative.winsdk.windows.applicationmodel.datatransfer import Clipboard
     from .pywinsdk.relative.winsdk.windows.foundation import AsyncStatus

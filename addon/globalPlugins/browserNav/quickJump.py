@@ -196,12 +196,19 @@ class ParagraphAttribute(Enum):
 class AutoSpeakMode(Enum):
     OFF = 'off'
     PARAGRAPH_DIFF = 'paragraph_diff'
-    DIFF = 'diff'
+    WORD_DIFF = 'word_diff'
+    CHIME_ON_ADD = 'chime_on_add'
+    CHIME_ON_REMOVE = 'chime_on_remove'
+    CHIME_ON_CHANGE = 'chime_on_change'
 
 autoSpeakModeNames = {
     AutoSpeakMode.OFF: _("AutoSpeak disabled"),
     AutoSpeakMode.PARAGRAPH_DIFF: _("Speak changed paragraphs"),
-    AutoSpeakMode.DIFF: _("Speak only changed text within paragraph (diff)"),
+    AutoSpeakMode.WORD_DIFF: _("Speak only changed words (diff)"),
+    AutoSpeakMode.CHIME_ON_ADD: _("Play chime when bookmark appears on the page"),
+    AutoSpeakMode.CHIME_ON_REMOVE: _("Play chime when bookmark disappears from the page"),
+    AutoSpeakMode.CHIME_ON_CHANGE: _("Play chime when text matched by bookmark changes"),
+
 }
 class QJImmutable:
     def __init__(self):
@@ -418,6 +425,7 @@ class QJBookmark(QJImmutable):
     keystroke: str
     enableAutoSpeak: bool
     autoSpeakMode: AutoSpeakMode
+    builtInWavFile: str
 
     def __init__(self, d):
         object.__setattr__(self, 'enabled', d['enabled'])
@@ -453,6 +461,7 @@ class QJBookmark(QJImmutable):
         object.__setattr__(self, 'keystroke', d.get('keystroke', None))
         object.__setattr__(self, 'enableAutoSpeak', d.get('enableAutoSpeak', False))
         object.__setattr__(self, 'autoSpeakMode', AutoSpeakMode(d.get('autoSpeakMode', AutoSpeakMode.OFF.value)))
+        object.__setattr__(self, 'builtInWavFile', d.get('builtInWavFile', None))
 
     def asDict(self):
         return {
@@ -472,6 +481,7 @@ class QJBookmark(QJImmutable):
             'keystroke': self.keystroke,
             'enableAutoSpeak': self.enableAutoSpeak,
             'autoSpeakMode': self.autoSpeakMode.value,
+            'builtInWavFile': self.builtInWavFile,
         }
 
     def getDisplayName(self):
@@ -506,6 +516,7 @@ class QJSite(QJImmutable):
     autoClickContinuousDelay: int
     autoSpeak: bool
     autoSpeakCategory: BookmarkCategory
+    suppressDescription: bool
 
     def __init__(self, d):
         super().__init__()
@@ -526,6 +537,7 @@ class QJSite(QJImmutable):
         self.autoClickContinuousDelay = d['autoClickContinuousDelay']
         self.autoSpeak = d.get('autoSpeak', False)
         self.autoSpeakCategory = BookmarkCategory(d.get('autoSpeakCategory', BookmarkCategory.QUICK_SPEAK.value))
+        self.suppressDescription = d.get('suppressDescription', False)
         self.freeze()
 
     def asDict(self):
@@ -544,6 +556,7 @@ class QJSite(QJImmutable):
             'autoClickContinuousDelay': self.autoClickContinuousDelay,
             'autoSpeak': self.autoSpeak,
             'autoSpeakCategory': self.autoSpeakCategory.value,
+            'suppressDescription': self.suppressDescription,
         }
 
 
@@ -717,6 +730,16 @@ def getDebugBeepModes(url, config):
         site.debugBeepMode
         for site in sites
     }
+
+def getSuppressDescription(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return False
+    mode = max([
+        site.suppressDescription
+        for site in sites
+    ])
+    return mode
 
 def getUrlFromObject(object):
     while object is not None:
@@ -960,57 +983,79 @@ def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
             tones.beep(500, 50)
         else:
             tones.beep(1000, 100)
-    
-    for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak):
-        mylog(f"asdf {line}")
-        line = line[1:]
-        def speak():
-            speech.cancelSpeech()
-            speech.speakText(line)
-        wx.CallAfter(speak)
-        #core.callLater(1000, speak)
+    firstUtterance = True
+    if bookmark.autoSpeakMode == AutoSpeakMode.PARAGRAPH_DIFF:
+        for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak):
+        
+            if line[0] in "!+":
+                line = line[1:]
+                def speak(firstUtterance):
+                    if firstUtterance:
+                        speech.cancelSpeech()
+                    speech.speakText(line)
+                wx.CallAfter(speak, firstUtterance)
+    elif bookmark.autoSpeakMode.value.startswith("chime"):
+        filterByType = {
+            AutoSpeakMode.CHIME_ON_ADD: "+",
+            AutoSpeakMode.CHIME_ON_REMOVE: "-",
+            AutoSpeakMode.CHIME_ON_CHANGE: "+-!"
+        }
+        filter = filterByType[bookmark.autoSpeakMode]
+        passes = any(line[0] in filter for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak))
+        if passes:
+            playBiw(bookmark)
+        
+
     cachedLines.lines = textToSpeak
     
 def diffAndExtractInterestingLines(s1, s2):
     mode = '0'
     for line in dl.context_diff(s1, s2):
         if line.startswith('***'):
-            mode = 'i' # ignore
+            mode = 'old'
         elif line.startswith('---'):
-            mode = 'a' # attention
-        elif mode == 'a' and len(line) > 0 and line[0] in {'!', '+'}:
+            mode = 'new'
+        elif mode == 'new' and len(line) > 0 and line[0] in {'!', '+'}:
             yield line
-    
+        elif mode == 'old' and len(line) > 0 and line[0] in {'-'}:
+            yield line
 
-def browseMonitorThreadFuncBakDelete():
+def playBiw(bookmark):
+    volume = 100.0
+    absPath = os.path.join(
+        utils.getSoundsPath(),
+        bookmark.builtInWavFile,
+    )
+    f = wave.open(absPath,"r")
+    if f.getsampwidth() != 2:
+        bits = f.getsampwidth() * 8
+        raise RuntimeError(f"We only support 16-bit encoded wav files. '{fileName}' is encoded with {bits} bits per sample.")
+    buf =  f.readframes(f.getnframes())
+    bufSize = len(buf)
+    n = bufSize//2
+    unpacked = struct.unpack(f"<{n}h", buf)
+    unpacked = list(unpacked)
+    for i in range(n):
+        unpacked[i] = int(unpacked[i] * volume/100)
+    packed = struct.pack(f"<{n}h", *unpacked)
+    buf = packed
+    fileWavePlayer = nvwave.WavePlayer(channels=f.getnchannels(), samplesPerSec=f.getframerate(),bitsPerSample=f.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+    fileWavePlayer.stop()
+    fileWavePlayer.feed(buf)
+    fileWavePlayer.idle()
+
+originalBrowseModeReport = None
+def preBrowseModeReport(self,readUnit=None):
+    url = getUrl(self.document)
+    suppress = getSuppressDescription(url, globalConfig)
+    originalValue = config.conf["presentation"]["reportObjectDescriptions"]
+    if suppress:
+        config.conf["presentation"]["reportObjectDescriptions"] = False
     try:
-        while not browseMonitorThreadShutdownRequested:
-            time.sleep(0.5)
-            focus = api.getFocusObject()
-            try:
-                browse = focus.treeInterceptor
-                if browse is None:
-                    continue
-            except AttributeError:
-                continue
-            url = getUrl(browse, onlyFromCache=True)
-            if url is None:
-                continue
-            sites = findSites(url, globalConfig)
-            # TODO move autoClick logic to this thread as well
-            #autoClickSites = [site for site in sites if site.autoClickOnFocus]
-            autoSpeakSites = [site for site in sites if site.autoSpeak]
-            autoSpeakBookmarks = [b for s in autoSpeakSites for b in s.bookmarks if b.category == s.autoSpeakCategory]
-            if len(autoSpeakBookmarks) > 0:
-                try:
-                    _autoClick(browse, None, tuple(autoSpeakBookmarks), automated=True, category=autoSpeakBookmarks[0].category)
-                except OSError:
-                    pass
-    except Exception as e:
-        #mylog(e)
-        core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
-        raise e
-
+        result = originalBrowseModeReport(self,readUnit=None)
+    finally:
+        config.conf["presentation"]["reportObjectDescriptions"] = originalValue
+    return result
 
 original_event_treeInterceptor_gainFocus = None
 def pre_event_treeInterceptor_gainFocus(self):
@@ -2114,7 +2159,6 @@ class EditBookmarkDialog(wx.Dialog):
         self.snippet = self.bookmark.snippet
         self.cursorLine, self.cursorColumn = 0,0
         self.keystroke = self.bookmark.keystroke
-
       # Translators: pattern
         patternLabelText = _("&Pattern")
         self.patternTextCtrl=sHelper.addLabeledControl(patternLabelText, wx.TextCtrl)
@@ -2222,8 +2266,26 @@ class EditBookmarkDialog(wx.Dialog):
         )
         self.autoSpeakModeComboBox.control.Bind(wx.EVT_CHOICE,self.onAutoSpeakMode)
         self.autoSpeakModeComboBox.control.SetSelection(list(AutoSpeakMode).index(self.bookmark.autoSpeakMode))
-
-
+      # Translators: built in wav category  combo box
+        biwCategoryLabelText=_("Chime &category:")
+        self.biwCategory=guiHelper.LabeledControlHelper(
+            self,
+            biwCategoryLabelText,
+            wx.Choice,
+            choices=self.getBiwCategories(),
+        )
+        self.biwCategory.control.Bind(wx.EVT_CHOICE,self.onBiwCategory)
+        
+      # Translators: built in wav file combo box
+        biwListLabelText=_("C&hime:")
+        self.biwList=guiHelper.LabeledControlHelper(
+            self,
+            biwListLabelText,
+            wx.Choice,
+            choices=[],
+        )
+        self.biwList.control.Bind(wx.EVT_CHOICE,self.onBiw)
+        self.setBiw(self.bookmark.builtInWavFile)
       # Edit script button
         self.editScriptButton = sHelper.addItem (wx.Button (self, label = _("Edit &script in new window; press Control+Enter when Done.")))
         self.editScriptButton.Bind(wx.EVT_BUTTON, self.OnEditScriptClick)
@@ -2239,6 +2301,7 @@ class EditBookmarkDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
 
         self.onCategory(None)
+        self.onAutoSpeakMode(None)
 
     def make(self, snippet=None, quiet=False):
         patternMatch = list(PatternMatch)[self.matchModeCategory.control.GetSelection()]
@@ -2303,6 +2366,7 @@ class EditBookmarkDialog(wx.Dialog):
             'keystroke': self.keystroke,
             #'enableAutoSpeak': self.autoSpeakEnabledCheckBox.Value,
             'autoSpeakMode': self.getAutoSpeakMode(),
+            'builtInWavFile': self.getBiw(),
         })
         return bookmark
 
@@ -2382,7 +2446,14 @@ class EditBookmarkDialog(wx.Dialog):
         return result
 
     def onAutoSpeakMode(self, event):
-        tones.beep(500, 50)
+        asm = self.getAutoSpeakMode()
+        biwControls = [
+            self.biwCategory,
+            self.biwList,
+        ]
+        [biw.control.Enable() for biw in biwControls] if (
+            asm.value.startswith("chime")
+        ) else [biw.control.Disable() for biw in biwControls]
 
     def OnEditScriptClick(self,evt):
         _snippet = self.snippet
@@ -2448,6 +2519,63 @@ class EditBookmarkDialog(wx.Dialog):
         if msg:
             core.callLater(50, ui.message, msg)
         self.updateCustomKeystrokeButtonLabel()
+        
+    def getBiwCategories(self):
+        soundsPath = utils.getSoundsPath()
+        return [o for o in os.listdir(soundsPath)
+            if os.path.isdir(os.path.join(soundsPath,o))
+        ]
+
+    def getBuiltInWaveFilesInCategory(self):
+        soundsPath = utils.getSoundsPath()
+        category = self.getBiwCategory()
+        ext = ".wav"
+        return [o for o in os.listdir(os.path.join(soundsPath, category))
+            if not os.path.isdir(os.path.join(soundsPath,o))
+                and o.lower().endswith(ext)
+        ]
+
+    def getBuiltInWaveFiles(self):
+        soundsPath = utils.getSoundsPath()
+        result = []
+        for dirName, subdirList, fileList in os.walk(soundsPath, topdown=True):
+            relDirName = dirName[len(soundsPath):]
+            if len(relDirName) > 0 and relDirName[0] == "\\":
+                relDirName = relDirName[1:]
+            for fileName in fileList:
+                if fileName.lower().endswith(".wav"):
+                    result.append(os.path.join(relDirName, fileName))
+        return result
+
+    def getBiw(self):
+        return os.path.join(
+            self.getBiwCategory(),
+            self.getBuiltInWaveFilesInCategory()[self.biwList.control.GetSelection()]
+        )
+
+    def setBiw(self, biw):
+        if biw is None:
+            return
+        category, biwFile = os.path.split(biw)
+        categoryIndex = self.getBiwCategories().index(category)
+        self.biwCategory.control.SetSelection(categoryIndex)
+        self.onBiwCategory(None)
+        biwIndex = self.getBuiltInWaveFilesInCategory().index(biwFile)
+        self.biwList.control.SetSelection(biwIndex)
+
+    def onBiw(self, evt):
+        soundsPath = utils.getSoundsPath()
+        biw = self.getBiw()
+        fullPath = os.path.join(soundsPath, biw)
+        nvwave.playWaveFile(fullPath)
+
+    def getBiwCategory(self):
+        return   self.getBiwCategories()[self.biwCategory.control.GetSelection()]
+
+    def onBiwCategory(self, evt):
+        soundsPath = utils.getSoundsPath()
+        category = self.getBiwCategory()
+        self.biwList.control.SetItems(self.getBuiltInWaveFilesInCategory())
 
     def onOk(self,evt):
         bookmark = self.make()
@@ -2751,6 +2879,10 @@ class EditSiteDialog(wx.Dialog):
             self.autoSpeakComboBox.control.SetSelection(self.autoClickOptions.index(
                 self.site.autoSpeakCategory if self.    site.autoSpeak else None
             ))
+      # Translators: label for enable recurrent auto click checkbox
+        Text = _("Suppress descriptions")
+        self.suppressDescriptionCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.suppressDescriptionCheckBox.SetValue(self.site.suppressDescription)
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -2817,7 +2949,7 @@ class EditSiteDialog(wx.Dialog):
             'autoClickContinuousDelay': self.recurrentDelayEdit.Value,
             #'autoSpeak': self.getAutoSpeakCombo() is not None,
             #'autoSpeakCategory': (self.getAutoSpeakCombo() or BookmarkCategory.QUICK_SPEAK).value,
-
+            'suppressDescription': self.suppressDescriptionCheckBox.Value,
         })
         return site
 
