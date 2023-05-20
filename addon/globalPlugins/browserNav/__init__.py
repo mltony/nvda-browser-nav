@@ -1200,8 +1200,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     winUser.setFocus(fg)
                     yield 1
               # Step 2.1: Ensure that the browser window is fully focused.
-                if slowFirefoxMode:
+                if True:
                     # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
+                    # This also proves necessary for Chrome on some websites like Jupyter
                     obj.setFocus()
                     #step21timeout = time.time() + 1 # Leave 1 second for this step
                     goodCounter = 0
