@@ -1306,7 +1306,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                             ):
                                 # Bingo! First char has appeared in clipboard. Restoring original clipboard state and exiting
                                 result = clipboard.deleteEntryFromClipboardHistory(firstChar, maxEntries=1)
-                                if result:
+                                if False and result:
                                     core.callLater(1000, tones.beep, 100, 1000)
                                 self.endInjectingKeystrokes()
                                 return
@@ -1412,7 +1412,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 #core.callLater(1000, clipboard.deleteEntryFromClipboardHistory, data)
                 result = clipboard.deleteEntryFromClipboardHistory(data, maxEntries=1)
                 # self.endInjectingKeystrokes() will be called outside 
-                if result:
+                if False and  result:
                     core.callLater(1000, tones.beep, 1000, 1000)
                 return data
             wx.Yield()
