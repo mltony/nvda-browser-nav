@@ -1846,9 +1846,6 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
     numericScriptBookmarks = findApplicableBookmarks(globalConfig, url, BookmarkCategory.NUMERIC_SCRIPT)
     if len(hierarchicalBookmarks) > 0:
         if len(numericScriptBookmarks) > 0:
-            api.h = hierarchicalBookmarks
-            api.n = numericScriptBookmarks
-            api.url = url
             ui.message(_("Both hierarchical and numeric script bookmarks are configured for this website. This is not supported; please disable either hierarchical or numeric script bookmarks."))
         else:
             return _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg)
@@ -1856,7 +1853,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
         if len(numericScriptBookmarks) > 0:
             return _numericScriptKeystroke(self, gesture, direction, level, numericScriptBookmarks)
         else:
-            pass
+            return endOfDocument(_('No hierarchical quickJump bookmarks or numeric script bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
 
 def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg):
     oldSelection = self.selection
