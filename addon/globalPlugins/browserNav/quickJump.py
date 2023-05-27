@@ -946,6 +946,11 @@ def browseMonitorThreadFunc():
                 cacheEntry = {}
                 AutoSpeakCache[browse] = cacheEntry
             processAutoSpeakEntry(browse, bookmarks, cacheEntry)
+            try:
+                #processWholePageDiff(browse, url)
+                pass
+            except OSError:
+                pass
     except Exception as e:
         #mylog(e)
         core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
@@ -986,7 +991,6 @@ def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
     firstUtterance = True
     if bookmark.autoSpeakMode == AutoSpeakMode.PARAGRAPH_DIFF:
         for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak):
-        
             if line[0] in "!+":
                 line = line[1:]
                 def speak(firstUtterance):
@@ -1009,6 +1013,10 @@ def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
     cachedLines.lines = textToSpeak
     
 def diffAndExtractInterestingLines(s1, s2):
+    if isinstance(s1, str):
+        s1 = s1.splitlines()
+    if isinstance(s2, str):
+        s2 = s2.splitlines()
     mode = '0'
     for line in dl.context_diff(s1, s2):
         if line.startswith('***'):
@@ -1020,11 +1028,11 @@ def diffAndExtractInterestingLines(s1, s2):
         elif mode == 'old' and len(line) > 0 and line[0] in {'-'}:
             yield line
 
-def playBiw(bookmark):
+def playBiw(bookmark=None, earcon=None):
     volume = 100.0
     absPath = os.path.join(
         utils.getSoundsPath(),
-        bookmark.builtInWavFile,
+        earcon or bookmark.builtInWavFile,
     )
     f = wave.open(absPath,"r")
     if f.getsampwidth() != 2:
@@ -1043,6 +1051,67 @@ def playBiw(bookmark):
     fileWavePlayer.stop()
     fileWavePlayer.feed(buf)
     fileWavePlayer.idle()
+
+
+def getTextFast(info):
+    fields = info.getTextWithFields()
+    text = [s.rstrip("\r\n") for s in fields if isinstance(s, str)]
+    return "\r\n".join(text)
+
+
+wpdCache = weakref.WeakKeyDictionary()
+WPDCacheEntry = namedtuple('WPDCacheEntry', ['text'])
+def processWholePageDiff(browse, url):
+    entry = wpdCache.get(browse, None)
+    info = browse.makeTextInfo(textInfos.POSITION_ALL)
+    c1 = time.time()
+    #newText = info.clipboardText
+    newText = getTextFast(info)
+    c2 = time.time()
+    if entry is not None:
+        oldText = entry.text
+        linesToSpeak= [] 
+        kinds = {}
+        for line in diffAndExtractInterestingLines(oldText, newText):
+            if line[0] in "!+":
+                linesToSpeak.append(line[1:])
+            kind = line[0]
+            counter = kinds.get(kind, 0)
+            kinds[kind] = counter + 1
+        if len(linesToSpeak) > 0:
+            if False:
+                api.t .append(len(newText))
+                api.d.append(len(linesToSpeak))
+                api.c.append(c2-c1)
+                global debugi
+                with open(f"H:\\bn{debugi}.txt", 'w', encoding='utf-8') as f:
+                    print(newText, file=f)
+                debugi += 1
+            
+            def speakLines(lines):
+                speech.speakText("\n".join(lines))
+            wx.CallAfter(speakLines, linesToSpeak)
+        playDiffEarcons(
+            add='+' in kinds,
+            modify='!' in kinds,
+            delete='-' in kinds,
+        )
+    wpdCache[browse] = WPDCacheEntry(text = newText)
+
+earconDelete = "3d/center.wav"
+earconModify = "3d/search-hit.wav"
+earconAdd = "3d/search-miss.wav"
+def playDiffEarcons(delete, modify, add):
+    if add or modify or delete:
+        tones.beep(100, 5)
+    if False:
+        if delete:
+            playBiw(earcon=earconDelete)
+        if modify:
+            playBiw(earcon=earconModify)
+        if add:
+            playBiw(earcon=earconAdd)
+
 
 originalBrowseModeReport = None
 def preBrowseModeReport(self,readUnit=None):
