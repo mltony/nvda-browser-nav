@@ -4,6 +4,7 @@
 #See the file LICENSE  for more details.
 
 import api
+import browseMode
 from collections import namedtuple, defaultdict
 from contextlib import ExitStack
 import controlTypes
@@ -916,9 +917,9 @@ def asyncBrowseMonitor(self):
             del browse
 
 class AutoSpeakCacheEntry:
-    enabled: bool 
+    enabled: bool
     lines = None
-    
+
     def __init__(self, lines):
         self.lines = lines
         self.enabled = True
@@ -982,7 +983,7 @@ def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
         mylog(f"l={len(textToSpeak)}")
         if len(textToSpeak) > 0:
             mylog(f" 0={textToSpeak[0]}")
-        
+
     if False:
         if cachedLines.lines == textToSpeak:
             tones.beep(500, 50)
@@ -1008,10 +1009,10 @@ def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
         passes = any(line[0] in filter for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak))
         if passes:
             playBiw(bookmark)
-        
+
 
     cachedLines.lines = textToSpeak
-    
+
 def diffAndExtractInterestingLines(s1, s2):
     if isinstance(s1, str):
         s1 = s1.splitlines()
@@ -1070,7 +1071,7 @@ def processWholePageDiff(browse, url):
     c2 = time.time()
     if entry is not None:
         oldText = entry.text
-        linesToSpeak= [] 
+        linesToSpeak= []
         kinds = {}
         for line in diffAndExtractInterestingLines(oldText, newText):
             if line[0] in "!+":
@@ -1087,7 +1088,7 @@ def processWholePageDiff(browse, url):
                 with open(f"H:\\bn{debugi}.txt", 'w', encoding='utf-8') as f:
                     print(newText, file=f)
                 debugi += 1
-            
+
             def speakLines(lines):
                 speech.speakText("\n".join(lines))
             wx.CallAfter(speakLines, linesToSpeak)
@@ -1722,7 +1723,7 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
                     ttsb = []
                     textToSpeakByBookmark[match.bookmark] = ttsb
                 ttsb.extend(entries)
-                    
+
             else:
                 error_hahaha
         distance += 1
@@ -2194,6 +2195,43 @@ def makeBookmarkSubmenu(self, frame):
         )
     return menu
 
+def getBrowseModeDefaultKeystrokeByFunc(funcName):
+    bmGestures = browseMode.BrowseModeTreeInterceptor._BrowseModeTreeInterceptor__gestures
+    results = [
+        k
+        for k, v in bmGestures.items()
+        if v == funcName
+    ]
+    if len(results) > 0:
+        result = results[0]
+        prefix = "kb:"
+        if result.startswith(prefix):
+            result = result[len(prefix):]
+        return result
+    else:
+        return "N/A"
+    quickJumpForward
+def getDefaultKeystroke(category):
+    categoriesToFuncNames = {
+        BookmarkCategory.QUICK_JUMP: "quickJumpForward",
+        BookmarkCategory.QUICK_JUMP_2: "quickJump2Forward",
+        BookmarkCategory.QUICK_JUMP_3: "quickJump3Forward",
+        BookmarkCategory.QUICK_CLICK: "autoClick",
+        BookmarkCategory.QUICK_CLICK_2: "autoClick2",
+        BookmarkCategory.QUICK_CLICK_3:  "autoClick3",
+        BookmarkCategory.QUICK_SPEAK: "quickSpeak",
+    }
+    try:
+        funcName = categoriesToFuncNames[category]
+    except KeyError:
+        if category == BookmarkCategory.HIERARCHICAL:
+            return "Alt+1 .. Alt+9"
+        elif category == BookmarkCategory.NUMERIC_SCRIPT:
+            return "Alt+0 .. Alt+9"
+        else:
+            return "N/A"
+    return getBrowseModeDefaultKeystrokeByFunc(funcName)
+
 
 class EditBookmarkDialog(wx.Dialog):
     def __init__(self, parent, bookmark=None, config=None, site=None, allowSiteSelection=False, paragraphInfo=None, text=None):
@@ -2341,7 +2379,7 @@ class EditBookmarkDialog(wx.Dialog):
             choices=self.getBiwCategories(),
         )
         self.biwCategory.control.Bind(wx.EVT_CHOICE,self.onBiwCategory)
-        
+
       # Translators: built in wav file combo box
         biwListLabelText=_("C&hime:")
         self.biwList=guiHelper.LabeledControlHelper(
@@ -2476,6 +2514,7 @@ class EditBookmarkDialog(wx.Dialog):
 
     def onCategory(self, event):
         category = self.getCategory()
+        self.updateCustomKeystrokeButtonLabel()
         self.messageTextCtrl.Disable() if category in {
             BookmarkCategory.SKIP_CLUTTER,
             BookmarkCategory.HIERARCHICAL,
@@ -2552,7 +2591,11 @@ class EditBookmarkDialog(wx.Dialog):
 
     def updateCustomKeystrokeButtonLabel(self):
         keystroke = self.keystroke
-        self.customeKeystrokeButton.SetLabel(_("Custom &Keystroke: %s") % (keystroke if keystroke else _("None")))
+        if keystroke:
+            self.customeKeystrokeButton.SetLabel(_("Custom &Keystroke: %s") % (keystroke))
+        else:
+            self.customeKeystrokeButton.SetLabel(_("Default &Keystroke: %s") % (getDefaultKeystroke(self.getCategory())))
+            #            if keystroke else _("Default (%s)"))) % 
 
     def OnCustomKeystrokeClick(self,evt):
         if inputCore.manager._captureFunc:
@@ -2585,7 +2628,7 @@ class EditBookmarkDialog(wx.Dialog):
         if msg:
             core.callLater(50, ui.message, msg)
         self.updateCustomKeystrokeButtonLabel()
-        
+
     def getBiwCategories(self):
         soundsPath = utils.getSoundsPath()
         return [o for o in os.listdir(soundsPath)

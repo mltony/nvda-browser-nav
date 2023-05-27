@@ -1785,3 +1785,4 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 gesture,
             ),
             doc=_("Show BrowserNav popup menu."))
+
