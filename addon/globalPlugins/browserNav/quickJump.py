@@ -382,7 +382,7 @@ def wrapPythonCode(code):
 
 safe_builtins = {
     s: __builtins__[s]
-    for s in "abs all any ascii bin chr dir divmod format hash hex id isinstance issubclass iter len max min next oct ord pow repr round sorted sum None Ellipsis NotImplemented False True bool bytearray bytes complex dict enumerate filter float frozenset int list map object range reversed set slice str tuple type zip BaseException Exception TypeError StopAsyncIteration StopIteration GeneratorExit SystemExit KeyboardInterrupt ImportError ModuleNotFoundError OSError EnvironmentError IOError WindowsError EOFError RuntimeError RecursionError NotImplementedError NameError UnboundLocalError AttributeError SyntaxError IndentationError TabError LookupError IndexError KeyError ValueError UnicodeError UnicodeEncodeError UnicodeDecodeError UnicodeTranslateError AssertionError ArithmeticError FloatingPointError OverflowError ZeroDivisionError SystemError ReferenceError MemoryError BufferError ConnectionError BlockingIOError BrokenPipeError ChildProcessError ConnectionAbortedError ConnectionRefusedError ConnectionResetError FileExistsError FileNotFoundError IsADirectoryError NotADirectoryError InterruptedError PermissionError ProcessLookupError TimeoutError".split()
+    for s in "__import__ abs all any ascii bin chr dir divmod format hash hex id isinstance issubclass iter len max min next oct ord pow repr round sorted sum None Ellipsis NotImplemented False True bool bytearray bytes complex dict enumerate filter float frozenset int list map object range reversed set slice str tuple type zip BaseException Exception TypeError StopAsyncIteration StopIteration GeneratorExit SystemExit KeyboardInterrupt ImportError ModuleNotFoundError OSError EnvironmentError IOError WindowsError EOFError RuntimeError RecursionError NotImplementedError NameError UnboundLocalError AttributeError SyntaxError IndentationError TabError LookupError IndexError KeyError ValueError UnicodeError UnicodeEncodeError UnicodeDecodeError UnicodeTranslateError AssertionError ArithmeticError FloatingPointError OverflowError ZeroDivisionError SystemError ReferenceError MemoryError BufferError ConnectionError BlockingIOError BrokenPipeError ChildProcessError ConnectionAbortedError ConnectionRefusedError ConnectionResetError FileExistsError FileNotFoundError IsADirectoryError NotADirectoryError InterruptedError PermissionError ProcessLookupError TimeoutError".split()
 }
 
 execGlobals = {
@@ -1948,6 +1948,7 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
 
 numericScriptNumberEntryInProgress = False
 numericScriptEntries = []
+numericScriptNegativeMultiplier = 1
 numericScriptModifiers = None
 def awaitNumberForNumericScript(self, bookmarks):
     global numericScriptNumberEntryInProgress
@@ -1961,7 +1962,7 @@ def awaitNumberForNumericScript(self, bookmarks):
     _runScriptBookmarks(self, None, bookmarks, isNumeric=True)
 
 def _numericScriptKeystroke(self, gesture, direction, level, bookmarks):
-    global numericScriptEntries, numericScriptModifiers
+    global numericScriptEntries, numericScriptModifiers, numericScriptNegativeMultiplier
 
     if numericScriptNumberEntryInProgress:
         numericScriptEntries.append(level)
@@ -1969,6 +1970,7 @@ def _numericScriptKeystroke(self, gesture, direction, level, bookmarks):
     else:
         numericScriptEntries = [level]
         numericScriptModifiers = utils.getCurrentModifiers()
+        numericScriptNegativeMultiplier = -1 if "shift" in gesture.modifierNames else 1
         utils.executeAsynchronously(awaitNumberForNumericScript(self, bookmarks))
 
 
@@ -1987,7 +1989,7 @@ def _runScriptBookmarks(self, gesture, bookmarks, isNumeric=False):
         else:
             levels = [str((i+1)%10) for i in levels]
             try:
-                level = int("".join(levels))
+                level = int("".join(levels)) * numericScriptNegativeMultiplier
             except ValueError:
                 ui.message(
                     _("Invalid level for numeric script: '{level}'")
