@@ -1137,6 +1137,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             raise e
         finally:
             self.endInjectingKeystrokes()
+        if (uniqueID is not None) and (uniqueID != 0):
+            focus = api.getFocusObject()
+            if uniqueID != focus.IA2UniqueID:
+                mesage = _("Warning! While copying text out of edit box, focused elementon the page has changed. Please try again.")
+                gui.messageBox(message)
+                return
         if (len(text) == 0) or len(preText) == 0:
             ui.message("Failed to copy text from semi-accessible edit-box. Please make sure edit box is not empty.")
             return
@@ -1230,6 +1236,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                             yield 10
                         else:
                             raise EditBoxUpdateError(_("Error during switch to window stage, focused element role is %d") % focus.role)
+              # Step 2.2: Ensure that the same edit box is focused
+                if (uniqueID is not None) and (uniqueID != 0):
+                    focus = api.getFocusObject()
+                    if uniqueID != focus.IA2UniqueID:
+                        mesage = _("Error! When switching back to browser window, a different edit box is focused.")
+                        raise EditBoxUpdateError(message)
 
               # Step 3: start sending keys
                 self.startInjectingKeystrokes()
@@ -1323,6 +1335,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
                     keystroke.send()
+              # Step 4.2: Verify again that the right edit box is focused
+                if (uniqueID is not None) and (uniqueID != 0):
+                    focus = api.getFocusObject()
+                    if uniqueID != focus.IA2UniqueID:
+                        mesage = _("Error! Focused element on the page has changed while pasting updated text. Possibly content of a different edit box has changed. Please inspect edit boxes manually and undo if needed.")
+                        raise EditBoxUpdateError(message)
 
             except EditBoxUpdateError as e:
                 tones.player.stop()
