@@ -9,6 +9,7 @@ import core
 import _ctypes
 from enum import Enum
 import IAccessibleHandler
+import os
 from queue import Queue
 import speech
 import textInfos
@@ -370,9 +371,45 @@ def speakMessage(message):
     if message is None:
         return
     if isinstance(message, str):
-        ui.message(message)
+        if not speech.isBlank(message):
+            ui.message(message)
     elif isinstance(message, textInfos.TextInfo):
         speech.speakTextInfo(message, reason=controlTypes.OutputReason.CARET)
     else:
         raise RuntimeError(f"speakMessage got unsupported argument of type {type(message)}.")
     
+allModifiers = [
+    winUser.VK_LCONTROL, winUser.VK_RCONTROL,
+    winUser.VK_LSHIFT, winUser.VK_RSHIFT, winUser.VK_LMENU,
+    winUser.VK_RMENU, winUser.VK_LWIN, winUser.VK_RWIN,
+]
+
+def getCurrentModifiers():
+    status = [
+        k
+        for k in allModifiers
+        if winUser.getKeyState(k) & 32768 > 0
+    ]
+    return status
+
+def waitForModifiersToBeReleased(timeoutSecs=1):
+    t0 = time.time()
+    t1 = t0 + timeoutSecs
+    while True:
+        if time.time() > t1:
+            raise TimeoutError()
+        status = [
+            winUser.getKeyState(k) & 32768
+            for k in allModifiers
+        ]
+        if not any(status):
+            return
+        yield 1
+
+def getSoundsPath():
+    globalPluginPath = os.path.abspath(os.path.dirname(__file__))
+    addonPath = os.path.split(
+        os.path.split(globalPluginPath)[0]
+    )[0]
+    soundsPath = os.path.join(addonPath, "sounds")
+    return soundsPath

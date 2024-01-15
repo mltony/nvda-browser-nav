@@ -1,3 +1,4 @@
+#-*- coding:utf-8 -*-
 #A part of the BrowserNav addon for NVDA
 #Copyright (C) 2017-2022 Tony Malykh
 #This file is covered by the GNU General Public License.
@@ -58,6 +59,8 @@ from . beeper import *
 from . import quickJump
 from . import clipboard
 from .editor import EditTextDialog
+import gc
+import garbageHandler
 
 
 debug = False
@@ -315,14 +318,8 @@ kbdLeft = fromNameSmart("LeftArrow")
 kbdRight = fromNameSmart("RightArrow")
 kbdUp = fromNameSmart("UpArrow")
 kbdDown = fromNameSmart("DownArrow")
-
-allModifiers = [
-    winUser.VK_LCONTROL, winUser.VK_RCONTROL,
-    winUser.VK_LSHIFT, winUser.VK_RSHIFT, winUser.VK_LMENU,
-    winUser.VK_RMENU, winUser.VK_LWIN, winUser.VK_RWIN,
-]
-
-def executeAsynchronously(gen):
+if False:
+  def executeAsynchronously(gen):
     """
     This function executes a generator-function in such a manner, that allows updates from the operating system to be processed during execution.
     For an example of such generator function, please see GlobalPlugin.script_editJupyter.
@@ -622,8 +619,8 @@ def browserNavPopup(selfself,gesture):
     try:
         frame = wx.Frame(None, -1,"Fake popup frame", pos=(1, 1),size=(1, 1))
         menu = wx.Menu()
-        menu.AppendMenu(wx.ID_ANY, '&Bookmark', quickJump.makeBookmarkSubmenu(self, frame))
-        menu.AppendMenu(wx.ID_ANY, '&Website', quickJump.makeWebsiteSubmenu(self, frame))
+        menu.AppendMenu(wx.ID_ANY, _("&Bookmark"), quickJump.makeBookmarkSubmenu(self, frame))
+        menu.AppendMenu(wx.ID_ANY, _("&Website"), quickJump.makeWebsiteSubmenu(self, frame))
         frame.Bind(
             wx.EVT_MENU_CLOSE,
             lambda evt: frame.Close()
@@ -666,9 +663,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
         quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
+        quickJump.originalBrowseModeReport = browseMode.TextInfoQuickNavItem.report
+        browseMode.TextInfoQuickNavItem.report = quickJump.preBrowseModeReport
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
         self.thread = threading.Thread(name="BrowserNav browser monitor thread", target = quickJump.browseMonitorThreadFunc, args =())
         self.thread.start()
+        while len(gc.callbacks) > 0:
+            del gc.callbacks[0]
+        garbageHandler.terminate = lambda: None
 
 
     def createMenu(self):
@@ -684,7 +686,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         documentBase.DocumentWithTableNavigation._tableMovementScriptHelper = originalTableScriptHelper
         cursorManager.CursorManager._set_selection = original_set_selection
         browseMode.BrowseModeDocumentTreeInterceptor.event_gainFocus = quickJump.original_event_gainFocus
-        browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript = originalGetAlternativeScript
+        browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript = quickJump.originalGetAlternativeScript
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.originalShouldPassThrough
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.original_event_treeInterceptor_gainFocus
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.originalReportLiveRegion
@@ -1072,9 +1074,13 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             self.beeper.fancyBeep("AF#", length=100, left=20, right=20)
             return
         fg=winUser.getForegroundWindow()
-        if api.getFocusObject().appModule.productName == 'NVDA':
+        focus = api.getFocusObject()
+        appName = focus.appModule.appName
+        if appName == 'nvda':
             ui.message(_("Cannot edit in this window."))
             return
+        fastChromeMode = appName == 'chrome'
+        slowFirefoxMode = appName == 'firefox'
         if isinstance(selfself, editableText.EditableText):
             obj = selfself
         elif not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
@@ -1182,16 +1188,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             blockAllKeys(timeoutSeconds)
             try:
               # step 1. wait for all modifiers to be released
-                while True:
-                    if time.time() > timeout:
-                        raise EditBoxUpdateError(_("Timed out during release modifiers stage"))
-                    status = [
-                        winUser.getKeyState(k) & 32768
-                        for k in allModifiers
-                    ]
-                    if not any(status):
-                        break
-                    yield 1
+                try:
+                    yield from utils.waitForModifiersToBeReleased(5)
+                except TimeoutError as e:
+                    raise EditBoxUpdateError(_("Timed out during release modifiers stage"), e)
               # Step 2: switch back to that browser window
                 while  winUser.getForegroundWindow() != fg:
                     if time.time() > timeout:
@@ -1200,34 +1200,36 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     winUser.setFocus(fg)
                     yield 1
               # Step 2.1: Ensure that the browser window is fully focused.
-                # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
-                obj.setFocus()
-                #step21timeout = time.time() + 1 # Leave 1 second for this step
-                goodCounter = 0
-                roles = []
-                kbdControlHome.send()
-                while True:
-                    if time.time() > timeout:
-                        raise EditBoxUpdateError(_("Timed out during switch to window stage"))
-                    focus = api.getFocusObject()
-                    roles.append(focus.role)
-                    if focus.role in [
-                        ROLE_PANE,
-                        ROLE_FRAME,
-                        ROLE_DOCUMENT,
-                    ]:
-                        # All good, Firefox is burning cpu, keep sleeping!
-                        yield 10
-                        goodCounter = 0
-                        continue
-                    elif focus.role == ROLE_EDITABLETEXT:
-                        goodCounter += 1
-                        if goodCounter > 10:
-                            tones.beep(1000, 100)
-                            break
-                        yield 10
-                    else:
-                        raise EditBoxUpdateError(_("Error during switch to window stage, focused element role is %d") % focus.role)
+                if True:
+                    # This is needed sometimes for Firefox - switching to it takes hundreds of milliseconds, especially when jupyter cells are large.
+                    # This also proves necessary for Chrome on some websites like Jupyter
+                    obj.setFocus()
+                    #step21timeout = time.time() + 1 # Leave 1 second for this step
+                    goodCounter = 0
+                    roles = []
+                    kbdControlHome.send()
+                    while True:
+                        if time.time() > timeout:
+                            raise EditBoxUpdateError(_("Timed out during switch to window stage"))
+                        focus = api.getFocusObject()
+                        roles.append(focus.role)
+                        if focus.role in [
+                            ROLE_PANE,
+                            ROLE_FRAME,
+                            ROLE_DOCUMENT,
+                        ]:
+                            # All good, Firefox is burning cpu, keep sleeping!
+                            yield 10
+                            goodCounter = 0
+                            continue
+                        elif focus.role == ROLE_EDITABLETEXT:
+                            goodCounter += 1
+                            if goodCounter > 10:
+                                tones.beep(1000, 100)
+                                break
+                            yield 10
+                        else:
+                            raise EditBoxUpdateError(_("Error during switch to window stage, focused element role is %d") % focus.role)
 
               # Step 3: start sending keys
                 self.startInjectingKeystrokes()
@@ -1303,8 +1305,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                                 )
                             ):
                                 # Bingo! First char has appeared in clipboard. Restoring original clipboard state and exiting
+                                result = clipboard.deleteEntryFromClipboardHistory(firstChar, maxEntries=1)
+                                if False and result:
+                                    core.callLater(1000, tones.beep, 100, 1000)
                                 self.endInjectingKeystrokes()
-                                clipboard.deleteEntryFromClipboardHistory(firstChar, maxEntries=1)
                                 return
                             else:
                                 # Something else found in clipboard - likely user has already copied something there. So just exit without restoring state
@@ -1312,12 +1316,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                                 log.error(f"text='{text}'")
                                 log.error(f"newText='{newText}'")
                                 log.error(f"firstChar='{firstChar}'")
-                                #api.newText=newText
-                                #api.firstChar=firstChar
-                                #api.text=text
                                 return
                         log.error(f"asdf Timeout")
-                    executeAsynchronously(watchAndRestoreClipboard())
+                    utils.executeAsynchronously(watchAndRestoreClipboard())
                     
               # Step 4: send the original keystroke, e.g. Control+Enter
                 if keystroke is not None:
@@ -1338,7 +1339,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
         self.popupEditTextDialog(
             text, cursorLine, cursorColumn,
-            lambda result, text, hasChanged, cursorLine, cursorColumn, keystroke: executeAsynchronously(updateText(result, text, hasChanged, cursorLine, cursorColumn, keystroke))
+            lambda result, text, hasChanged, cursorLine, cursorColumn, keystroke: utils.executeAsynchronously(updateText(result, text, hasChanged, cursorLine, cursorColumn, keystroke))
         )
 
     def script_copyJupyterText(self, gesture, selfself):
@@ -1410,8 +1411,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 #time.sleep(1)
                 #core.callLater(1000, clipboard.deleteEntryFromClipboardHistory, data)
                 result = clipboard.deleteEntryFromClipboardHistory(data, maxEntries=1)
-                #if result:
-                    #core.callLater(1000, tones.beep, 1000, 1000)
+                # self.endInjectingKeystrokes() will be called outside 
+                if False and  result:
+                    core.callLater(1000, tones.beep, 1000, 1000)
                 return data
             wx.Yield()
             time.sleep(10/1000)
@@ -1783,7 +1785,4 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 gesture,
             ),
             doc=_("Show BrowserNav popup menu."))
-
-
-
 

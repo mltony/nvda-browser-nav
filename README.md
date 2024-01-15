@@ -53,10 +53,13 @@ BrowserNav 2.0 introduces a new set of bookmark features .
 * NVDA+J: Show quickJump popup menu.
 * J or Shift+J: Jump to next or previous QuickJump bookmark.
 * / and Control+/: Toggle SkipClutter mode for navigating by line (Up and Down arrows) and by paragraph (Control+Up and Control+Down arrows) correspondingly.
-* Alt+J: click all AutoClick bookmarks on current page.
-* Alt+1, Alt+2, ..., Alt+0: jump to next hierarchical bookmark of corresponding level. 0 corresponds to level 10.
+* Alt+J: click all QuickClick bookmarks on the current page.
+* Control+J: Speak all QuickSpeak bookmarks on the current page.
+* Alt+1, Alt+2, ..., Alt+0: jump to next hierarchical bookmark of corresponding level. 0 corresponds to level 10.; alternatively, call numerical script if defined.
 * Shift+Alt+1, Shift+Alt+2, ..., Shift+Alt+0: jump to previous hierarchical bookmark.
 * Alt+` or Shift+Alt+`: jump to next or previous hierarchical bookmark of any level.
+
+You can also configure custom keystrokes for most bookmark types (except for SkipClutter, Hierarchical and Numeric Script bookmarks).
 
 ### Sites
 
@@ -74,12 +77,15 @@ Because of this flexible definition, on every given webpage multiple QuickJump s
 
 Once you have configured site definition, you can proceed to define some bookmarks on it.
 
-BrowserNav currently supports four types of bookmarks:
+BrowserNav  supports several types of bookmarks:
 
 * QuickJump bookmarks: you can jump to them by pressing J or Shift+J.
 * SkipClutter bookmarks: These bookmarks are skipped automatically when navigating by line (Up/Down arrow) or by paragraph (Control+Up/Down arrows). This allows to hide clutter on webpages, such as empty lines, timestamps and any other redundant information. The information is not removed completely, SkipClutter can be temporarily disabled via / or Control+/ commands. By default SkipClutter skips empty paragraphs on all websites.
-* AutoClick bookmarks: you can mark clickable elements, such as links, buttons or checkboxes to be autoClick bookmarks. Then by pressing Alt+J you can quickly press all autoClick bookmarks on current page with a single keystroke without moving the cursor. This can come in handy to press a frequently used button on a website, such as play button on YouTube or Mute button on video-conferencing websites.
-* Hierarchical bookmarks: this is similar to quickJump bookmarks, but this takes into account horizontal offset of a bookmark. Sites like Reddit and Hacker News have a hierarchical tree of comments, that was pretty challenging to efficiently navigate for screenreader users. On these websites you can mark comments as a hierarchical bookmark and then you can navigate between them By pressing Alt+digit or Shift+Alt+ditgit, where digit stands for number row 1,2,3,...0 - that is the level of the comment. By default BrowserNav has hierarchical bookmarks configured for Hacker News and old.reddit.com; it was however too difficult to configure them for modern reddit.com website since there doesn't appear to be easily searcheable paragraph that would identify comments.
+* QuickClick bookmarks: you can mark clickable elements, such as links, buttons or checkboxes to be QuickClick bookmarks. Then by pressing Alt+J you can quickly press all QuickClick bookmarks on current page with a single keystroke without moving the cursor. This can come in handy to press a frequently used button on a website, such as play button on YouTube or Mute button on video-conferencing websites.
+* QuickSpeak bookmarks: you can read this type of bookmarks by pressing Control+J keystroke; Curosr won't move. This is handy to check frequently changed elements of the page. You can also set quickClick bookmark to be autorefreshable, that is BrowserNav will scan the page preiodically and would auto-speak if matched text changes.
+* Hierarchical bookmarks: this is similar to quickJump bookmarks, but this takes into account horizontal offset of a bookmark. Sites like Reddit and Hacker News have a hierarchical tree of comments, that was pretty challenging to efficiently navigate for screenreader users. On these websites you can mark comments as a hierarchical bookmark and then you can navigate between them By pressing Alt+digit or Shift+Alt+ditgit, where digit stands for number row 1,2,3,...0 - that is the level of the comment. By default BrowserNav has hierarchical bookmarks configured for Hacker News and reddit.com.
+* Script bookmarks: Just execute provided script when invoked.
+* Numeric script: press Alt+0 through Alt+9 to execute script taking a number as its input. Can be handy for example to jump to `i`-th bookmark on the page in a single keystroke.
 
 ### Creating a new bookmark
 
@@ -103,8 +109,14 @@ In site configuration dialog you can specify a number of advanced options:
 * Display name: optional display name for better readability in the list of sites.
 * Focus mode: this allows to override default handling of focus events in NVDA. Certain websites misuse focus events. In order to use them more conveniently, you can either ignore focus events, or alternatively disable automatic entering of focus mode when a focus event is received.
 * Live region mode: Some website misuse live regions. This option allows to disable live region announcements for current website only.
-* Debug beep mode: this is mostly good for debugging purposes. You can make NVDA beep when certain event (focus, live region update or successful autoClick) happened.
-* AutoClick options: when you set up QuickClick bookmark, this allows you to configure this bookmark to be pressed automatically after a certain delay once the website is fully loaded. Another option allows BrowserNav to keep monitoring the website and whenever any more of such QuickClick bookmarks appear, it would click them automatically still. Please note that this feature is experimental.
+* Debug beep mode: this is mostly good for debugging purposes. You can make NVDA beep when certain event (focus, live region update or successful QuickClick) happened.
+
+### Scripting
+
+Starting from BrowserNav v2.5 you can customize your bookmarks with Python scripting. Scripting can be used for two purposes:
+1. To enhance matching algorithm  where existing match options are not enough. This applies to QuickJump, QuickSpeak, QuickClick, hierarchical and SkipClutter bookmarks.
+2. To execute arbitrary Python code in order to automate certain actions on the web pages. This can be done via Script or Numeric Script bookmarks.
+
 
 ### Configuration
 
