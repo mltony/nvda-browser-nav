@@ -927,8 +927,8 @@ class AutoSpeakCacheEntry:
 browseMonitorThreadShutdownRequested = False
 AutoSpeakCache = weakref.WeakKeyDictionary()
 def browseMonitorThreadFunc():
-    try:
-        while not browseMonitorThreadShutdownRequested:
+    while not browseMonitorThreadShutdownRequested:
+        try:
             time.sleep(0.5)
             focus = api.getFocusObject()
             try:
@@ -952,10 +952,10 @@ def browseMonitorThreadFunc():
                 pass
             except OSError:
                 pass
-    except Exception as e:
-        #mylog(e)
-        core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
-        raise e
+        except Exception as e:
+            #mylog(e)
+            #core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
+            log.error("Exception in BrowserNav monitor thread", e)
 
 def processAutoSpeakEntry(browse, bookmarks, cacheEntry):
     if len(bookmarks) == 0:
