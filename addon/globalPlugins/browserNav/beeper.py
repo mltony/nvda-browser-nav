@@ -67,7 +67,7 @@ class Beeper:
                 self.getPitch(l), beepLen, volume, volume)
             bufPtr += pauseBufSize # add a short pause
         self.player.stop()
-        self.player.feed(buf.raw)
+        threading.Thread(target=lambda:self.player.feed(buf.raw)).start()
 
     def simpleCrackle(self, n, volume, initialDelay=0):
         return self.fancyCrackle([0] * n, volume, initialDelay=initialDelay)
@@ -108,7 +108,7 @@ class Beeper:
         maxInt = 1 << (8 * intSize)
         result = map(lambda x : x %maxInt, result)
         packed = struct.pack("<%dQ" % (bufSize // intSize), *result)
-        self.player.feed(packed)
+        threading.Thread(target=lambda:self.player.feed(packed)).start()
 
     def uniformSample(self, a, m):
         n = len(a)
