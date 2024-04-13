@@ -90,6 +90,20 @@ class BookmarkCategory(Enum):
     SCRIPT = 11
     NUMERIC_SCRIPT = 12
 
+BookmarkCategoryDeprecationMap = {
+    BookmarkCategory.QUICK_JUMP_2: BookmarkCategory.QUICK_JUMP,
+    BookmarkCategory.QUICK_JUMP_3: BookmarkCategory.QUICK_JUMP,
+    BookmarkCategory.QUICK_CLICK_2: BookmarkCategory.QUICK_CLICK,
+    BookmarkCategory.QUICK_CLICK_3: BookmarkCategory.QUICK_CLICK,
+    BookmarkCategory.QUICK_SPEAK_2: BookmarkCategory.QUICK_SPEAK,
+}
+
+NonDeprecatedBookmarkCategories = [
+    c 
+    for c in BookmarkCategory
+    if c not in BookmarkCategoryDeprecationMap
+]
+
 BookmarkCategoryShortNames = {
     BookmarkCategory.QUICK_JUMP: _('QuickJump'),
     BookmarkCategory.QUICK_JUMP_2: _('QuickJump2'),
@@ -2288,10 +2302,12 @@ class EditBookmarkDialog(wx.Dialog):
             self,
             categoryText,
             wx.Choice,
-            choices=[BookmarkCategoryNames[i] for i in BookmarkCategory],
+            choices=[BookmarkCategoryNames[i] for i in NonDeprecatedBookmarkCategories],
         )
         self.categoryComboBox.control.Bind(wx.EVT_CHOICE,self.onCategory)
-        self.categoryComboBox.control.SetSelection(list(BookmarkCategory).index(self.bookmark.category))
+        category = self.bookmark.category
+        category = BookmarkCategoryDeprecationMap.get(category, category)
+        self.categoryComboBox.control.SetSelection(NonDeprecatedBookmarkCategories.index(category))
       # Translators:  Custom keystroke button
         self.customeKeystrokeButton = sHelper.addItem (wx.Button (self, label = _("Custom &Keystroke")))
         self.customeKeystrokeButton.Bind(wx.EVT_BUTTON, self.OnCustomKeystrokeClick)
@@ -2512,7 +2528,7 @@ class EditBookmarkDialog(wx.Dialog):
             event.Skip()
 
     def getCategory(self):
-        return list(BookmarkCategory)[self.categoryComboBox.control.GetSelection()]
+        return NonDeprecatedBookmarkCategories[self.categoryComboBox.control.GetSelection()]
 
     def onCategory(self, event):
         category = self.getCategory()

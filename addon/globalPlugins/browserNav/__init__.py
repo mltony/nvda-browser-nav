@@ -1523,28 +1523,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "quickJumpBack",
             script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP, -1,  _("No next QuickJump result. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
             doc=_("QuickJump back according to BrowserNav QuickJump bookmarks; please check browserNav configuration panel for the list of bookmarks."))
-      # QuickJump 2 and 3 bookmarks
-        self.injectBrowseModeKeystroke(
-            [],
-            "quickJump2Forward",
-            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP_2, 1,  _("No next QuickJump result for QuickJump2 bookmarks. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
-            doc=_("QuickJump forward according to BrowserNav QuickJump2 bookmarks; please check browserNav configuration panel for the list of bookmarks."))
-        self.injectBrowseModeKeystroke(
-            [],
-            "quickJump2Back",
-            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP_2, -1,  _("No next QuickJump result for QuickJump2 bookmarks. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
-            doc=_("QuickJump back according to BrowserNav QuickJump2 bookmarks; please check browserNav configuration panel for the list of bookmarks."))
-        self.injectBrowseModeKeystroke(
-            [],
-            "quickJump3Forward",
-            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP_3, 1,  _("No next QuickJump result for QuickJump3 bookmarks. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
-            doc=_("QuickJump forward according to BrowserNav QuickJump3 bookmarks; please check browserNav configuration panel for the list of bookmarks."))
-        self.injectBrowseModeKeystroke(
-            [],
-            "quickJump3Back",
-            script=lambda selfself, gesture: quickJump.quickJump(selfself, gesture, quickJump.BookmarkCategory.QUICK_JUMP_3, -1,  _("No next QuickJump result for QuickJump3 bookmarks. To configure QuickJump rules, please go to BrowserNav settings in NVDA configuration window.")),
-            doc=_("QuickJump back according to BrowserNav QuickJump3 bookmarks; please check browserNav configuration panel for the list of bookmarks."))
-
       # AutoClick
         self.injectBrowseModeKeystroke(
             "kb:Alt+J",
@@ -1608,130 +1586,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             script=lambda selfself, gesture: quickJump.autoClick(selfself, gesture, quickJump.BookmarkCategory.QUICK_SPEAK),
             doc=_("QuickSpeak  according to BrowserNav QuickSpeak bookmark; please check browserNav configuration panel for the list of bookmarks."))
 
-      # Tabs
-        # Example page with tabs:
-        # https://wet-boew.github.io/v4.0-ci/demos/tabs/tabs-en.html
-        self.injectBrowseModeKeystroke(
-            "kb:Y",
-            "nextTab",
-            script=lambda selfself, gesture: self.findByRole(
-                direction=1,
-                roles={ROLE_TAB, ROLE_TABCONTROL},
-                errorMessage=_("No next tab"),
-                newMethod=True,
-            ),
-            doc=_("Jump to next tab"))
-        self.injectBrowseModeKeystroke(
-            "kb:Shift+Y",
-            "previousTab",
-            script=lambda selfself, gesture: self.findByRole(
-                direction=-1,
-                roles={ROLE_TAB, ROLE_TABCONTROL},
-                errorMessage=_("No previous tab"),
-                newMethod=True,
-            ),
-            doc=_("Jump to previous tab"))
-
-      #Dialog
-        dialogTypes = [ROLE_APPLICATION, ROLE_DIALOG]
-        self.injectBrowseModeKeystroke(
-            "kb:P",
-            "nextDialog",
-            script=lambda selfself, gesture: self.findByRole(
-                direction=1,
-                roles=dialogTypes,
-                errorMessage=_("No next dialog")),
-            doc=_("Jump to next dialog"))
-        self.injectBrowseModeKeystroke(
-            "kb:Shift+P",
-            "previousDialog",
-            script=lambda selfself, gesture: self.findByRole(
-                direction=-1,
-                roles=dialogTypes,
-                errorMessage=_("No previous dialog")),
-            doc=_("Jump to previous dialog"))
-      # Menus
-        menuTypes = [
-            ROLE_MENU,
-            ROLE_MENUBAR,
-            ROLE_MENUITEM,
-            ROLE_POPUPMENU,
-            ROLE_CHECKMENUITEM,
-            ROLE_RADIOMENUITEM,
-            ROLE_TEAROFFMENU,
-            ROLE_MENUBUTTON,
-        ]
-        self.injectBrowseModeKeystroke(
-            "kb:Z",
-            "nextMenu",
-            script=lambda selfself, gesture: self.findByRole(
-                direction=1,
-                roles=menuTypes,
-                errorMessage=_("No next menu"),
-                newMethod=True,
-            ),
-            doc=_("Jump to next menu"))
-        self.injectBrowseModeKeystroke(
-            "kb:Shift+Z",
-            "previousMenu",
-            script=lambda selfself, gesture: self.findByRole(
-                direction=-1,
-                roles=menuTypes,
-                errorMessage=_("No previous menu"),
-                newMethod=True,
-            ),
-            doc=_("Jump to previous menu"))
-
-      # Tree views, tool bars
-        self.injectBrowseModeKeystroke(
-            "kb:0",
-            "nextTreeView",
-            script=lambda selfself, gesture: self.findByRole(
-                direction=1,
-                roles=[ROLE_TREEVIEW],
-                errorMessage=_("No next tree view")),
-            doc=_("Jump to next tree view"))
-        self.injectBrowseModeKeystroke(
-            "kb:Shift+0",
-            "previousTreeView",
-            script=lambda selfself, gesture: self.findByRole(
-                direction=-1,
-                roles=[ROLE_TREEVIEW],
-                errorMessage=_("No previous tree view")),
-            doc=_("Jump to previous tree view"))
-        self.injectBrowseModeKeystroke(
-            "kb:9",
-            "nextToolBar",
-            script=lambda selfself, gesture: self.findByControlField(
-                direction=1,
-                role=ROLE_TOOLBAR,
-                errorMessage=_("No next tool bar")),
-            doc=_("Jump to next tool bar"))
-        self.injectBrowseModeKeystroke(
-            "kb:Shift+9",
-            "previousToolBar",
-            script=lambda selfself, gesture: self.findByControlField(
-                direction=-1,
-                role=ROLE_TOOLBAR,
-                errorMessage=_("No previous tool bar")),
-            doc=_("Jump to previous tool bar"))
-      #Format change
-        self.injectBrowseModeKeystroke(
-            "kb:`",
-            "nextFormatChange",
-            script=lambda selfself, gesture: self.findFormatChange(
-                selfself,
-                direction=1,
-                errorMessage=_("No next format change")),
-            doc=_("Jump to next format change"))
-        self.injectBrowseModeKeystroke(
-            "kb:Shift+`",
-            "previousFormatChange",
-            script=lambda selfself, gesture: self.findFormatChange(
-                selfself,
-                direction=-1,
-                errorMessage=_("No previous format change")),
-            doc=_("Jump to previous format change"))
       # Scroll all:
         self.injectBrowseModeKeystroke(
             "kb:\\",
@@ -1803,4 +1657,3 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 gesture,
             ),
             doc=_("Show BrowserNav popup menu."))
-
