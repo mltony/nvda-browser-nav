@@ -2,18 +2,13 @@
 
 This add-on provides NVDA users powerful navigation commands in browser mode. It works in web browsers, as well as any other applications that support NVDA browse mode, such as Word documents and email clients.
 
-For example, with BrowserNav you can find vertically aligned paragraphs, that is paragraphs with the same horizontal offset. This can be used to read hierarchical trees of comments or malformed HTML tables.
-
-You can also find paragraphs written in the same font size or style.
-
-BrowserNav also provides new QuickNav commands: P for next paragraph and Y for next tab.
-
 ## Download
 
-* Current stable version: [BrowserNav](https://github.com/mltony/nvda-browser-nav/releases/latest/download/browsernav.nvda-addon)
-* Last Python 2 version (compatible with NVDA 2019.2 and prior): [BrowserNav v1.1](https://github.com/mltony/nvda-browser-nav/releases/download/v1.1/BrowserNav-1.1.nvda-addon)
+Please install via add-on store.
 
 ## Usage in browsers and other programs that support browse mode
+
+Please note, that starting with NVDA v2024.2, vertical navigation and same style navigation commands are now available in NVDA core. It is preferred to use builtin commands. They are not assigned any default gesture, so gestures must be assigned by the user in Input gestures dialog.
 
 BrowserNav can be used to navigate by horizontal offset from the left edge of the screen, by font size, or by font style. 
 
@@ -33,20 +28,14 @@ BrowserNav works in any browser supported by NVDA. Although some features may no
 * NVDA+Alt+PageDown or NVDA+Alt+RightArrow: Jump to next paragraph with greater offset or smaller font size (child paragraph).
 * NVDA+Alt+PageUp or NVDA+Control+Alt+RightArrow: Jump to previous paragraph with greater offset or smaller font size (previous child paragraph).
 * NVDA+O: Switch rotor setting between horizontal offset, font size, font size with font style.
-* Y or Shift+Y: Jump to next or previous tab.
-* P or Shift+P: Jump to next or previous dialog.
-* Z or Shift+Z: Jump to next or previous menu.
-* \` orShift+\` (backquote or tilde): Jump to next or previous format change.
 * \\ or Shift+\\ (backslash): Scroll up or down to reveal each page element; can be useful in dynamic web pages to load all the elements; also can be useful in infinite scroll webpages to load the next chunk.
-* 0 or Shift+0: Jump to next or previous tree view.
-* 9 or Shift+9: Jump to next or previous tool bar.
 * NVDA+Shift+LeftArrow: Go back to previous location of cursor within current document.
 * NVDA+E: edit semi-accessible edit boxes - see corresponding section below.
 * T or Shift+T: jump to next or previous table, but place the cursor in the first cell. Sometimes NVDA puts the cursor just before the first cell and BrowserNav fixes this behavior.
 
-## Bookmarks
+## QuickJump Bookmarks
 
-BrowserNav 2.0 introduces a new set of bookmark features .
+BrowserNav QuickJump bookmarks is a powerful tool that allows to navigate around web pages and automate some repetitive actions.
 
 ### Bookmark keystrokes
 
@@ -117,7 +106,111 @@ Starting from BrowserNav v2.5 you can customize your bookmarks with Python scrip
 1. To enhance matching algorithm  where existing match options are not enough. This applies to QuickJump, QuickSpeak, QuickClick, hierarchical and SkipClutter bookmarks.
 2. To execute arbitrary Python code in order to automate certain actions on the web pages. This can be done via Script or Numeric Script bookmarks.
 
+#### Scripting API
 
+In your script you are provided the following variables:
+* `p` - current paragraph. This is an instance of `Paragraph` class defined in [paragraph.py](addon/globalPlugins/browserNav/paragraph.py)
+* `t` - current `textInfo` object.
+
+It is recommended to work with paragraphs, since they provide higher level interface then `textInfo`s.
+
+Your script must decide whether current paragraph matches your custom rule or not. You can either:
+
+* Return `True` if it matches, otherwise `False`.
+* Return `None` or no `return` statement to indicate no match.
+* Return an integer number `i` to indicate that `i`-th following or `i`-th preceding paragraph matches and must be spoken instead of current paragraph.
+* Return tuple `(i: int, s:str)` to indicate match with offset (see previous point) and have BrowserNav speak message `s`.
+* Call `match()` function to indicate a match. This function internally raises an Exception, so that execution of your script will be terminated after calling match. The function is defined as:
+    ```
+    def match(offset: int | TextInfo | Paragraph = None, message: str = None) -> None:
+    ```
+
+You are also allowed to import any modules and write general purpose scripts.
+
+You can use `print()` statement to debug your script: the output will be printed to NVDA log.
+
+#### Example scripts
+
+1. This script checks that current paragraph is a link and that the text of the previous heading level 5 starts with text of current paragraph:
+    ```
+    try:
+        if controlTypes.Role.LINK in p.roles and p.previousHeading5.textInfo.text.startswith(p.text):
+            print(f"pp5 {p.previousHeading5.textInfo.text}")
+            return True
+    except NotFoundError:
+        return None
+    ```
+2. This script doesn't perform a match, but activates the last edit box on the page:
+    '''
+    p.end.previous.previousEdit.activate()
+    '''
+4. This script finds username, which can be one or two paragraphs ahead; then it finds the beginning of the comment by analyzing font size; then it finds the end of the comment by searching for "Reply" text. Then it matches the entire body of the comment and adds username to be spoken prior to matched text:
+    ```
+    user = p.next
+    if user.text == "downvote":
+        user = user.next
+    try:
+        username = user.text.split()[0]
+    except IndexError:
+        username = '?'
+    pp = p
+    begin = None
+    for i in range(5):
+        fs = pp.attributes.get(ParagraphAttribute.FONT_SIZE, [])
+        #print(f"i={i} fs={fs}")
+        if '9_pt' in fs:
+            begin = pp
+            break
+        pp = pp.next
+    else:
+        return
+    end = begin
+    while end.text != 'reply':
+        end = end.next
+    match(textInfoRange(begin, end), username)
+    ```
+5. This script is a generator, which means whatever it yields will be used as sleep time before the next line is executed. This script will be executed in a background thread in a non-blocking manner.
+    This script performs a series of actions:
+    * Finds a button with a given name and presses it.
+    * Enters dialog that pops up: `p.home.nextEmbeddedObject.activate()`
+    * Obtains newly focused element within that dialog: `d = getFocusParagraph()`
+    * Finds and checks checkbox in that dialog.
+    * Finds another button in that dialog window by name and presses it.
+    These steps are repeated 20 times via `retry` function. Then after 500 ms pause, it finds "Run Query" button and presses it.
+    ```
+    def waitForDialogAndClickCheckbox():
+        try:
+            p.home.find("Link Last Used").activate()
+            p.home.nextEmbeddedObject.activate()
+        except NotFoundError:
+            pass
+        d = getFocusParagraph()
+        c = d.home.nextCheckBox
+        if controlTypes.State.CHECKED not in c.obj.states:
+            c.activate() 
+        d.home.find("Link QCPR Project").activate()
+    
+    yield from retry(waitForDialogAndClickCheckbox, count=20)
+    yield 500
+    yield from retry(lambda: p.home.find("Run Query").activate(), count=10)
+    ```
+6. This is a numeric script since it takes `level` as input variable. This finds `level`-th edit box from the beginning of the page (or from the end if level is negative) and invokes `script_editJupyter` on it.
+    ```
+    if level > 0:
+        p = p.home
+        for i in range(level):
+            p = Paragraph(p.nextEdit.textInfo)
+    elif level <= 0:
+        level = 1-level
+        p = p.end.previous
+        tones.beep(500, 50)
+        for i in range(level):
+            p = Paragraph(p.previousEdit.textInfo)
+        else:
+            tones.beep(500, 50)
+    p.textInfo.obj.currentFocusableNVDAObject = p.textInfo.focusableNVDAObjectAtStart
+    p.textInfo.obj.script_editJupyter(None)
+    ```
 ### Configuration
 
 Bookmark definitions are stored in NVDA configuration directory in file `browserNavRules.json`. You can edit this file manually or share it with someone.
