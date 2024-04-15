@@ -1491,19 +1491,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             "moveToPreviousSibling",
             doc=_("Moves to previous sibling in browser"))
         self.injectBrowseModeKeystroke(
-            ["kb:NVDA+Alt+LeftArrow", "kb:NVDA+Alt+Home"],
+            ["kb:NVDA+Alt+LeftArrow"],
             "moveToParent",
             doc=_("Moves to next parent in browser"))
         self.injectBrowseModeKeystroke(
-            ["kb:NVDA+Control+Alt+LeftArrow", "kb:NVDA+Alt+End"],
+            ["kb:NVDA+Control+Alt+LeftArrow"],
             "moveToNextParent",
             doc=_("Moves to next parent in browser"))
         self.injectBrowseModeKeystroke(
-            ["kb:NVDA+Alt+RightArrow", "kb:NVDA+Alt+PageDown"],
+            ["kb:NVDA+Alt+RightArrow"],
             "moveToChild",
             doc=_("Moves to next child in browser"))
         self.injectBrowseModeKeystroke(
-            ["kb:NVDA+Control+Alt+RightArrow", "kb:NVDA+Alt+PageUp"],
+            ["kb:NVDA+Control+Alt+RightArrow"],
             "moveToPreviousChild",
             doc=_("Moves to previous child in browser"))
       #Rotor
