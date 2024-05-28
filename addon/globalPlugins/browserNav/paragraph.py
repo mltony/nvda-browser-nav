@@ -97,17 +97,18 @@ class Paragraph(baseObject.AutoPropertyObject):
         return self.textInfo.getTextWithFields()
 
     def _get_attributes(self):
-        return {
-            attr.attribute: attr.value
-            for attr in quickJump.extractAttributesSet(self.textInfo)
-        }
+        result = {}
+        for attr in quickJump.extractAttributesSet(self.textInfo):
+            try:
+                l = result[attr.attribute]
+            except KeyError:
+                l = []
+                result[attr.attribute] = l
+            l.append(attr.value)
+        return result
 
     def _get_roles(self):
-        return {
-            attr.value
-            for attr in self.attributes
-            if attr.attribute == quickJump.ParagraphAttribute.ROLE
-        }
+        return self.attributes.get(quickJump.ParagraphAttribute.ROLE, [])
 
     def get_headingLevel(self):
         try:
