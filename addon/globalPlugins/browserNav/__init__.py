@@ -693,7 +693,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
         quickJump.browseMonitorThreadShutdownRequested = True
         self.thread.join()
-        tones.beep(500, 50)
 
 
     def script_moveToNextSibling(self, gesture, selfself):
