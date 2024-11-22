@@ -532,6 +532,9 @@ class QJSite(QJImmutable):
     autoSpeak: bool
     autoSpeakCategory: BookmarkCategory
     suppressDescription: bool
+    suppressAriaLabel: bool
+    suppressAriaLabelEditable: bool
+    suppressTreeLevel: bool
 
     def __init__(self, d):
         super().__init__()
@@ -553,6 +556,9 @@ class QJSite(QJImmutable):
         self.autoSpeak = d.get('autoSpeak', False)
         self.autoSpeakCategory = BookmarkCategory(d.get('autoSpeakCategory', BookmarkCategory.QUICK_SPEAK.value))
         self.suppressDescription = d.get('suppressDescription', False)
+        self.suppressAriaLabel = d.get('suppressAriaLabel', False)
+        self.suppressAriaLabelEditable = d.get('suppressAriaLabelEditable', False)
+        self.suppressTreeLevel = d.get('suppressTreeLevel', False)
         self.freeze()
 
     def asDict(self):
@@ -572,6 +578,9 @@ class QJSite(QJImmutable):
             'autoSpeak': self.autoSpeak,
             'autoSpeakCategory': self.autoSpeakCategory.value,
             'suppressDescription': self.suppressDescription,
+            'suppressAriaLabel': self.suppressAriaLabel,
+            'suppressAriaLabelEditable': self.suppressAriaLabelEditable,
+            'suppressTreeLevel': self.suppressTreeLevel,
         }
 
 
@@ -752,6 +761,36 @@ def getSuppressDescription(url, config):
         return False
     mode = max([
         site.suppressDescription
+        for site in sites
+    ])
+    return mode
+
+def getSuppressAriaLabel(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return False
+    mode = max([
+        site.suppressAriaLabel
+        for site in sites
+    ])
+    return mode
+
+def getSuppressAriaLabelEditable(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return False
+    mode = max([
+        site.suppressAriaLabelEditable
+        for site in sites
+    ])
+    return mode
+
+def getSuppressTreeLevel(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return False
+    mode = max([
+        site.suppressTreeLevel
         for site in sites
     ])
     return mode
@@ -990,7 +1029,6 @@ def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
     if False:
         api.c = cachedLines
         api.t = textToSpeak
-        mylog(f'asdf {cachedLines.lines == textToSpeak}')
         mylog(f"l={len(cachedLines.lines)}")
         if len(cachedLines.lines)>0:
             mylog(f" 0={cachedLines.lines[0]}")
@@ -1128,10 +1166,50 @@ def playDiffEarcons(delete, modify, add):
             playBiw(earcon=earconAdd)
 
 
+class AdjustedTextInfo:
+    def __init__(self, textInfo, suppressAriaLabel=False, suppressAriaLabelEditable=False, suppressTreeLevel=False):
+        self.textInfo = textInfo
+        self.suppressAriaLabel = suppressAriaLabel
+        self.suppressAriaLabelEditable = suppressAriaLabelEditable
+        self.suppressTreeLevel = suppressTreeLevel
+
+    def getTextWithFields(self, formatConfig=None):
+        ff = self.textInfo.getTextWithFields(formatConfig)
+        for field in ff:
+            if isinstance(field, textInfos.FieldCommand) and field.command in ("controlStart"):
+                if self.suppressAriaLabel and field.field['role'] in (
+                    controlTypes.Role.GROUPING,
+                    controlTypes.Role.PROPERTYPAGE,
+                    controlTypes.Role.LANDMARK,
+                    controlTypes.Role.REGION,
+                ):
+                    field.field['name'] = ""
+                
+                if self.suppressAriaLabelEditable and field.field['role'] in (
+                    controlTypes.Role.EDITABLETEXT,
+                    controlTypes.Role.COMBOBOX,
+                ):
+                    field.field['name'] = ""
+                
+                if self.suppressTreeLevel and 'level' in field.field:
+                    del field.field['level']
+        return ff
+
+    def __getattr__(self, name):
+        return getattr(self.textInfo, name)
+
+    def __dir__(self):
+        return dir(self.textInfo)
+
 originalBrowseModeReport = None
 def preBrowseModeReport(self,readUnit=None):
     url = getUrl(self.document)
     suppress = getSuppressDescription(url, globalConfig)
+    suppressAriaLabel = getSuppressAriaLabel(url, globalConfig)
+    suppressAriaLabelEditable = getSuppressAriaLabelEditable(url, globalConfig)
+    suppressTreeLevel = getSuppressTreeLevel(url, globalConfig)
+    if not isinstance(self.textInfo, AdjustedTextInfo) and (suppressAriaLabel or suppressAriaLabelEditable or suppressTreeLevel):
+        self.textInfo = AdjustedTextInfo(self.textInfo, suppressAriaLabel=suppressAriaLabel, suppressAriaLabelEditable=suppressAriaLabelEditable, suppressTreeLevel=suppressTreeLevel)
     originalValue = config.conf["presentation"]["reportObjectDescriptions"]
     if suppress:
         config.conf["presentation"]["reportObjectDescriptions"] = False
@@ -1642,8 +1720,16 @@ def _quickJump(self, gesture, bookmarks, direction, errorMsg):
             sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
             return
 
+def needOverride_caretMovement(self):
+    url = getUrl(self)
+    suppressAriaLabelEditable = getSuppressAriaLabelEditable(url, globalConfig)
+    suppressTreeLevel = getSuppressTreeLevel(url, globalConfig)
+    return suppressAriaLabelEditable or suppressTreeLevel
+
+
 def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
-    bookmarks = findApplicableBookmarksOrderedByOffset(globalConfig, getUrl(self), BookmarkCategory.SKIP_CLUTTER)
+    url = getUrl(self)
+    bookmarks = findApplicableBookmarksOrderedByOffset(globalConfig, url, BookmarkCategory.SKIP_CLUTTER)
     skipped = False
     oldInfo=self.makeTextInfo(posConstant)
     info=oldInfo.copy()
@@ -1666,7 +1752,12 @@ def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=tex
         break
     selection = info.copy()
     info.expand(unit)
-    speech.speakTextInfo(info, unit=unit, reason=REASON_CARET)
+    infoToSpeak = info
+    suppressAriaLabelEditable = getSuppressAriaLabelEditable(url, globalConfig)
+    suppressTreeLevel = getSuppressTreeLevel(url, globalConfig)
+    if (suppressAriaLabelEditable or suppressTreeLevel):
+        infoToSpeak = AdjustedTextInfo(info, suppressAriaLabelEditable=suppressAriaLabelEditable, suppressTreeLevel =suppressTreeLevel)
+    speech.speakTextInfo(infoToSpeak, unit=unit, reason=REASON_CARET)
     if not oldInfo.isCollapsed:
         speech.speakSelectionChange(oldInfo, selection)
     self.selection = selection
@@ -1679,7 +1770,6 @@ def autoClick(self, gesture, category, site=None, automated=False):
         bookmarks = findApplicableBookmarks(globalConfig, getUrl(self), category)
     else:
         bookmarks = findApplicableBookmarks(category=category, site=site)
-    mylog(f"asdf {category}")
     return _autoClick(self, gesture, bookmarks, site, automated, category=category)
 
 AutoSpeakTextCache = weakref.WeakKeyDictionary()
@@ -1905,9 +1995,7 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
         adjustedDistance += 1
         #mylog("hqj->matchTextAndAttributes2")
         mylog("HQJ calling matchAndScript")
-        mylog(f"asdf {textInfo.text}")
         matchInfo, message, dummyMatch = matchAndScript(bookmarks, [], textInfo)
-        mylog(f"asdf2 {textInfo.text}")
         if matchInfo is not None:
             if not isMatchInRightDirection(oldSelection, direction, matchInfo):
                 continue
@@ -2933,6 +3021,7 @@ class EditSiteDialog(wx.Dialog):
             ],
         )
         self.liveRegionModeCategory.control.SetSelection(list(LiveRegionMode).index(self.site.liveRegionMode))
+        
       # Translators: Debug Beep  comboBox
         labelText=_("Debug &beep mode")
         self.debugBeepModeCategory=guiHelper.LabeledControlHelper(
@@ -3006,10 +3095,22 @@ class EditSiteDialog(wx.Dialog):
             self.autoSpeakComboBox.control.SetSelection(self.autoClickOptions.index(
                 self.site.autoSpeakCategory if self.    site.autoSpeak else None
             ))
-      # Translators: label for enable recurrent auto click checkbox
+      # Suppress descriptions checkbox
         Text = _("Suppress descriptions")
         self.suppressDescriptionCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
         self.suppressDescriptionCheckBox.SetValue(self.site.suppressDescription)
+      # Checkbox suppress aria label announcements
+        Text = _("Suppress aria label announcements for landmarks and regions")
+        self.suppressAriaLabelCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.suppressAriaLabelCheckBox.SetValue(self.site.suppressAriaLabel)
+      # Checkbox suppress aria name announcements for editables and comboboxes
+        Text = _("Suppress aria name announcements for editables and combo boxes")
+        self.suppressAriaLabelEditableCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.suppressAriaLabelEditableCheckBox.SetValue(self.site.suppressAriaLabelEditable)
+      # Checkbox suppress tree level announcements
+        Text = _("Suppress tree level announcements")
+        self.suppresstreeLevelCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.suppresstreeLevelCheckBox.SetValue(self.site.suppressTreeLevel)
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -3077,6 +3178,9 @@ class EditSiteDialog(wx.Dialog):
             #'autoSpeak': self.getAutoSpeakCombo() is not None,
             #'autoSpeakCategory': (self.getAutoSpeakCombo() or BookmarkCategory.QUICK_SPEAK).value,
             'suppressDescription': self.suppressDescriptionCheckBox.Value,
+            'suppressAriaLabel': self.suppressAriaLabelCheckBox.Value,
+            'suppressAriaLabelEditable': self.suppressAriaLabelEditableCheckBox.Value,
+            'suppressTreeLevel': self.suppresstreeLevelCheckBox.Value,
         })
         return site
 

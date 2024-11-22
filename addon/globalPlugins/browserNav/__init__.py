@@ -515,6 +515,8 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
             ) or  (
                 getConfig("skipEmptyLines")
                 and unit == textInfos.UNIT_LINE
+            ) or (
+                quickJump.needOverride_caretMovement(self)
             )
         )
         and direction is not None
