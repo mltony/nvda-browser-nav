@@ -795,50 +795,8 @@ def getSuppressTreeLevel(url, config):
     ])
     return mode
 
-def getUrlFromObject(object):
-    while object is not None:
-        try:
-            interceptor = object.treeInterceptor
-        except AttributeError:
-            pass
-        if interceptor is not None:
-            url = interceptor._get_documentConstantIdentifier()
-            if url is not None and len(url) > 0:
-                return url
-        object = object.simpleParent
-urlCache = weakref.WeakKeyDictionary()
 def getUrl(self, onlyFromCache=False):
-    t0 = time.time()
-    urlFromObject = False
-    if not onlyFromCache and not isinstance(threading.currentThread(), threading._MainThread):
-        raise RuntimeError("Impossible: URL can only be determined from the main thread.")
-    if self is None:
-        return ""
-    if onlyFromCache:
-        try:
-            return urlCache[self]
-        except KeyError:
-            return ""
-    try:
-        try:
-            url = self._get_documentConstantIdentifier()
-        except AttributeError:
-            return ""
-        if url is None or len(url) == 0:
-            urlFromObject = True
-            url = getUrlFromObject(self.currentNVDAObject)
-    finally:
-        t1 = time.time()
-        tt = int(1000 * (t1-t0))
-        #mylog(f"getUrl {tt} ms = {url} {urlFromObject}")
-        #mylog(str(threading.currentThread()))
-    urlCache[self] = url
-    if url is None or len(url) == 0:
-        return ""
-        #future.set("")
-    else:
-        return url
-        #future.set(url)
+    return api.getCurrentURL()
 
 @functools.lru_cache()
 def getBookmarksWithKeystrokesForUrl(url, config, keystroke, category=None):

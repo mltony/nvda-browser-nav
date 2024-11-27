@@ -48,6 +48,7 @@ import types
 import ui
 from . import utils
 from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
+import virtualBuffers
 import wave
 import weakref
 import winUser
@@ -61,7 +62,12 @@ from . import clipboard
 from .editor import EditTextDialog
 import gc
 import garbageHandler
-
+from comtypes import COMError
+import NVDAObjects.IAccessible
+import IAccessibleHandler
+from NVDAObjects.UIA import UIA
+import UIAHandler
+import globalVars
 
 debug = False
 if debug:
@@ -318,29 +324,6 @@ kbdLeft = fromNameSmart("LeftArrow")
 kbdRight = fromNameSmart("RightArrow")
 kbdUp = fromNameSmart("UpArrow")
 kbdDown = fromNameSmart("DownArrow")
-if False:
-  def executeAsynchronously(gen):
-    """
-    This function executes a generator-function in such a manner, that allows updates from the operating system to be processed during execution.
-    For an example of such generator function, please see GlobalPlugin.script_editJupyter.
-    Specifically, every time the generator function yilds a positive number,, the rest of the generator function will be executed
-    from within wx.CallLater() call.
-    If generator function yields a value of 0, then the rest of the generator function
-    will be executed from within wx.CallAfter() call.
-    This allows clear and simple expression of the logic inside the generator function, while still allowing NVDA to process update events from the operating system.
-    Essentially the generator function will be paused every time it calls yield, then the updates will be processed by NVDA and then the remainder of generator function will continue executing.
-    """
-    if not isinstance(gen, types.GeneratorType):
-        raise Exception("Generator function required")
-    try:
-        value = gen.__next__()
-    except StopIteration:
-        return
-    l = lambda gen=gen: executeAsynchronously(gen)
-    if value == 0:
-        wx.CallAfter(l)
-    else:
-        wx.CallLater(value, l)
 
 class NoSelectionError(Exception):
     def __init__(self, *args, **kwargs):
@@ -632,6 +615,98 @@ def browserNavPopup(selfself,gesture):
         wx.CallAfter(lambda: frame.PopupMenu(menu))
     finally:
         gui.mainFrame.postPopup()
+
+def getIA2FocusedObject(obj):
+    ia2Focus, ia2ChildId = IAccessibleHandler.accFocus(obj.IAccessibleObject)
+    realObj = NVDAObjects.IAccessible.IAccessible(
+        IAccessibleObject=ia2Focus,
+        IAccessibleChildID=ia2ChildId,
+    )
+    return realObj
+
+def getFocusedURL():
+    focus = api.getFocusObject()
+    if isinstance(focus, UIA):
+        if False:
+            # UIA Chromium or Edge
+            # Unfortunately, there appears to be no easy way to obtain URL directly from UIA. Code below for document constnat identifier just returns some numeric constant.
+            # Googling returns ways to find address bar and read URL from it.
+            # We will keep it in mind for the future if current way changes.
+            # However, we prefer falling back to IA2 since address bar is not necessarily visible.
+            # using def _get_documentConstantIdentifier from NVDAObjects/UIA/chromium.py
+            return obj.parent._getUIACacheablePropertyValue(UIAHandler.UIA_AutomationIdPropertyId)
+        # Retrieve topmost IA2 object in the window
+        obj = NVDAObjects.IAccessible.getNVDAObjectFromEvent(focus.windowHandle, winUser.OBJID_CLIENT, 0)
+        if obj.role == controlTypes.Role.DOCUMENT:
+            try:
+                return obj.IAccessibleObject.accValue(0)
+            except COMError:
+                return None
+        else:
+            obj = getIA2FocusedObject(obj)
+            while obj is not None:
+                if obj.role == controlTypes.Role.DOCUMENT:
+                    try:
+                        return obj.IAccessibleObject.accValue(0)
+                    except COMError:
+                        return None
+                obj = obj.parent
+            return None
+    elif isinstance(focus, NVDAObjects.IAccessible.IAccessible):
+        for obj in itertools.chain(api.getFocusAncestors(), [focus]):
+            if obj.role == controlTypes.Role.DOCUMENT:
+                # Chrome, Firefox, Thunderbird
+                # Using def _get_documentConstantIdentifier from virtualBuffers/gecko_ia2.py.
+                try:
+                    return obj.IAccessibleObject.accValue(0)
+                except COMError:
+                    return None
+    else:
+        return None
+
+globalUpdateUrlCounter = 0
+globalVars.currentURL = None
+def getCurrentURL():
+    return globalVars.currentURL
+
+
+api.getCurrentURL = getCurrentURL
+updateURLLock = threading.Lock()
+URL_WATCH_DELAYS_MS = [300, 700, 2000, 7000]
+def watchURLAsync(localUpdateUrlCounter, delays=None):
+    delays = delays or URL_WATCH_DELAYS_MS
+    for delayMs in delays:
+        yield delayMs
+        with updateURLLock:
+            global globalUpdateUrlCounter
+            if globalUpdateUrlCounter != localUpdateUrlCounter:
+                return
+            globalVars.currentURL = getFocusedURL()
+
+def watchURL(initialDelayMs=None):
+    with updateURLLock:
+        global globalUpdateUrlCounter
+        globalUpdateUrlCounter += 1
+        localUpdateUrlCounter = globalUpdateUrlCounter
+    delays = None
+    if initialDelayMs is None:
+        globalVars.currentURL = getFocusedURL()
+    else:
+        delays = [initialDelayMs] + URL_WATCH_DELAYS_MS
+    utils.executeAsynchronously(watchURLAsync(localUpdateUrlCounter, delays))
+
+originalSetFocusObject = None
+originalVirtualBufferHandleUpdate = None
+def bnSetFocusObject(obj):
+    result = originalSetFocusObject(obj)
+    watchURL()
+    return result
+
+def bnVirtualBufferHandleUpdate(self):
+    result = originalVirtualBufferHandleUpdate(self)
+    watchURL()
+    return result
+
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     scriptCategory = _("BrowserNav")
     beeper = Beeper()
@@ -673,7 +748,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         while len(gc.callbacks) > 0:
             del gc.callbacks[0]
         garbageHandler.terminate = lambda: None
-
+        global originalSetFocusObject, originalVirtualBufferHandleUpdate
+        originalSetFocusObject = api.setFocusObject
+        api.setFocusObject = bnSetFocusObject
+        originalVirtualBufferHandleUpdate = virtualBuffers.VirtualBuffer._handleUpdate
+        virtualBuffers.VirtualBuffer._handleUpdate = bnVirtualBufferHandleUpdate
 
     def createMenu(self):
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(SettingsDialog)
@@ -695,6 +774,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
         quickJump.browseMonitorThreadShutdownRequested = True
         self.thread.join()
+        
+        api.setFocusObject = originalSetFocusObject
+        virtualBuffers.VirtualBuffer._handleUpdate = originalVirtualBufferHandleUpdate
 
 
     def script_moveToNextSibling(self, gesture, selfself):
@@ -1658,3 +1740,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 gesture,
             ),
             doc=_("Show BrowserNav popup menu."))
+            
+    @script(description=_("Speak current URL for debug purpose."), gestures=['kb:NVDA+windows+z'])
+    def script_speakCurrentURL(self, gesture):
+        #url = getFocusedURL()
+        url = api.getCurrentURL()
+        ui.message(url)
