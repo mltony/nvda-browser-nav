@@ -68,6 +68,7 @@ import IAccessibleHandler
 from NVDAObjects.UIA import UIA
 import UIAHandler
 import globalVars
+from gui import nvdaControls
 
 debug = False
 if debug:
@@ -126,6 +127,7 @@ def initConfiguration():
         "skipChimeVolume" : "integer( default=25, min=0, max=100)",
         "skipRegex" : "string( default='(^Hide or report this$)')",
         "tableNavigateToCell" : "boolean( default=True)",
+        "verticalAlignmentMargin" : "integer( default=2, min=0, max=10000)",
     }
     config.conf.spec["browsernav"] = confspec
 
@@ -221,7 +223,15 @@ class SettingsDialog(SettingsPanel):
         sizer.Add(slider)
         settingsSizer.Add(sizer)
         self.skipChimeVolumeSlider = slider
-
+      # Vertical alignment margin edit box
+        label = _("Vertical alignment margin in pixels")
+        self.verticalMarginSpinControl = sHelper.addLabeledControl(
+            label,
+            nvdaControls.SelectOnFocusSpinCtrl,
+            min=0,
+            max=10000,
+            initial=getConfig("verticalAlignmentMargin"),
+        )
 
     def onSave(self):
         config.conf["browsernav"]["crackleVolume"] = self.crackleVolumeSlider.Value
@@ -234,6 +244,7 @@ class SettingsDialog(SettingsPanel):
         config.conf["browsernav"]["useBoldItalic"] = self.useBoldItalicCheckBox.Value
         config.conf["browsernav"]["tableNavigateToCell"] = self.tableNavigateToCellCheckBox.Value
         config.conf["browsernav"]["skipChimeVolume"] = self.skipChimeVolumeSlider.Value
+        config.conf["browsernav"]["verticalAlignmentMargin"] = self.verticalMarginSpinControl.GetValue()
 
 
 def getMode():
@@ -245,12 +256,16 @@ BROWSE_MODES = [
     _("font size"),
     _("font size and same style"),
 ]
-
+margin_eq = lambda x,y : abs(x-y) <= getConfig("verticalAlignmentMargin")
+margin_lt = lambda x,y : (y - x) > getConfig("verticalAlignmentMargin")
+margin_gt = lambda x,y : (x - y) > getConfig("verticalAlignmentMargin")
 PARENT_OPERATORS = [operator.lt, operator.gt, operator.gt]
 CHILD_OPERATORS = [operator.gt, operator.lt, operator.lt]
 OPERATOR_STRINGS = {
     operator.lt: _("smaller"),
+    margin_lt: _("smaller"),
     operator.gt: _("greater"),
+    margin_gt: _("greater"),
 }
 # Just some random unicode character that is not likely to appear anywhere.
 # This character is used for semi-accessible jupyter edit box automation.
@@ -617,7 +632,12 @@ def browserNavPopup(selfself,gesture):
         gui.mainFrame.postPopup()
 
 def getIA2FocusedObject(obj):
-    ia2Focus, ia2ChildId = IAccessibleHandler.accFocus(obj.IAccessibleObject)
+    if obj is None:
+        return None
+    tup = IAccessibleHandler.accFocus(obj.IAccessibleObject)
+    if tup is None:
+        return None
+    ia2Focus, ia2ChildId = tup
     realObj = NVDAObjects.IAccessible.IAccessible(
         IAccessibleObject=ia2Focus,
         IAccessibleChildID=ia2ChildId,
@@ -637,6 +657,8 @@ def getFocusedURL():
             return obj.parent._getUIACacheablePropertyValue(UIAHandler.UIA_AutomationIdPropertyId)
         # Retrieve topmost IA2 object in the window
         obj = NVDAObjects.IAccessible.getNVDAObjectFromEvent(focus.windowHandle, winUser.OBJID_CLIENT, 0)
+        if obj is None:
+            return None
         if obj.role == controlTypes.Role.DOCUMENT:
             try:
                 return obj.IAccessibleObject.accValue(0)
@@ -779,25 +801,37 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         api.setFocusObject = originalSetFocusObject
         virtualBuffers.VirtualBuffer._handleUpdate = originalVirtualBufferHandleUpdate
 
+    def maybeAdjustOperator(self, op):
+        mode = getConfig("browserMode")
+        margin = getConfig("verticalAlignmentMargin")
+        if mode != 0 or margin == 0:
+            return op
+        if op == operator.eq:
+            return margin_eq
+        elif op == operator.lt:
+            return margin_lt
+        elif op == operator.gt:
+            return margin_gt
+        else:
+            raise RuntimeError
 
     def script_moveToNextSibling(self, gesture, selfself):
         mode = getMode()
         # Translators: error message if next sibling couldn't be found
         errorMessage = _("No next paragraph with the same {mode} in the document").format(
             mode=BROWSE_MODES[mode])
-        self.moveInBrowser(1, errorMessage, operator.eq, selfself)
+        self.moveInBrowser(1, errorMessage, self.maybeAdjustOperator(operator.eq), selfself)
 
     def script_moveToPreviousSibling(self, gesture, selfself):
         mode = getMode()
         # Translators: error message if previous sibling couldn't be found
         errorMessage = _("No previous paragraph with the same {mode} in the document").format(
             mode=BROWSE_MODES[mode])
-        self.moveInBrowser(-1, errorMessage, operator.eq, selfself)
-
+        self.moveInBrowser(-1, errorMessage, self.maybeAdjustOperator(operator.eq), selfself)
 
     def script_moveToParent(self, gesture, selfself):
         mode = getMode()
-        op = PARENT_OPERATORS[mode]
+        op = self.maybeAdjustOperator(PARENT_OPERATORS[mode])
         # Translators: error message if parent could not be found
         errorMessage = _("No previous paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
@@ -806,7 +840,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def script_moveToNextParent(self, gesture, selfself):
         mode = getMode()
-        op = PARENT_OPERATORS[mode]
+        op = self.maybeAdjustOperator(PARENT_OPERATORS[mode])
         # Translators: error message if parent could not be found
         errorMessage = _("No next paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
@@ -816,7 +850,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def script_moveToChild(self, gesture, selfself):
         mode = getMode()
-        op = CHILD_OPERATORS[mode]
+        op = self.maybeAdjustOperator(CHILD_OPERATORS[mode])
         # Translators: error message if child could not be found
         errorMessage = _("No next paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
@@ -825,7 +859,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def script_moveToPreviousChild(self, gesture, selfself):
         mode = getMode()
-        op = CHILD_OPERATORS[mode]
+        op = self.maybeAdjustOperator(CHILD_OPERATORS[mode])
         # Translators: error message if child could not be found
         errorMessage = _("No previous paragraph  with {qualifier} {mode} in the document").format(
             mode=BROWSE_MODES[mode],
