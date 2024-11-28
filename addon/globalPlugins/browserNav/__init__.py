@@ -653,14 +653,15 @@ def getFocusedURL():
                 obj = obj.parent
             return None
     elif isinstance(focus, NVDAObjects.IAccessible.IAccessible):
-        for obj in itertools.chain(api.getFocusAncestors(), [focus]):
-            if obj.role == controlTypes.Role.DOCUMENT:
-                # Chrome, Firefox, Thunderbird
-                # Using def _get_documentConstantIdentifier from virtualBuffers/gecko_ia2.py.
-                try:
-                    return obj.IAccessibleObject.accValue(0)
-                except COMError:
-                    return None
+        document = utils.getIA2Document()
+        if document is not None:
+            # Chrome, Firefox, Thunderbird
+            # Using def _get_documentConstantIdentifier from virtualBuffers/gecko_ia2.py.
+            try:
+                return document.IAccessibleObject.accValue(0)
+            except COMError:
+                pass
+        return None
     else:
         return None
 
@@ -1745,4 +1746,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def script_speakCurrentURL(self, gesture):
         #url = getFocusedURL()
         url = api.getCurrentURL()
+        #api.d = utils.getIA2Document()
+        #api.url = getFocusedURL()
         ui.message(url)

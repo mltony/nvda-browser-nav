@@ -23,6 +23,8 @@ from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import weakref
 import ui
 import winUser
+import api
+import itertools
 
 class FakeObjectForWeakMemoize:
     pass
@@ -158,17 +160,12 @@ class Future:
         return self.__is_set
 
 
-def getIA2Document(textInfo):
-    # IAccessibleHandler.getRecursiveTextFromIAccessibleTextObject(IAccessibleHandler.normalizeIAccessible(pacc1.accParent))
-    ia = textInfo.NVDAObjectAtStart.IAccessibleObject
-    for i in range(1000):
-        try:
-            if ROLE_DOCUMENT == IAccessibleHandler.IAccessibleRolesToNVDARoles[ia.accRole(winUser.CHILDID_SELF)]:
-                return ia
-        except KeyError:
-            pass
-        ia=IAccessibleHandler.normalizeIAccessible(ia.accParent)
-    raise Exception("Infinite loop!")
+def getIA2Document(textInfo=None):
+    focus = api.getFocusObject()
+    for obj in itertools.chain(api.getFocusAncestors(), [focus]):
+        if obj.role == controlTypes.Role.DOCUMENT:
+            return obj
+    return None
 
 
 class DocumentHolder:
@@ -195,7 +192,7 @@ def getGeckoParagraphIndent(textInfo, documentHolder=None, oneLastAttempt=False)
             document = documentHolder.document
         offset = textInfo._startOffset
         docHandle,ID=textInfo._getFieldIdentifierFromOffset(offset)
-        location = document.accLocation(ID)
+        location = document.IAccessibleObject.accLocation(ID)
         return location[0]
     except WindowsError:
         return None
