@@ -755,6 +755,19 @@ def getDebugBeepModes(url, config):
         for site in sites
     }
 
+def getSuppressOptions(url, config):
+    sites = findSites(url, config)
+    if len(sites) == 0:
+        return False
+    options ={
+        option: max([
+            getattr(site, option)
+            for site in sites
+        ])
+        for option in ['suppressDescription','suppressAriaLabel','suppressAriaLabelEditable','suppressTreeLevel']
+    }
+    return options
+
 def getSuppressDescription(url, config):
     sites = findSites(url, config)
     if len(sites) == 0:
@@ -795,7 +808,7 @@ def getSuppressTreeLevel(url, config):
     ])
     return mode
 
-def getUrl(self, onlyFromCache=False):
+def getUrl(self=None, onlyFromCache=False):
     return api.getCurrentURL()
 
 @functools.lru_cache()
@@ -1125,11 +1138,12 @@ def playDiffEarcons(delete, modify, add):
 
 
 class AdjustedTextInfo:
-    def __init__(self, textInfo, suppressAriaLabel=False, suppressAriaLabelEditable=False, suppressTreeLevel=False):
+    def __init__(self, textInfo, suppressAriaLabel=False, suppressAriaLabelEditable=False, suppressTreeLevel=False, suppressDescription=False):
         self.textInfo = textInfo
         self.suppressAriaLabel = suppressAriaLabel
         self.suppressAriaLabelEditable = suppressAriaLabelEditable
         self.suppressTreeLevel = suppressTreeLevel
+        self.suppressDescription = suppressDescription
 
     def getTextWithFields(self, formatConfig=None):
         ff = self.textInfo.getTextWithFields(formatConfig)
@@ -1149,8 +1163,13 @@ class AdjustedTextInfo:
                 ):
                     field.field['name'] = ""
                 
-                if self.suppressTreeLevel and 'level' in field.field:
+                if self.suppressTreeLevel and 'level' in field.field and field.field['role'] in [
+                    controlTypes.Role.TREEVIEWITEM
+                ]:
                     del field.field['level']
+                
+                if self.suppressDescription and 'description' in field.field:
+                    del field.field['description']
         return ff
 
     def __getattr__(self, name):
@@ -1159,23 +1178,6 @@ class AdjustedTextInfo:
     def __dir__(self):
         return dir(self.textInfo)
 
-originalBrowseModeReport = None
-def preBrowseModeReport(self,readUnit=None):
-    url = getUrl(self.document)
-    suppress = getSuppressDescription(url, globalConfig)
-    suppressAriaLabel = getSuppressAriaLabel(url, globalConfig)
-    suppressAriaLabelEditable = getSuppressAriaLabelEditable(url, globalConfig)
-    suppressTreeLevel = getSuppressTreeLevel(url, globalConfig)
-    if not isinstance(self.textInfo, AdjustedTextInfo) and (suppressAriaLabel or suppressAriaLabelEditable or suppressTreeLevel):
-        self.textInfo = AdjustedTextInfo(self.textInfo, suppressAriaLabel=suppressAriaLabel, suppressAriaLabelEditable=suppressAriaLabelEditable, suppressTreeLevel=suppressTreeLevel)
-    originalValue = config.conf["presentation"]["reportObjectDescriptions"]
-    if suppress:
-        config.conf["presentation"]["reportObjectDescriptions"] = False
-    try:
-        result = originalBrowseModeReport(self,readUnit)
-    finally:
-        config.conf["presentation"]["reportObjectDescriptions"] = originalValue
-    return result
 
 original_event_treeInterceptor_gainFocus = None
 def pre_event_treeInterceptor_gainFocus(self):
@@ -1711,16 +1713,22 @@ def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=tex
     selection = info.copy()
     info.expand(unit)
     infoToSpeak = info
-    suppressAriaLabelEditable = getSuppressAriaLabelEditable(url, globalConfig)
-    suppressTreeLevel = getSuppressTreeLevel(url, globalConfig)
-    if (suppressAriaLabelEditable or suppressTreeLevel):
-        infoToSpeak = AdjustedTextInfo(info, suppressAriaLabelEditable=suppressAriaLabelEditable, suppressTreeLevel =suppressTreeLevel)
     speech.speakTextInfo(infoToSpeak, unit=unit, reason=REASON_CARET)
     if not oldInfo.isCollapsed:
         speech.speakSelectionChange(oldInfo, selection)
     self.selection = selection
     if skipped:
         skippedParagraphChime()
+
+def adjustTextInfoForSpeech(info):
+    url = getUrl()
+    if url is None:
+        return info
+    suppressOptions = getSuppressOptions(url, globalConfig)
+    if not any(suppressOptions.values()):
+        return info
+    else:
+        return AdjustedTextInfo(info, **suppressOptions)
 
 
 def autoClick(self, gesture, category, site=None, automated=False):

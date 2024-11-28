@@ -730,6 +730,10 @@ def bnVirtualBufferHandleUpdate(self):
     watchURL()
     return result
 
+originalSpeakTextInfo = None
+def bnSpeakTextInfo(info, *args, **kwargs):
+    return  originalSpeakTextInfo(quickJump.adjustTextInfoForSpeech(info), *args, **kwargs)
+
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     scriptCategory = _("BrowserNav")
     beeper = Beeper()
@@ -763,8 +767,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
         quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
-        quickJump.originalBrowseModeReport = browseMode.TextInfoQuickNavItem.report
-        browseMode.TextInfoQuickNavItem.report = quickJump.preBrowseModeReport
         NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
         self.thread = threading.Thread(name="BrowserNav browser monitor thread", target = quickJump.browseMonitorThreadFunc, args =())
         self.thread.start()
@@ -776,6 +778,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         api.setFocusObject = bnSetFocusObject
         originalVirtualBufferHandleUpdate = virtualBuffers.VirtualBuffer._handleUpdate
         virtualBuffers.VirtualBuffer._handleUpdate = bnVirtualBufferHandleUpdate
+        global originalSpeakTextInfo
+        originalSpeakTextInfo = speech.speakTextInfo
+        speech.speakTextInfo = bnSpeakTextInfo
 
     def createMenu(self):
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(SettingsDialog)
@@ -800,6 +805,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         
         api.setFocusObject = originalSetFocusObject
         virtualBuffers.VirtualBuffer._handleUpdate = originalVirtualBufferHandleUpdate
+        speech.speakTextInfo = originalSpeakTextInfo
+        
 
     def maybeAdjustOperator(self, op):
         mode = getConfig("browserMode")
