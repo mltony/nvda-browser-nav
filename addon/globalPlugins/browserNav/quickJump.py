@@ -950,38 +950,21 @@ class AutoSpeakCacheEntry:
         self.lines = lines
         self.enabled = True
 
-browseMonitorThreadShutdownRequested = False
 AutoSpeakCache = weakref.WeakKeyDictionary()
-def browseMonitorThreadFunc():
-    while not browseMonitorThreadShutdownRequested:
-        try:
-            time.sleep(0.5)
-            focus = api.getFocusObject()
-            try:
-                browse = focus.treeInterceptor
-                if browse is None:
-                    continue
-            except AttributeError:
-                continue
-            url = getUrl(browse, onlyFromCache=True)
-            if url is None:
-                continue
-            bookmarks = getAutoSpeakBookmarksForUrl(url, globalConfig)
-            try:
-                cacheEntry = AutoSpeakCache[browse]
-            except KeyError:
-                cacheEntry = {}
-                AutoSpeakCache[browse] = cacheEntry
-            processAutoSpeakEntry(browse, bookmarks, cacheEntry)
-            try:
-                #processWholePageDiff(browse, url)
-                pass
-            except OSError:
-                pass
-        except Exception as e:
-            #mylog(e)
-            #core.callLater(50, ui.message, _("Warning: BrowserNav browse monitor thread crashed: %s") % str(e))
-            log.error("Exception in BrowserNav monitor thread", e)
+def onVirtualBufferUpdate(browse):
+    url = getUrl(browse, onlyFromCache=True)
+    if url is None:
+        return
+    bookmarks = getAutoSpeakBookmarksForUrl(url, globalConfig)
+    try:
+        cacheEntry = AutoSpeakCache[browse]
+    except KeyError:
+        cacheEntry = {}
+        AutoSpeakCache[browse] = cacheEntry
+    try:
+        processAutoSpeakEntry(browse, bookmarks, cacheEntry)
+    except Exception as e:
+        log.exception("Exception during virtual buffer update processing in BrowserNav QuickJump", e)
 
 def processAutoSpeakEntry(browse, bookmarks, cacheEntry):
     if len(bookmarks) == 0:
