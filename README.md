@@ -122,8 +122,14 @@ Your script must decide whether current paragraph matches your custom rule or no
 * Return tuple `(i: int, s:str)` to indicate match with offset (see previous point) and have BrowserNav speak message `s`.
 * Call `match()` function to indicate a match. This function internally raises an Exception, so that execution of your script will be terminated after calling match. The function is defined as:
     ```
-    def match(offset: int | TextInfo | Paragraph = None, message: str = None) -> None:
+    def match(
+        offset: int | TextInfo | Paragraph = None,
+        message: str|TextInfo|Paragraph = None,
+        xLocation: int|TextInfo|Paragraph = None) -> None,
+    )
     ```
+    * `message` is an optional message to be spoken before match.
+    * `xLocation` is optional and is only used in hierarchical bookmarks to calculate the level.
 
 You are also allowed to import any modules and write general purpose scripts.
 

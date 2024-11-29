@@ -1456,7 +1456,7 @@ def shouldSkipClutter(textInfo, allBookmarks):
             bookmarksZero = []
         bookmarksOther = allBookmarks
     for match in matchTextAndAttributes(bookmarks0, textInfo):
-        scriptMatch, message = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=[])
+        scriptMatch, message, __ = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=[])
         if scriptMatch is not None:
             return True
     for _offset, bookmarks in bookmarksOther.items():
@@ -1500,6 +1500,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
         Returns tuple
             0-th element represents matched textInfo or None if there was no match.
             1-st element is either string or textInfo to announce prior to match, or None if nothing to announce.
+            2nd element is either int representing x coordinate or textInfo from which to extract said x coordinate - only used for hierarchical bookmarks
     """
     bookmark = match.bookmark
     textInfo = textInfo.copy()
@@ -1511,13 +1512,13 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
             textInfo.collapse()
             textInfo.move(textInfos.UNIT_CHARACTER, match.start)
             textInfo.move(textInfos.UNIT_CHARACTER, len(match.text), endPoint='end')
-            return (textInfo, bookmark.message)
+            return (textInfo, bookmark.message, textInfo)
         else:
             mylog("q3")
             result = moveParagraphWithSkipClutter(None, textInfo, offset, skipClutterBookmarks=skipClutterBookmarks)
             mylog(f"q4 {result}")
             if result == offset:
-                return (textInfo, bookmark.message)
+                return (textInfo, bookmark.message, textInfo)
 
     else:
         if bookmark.offset != 0:
@@ -1533,12 +1534,14 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
         t = textInfo.copy()
         _offset = None
         _message = None
-        def match(offset=None, message=None):
-            nonlocal _offset, _message
+        _xLocation = None
+        def match(offset=None, message=None, xLocation=None):
+            nonlocal _offset, _message, _xLocation
             if offset is None:
                 offset = 0
             _offset = offset
             _message = message
+            _xLocation = xLocation
             raise QuickJumpMatchPerformedException
         execLocals = {
             'p': p,
@@ -1588,6 +1591,14 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
                 log.error(e)
                 raise e
 
+            if not (
+                _xLocation is None
+                or isinstance(_xLocation, (int, textInfos.TextInfo, Paragraph))
+            ):
+                e = QuickJumpScriptException(f"Third argument of match() function (message) must be either None, or int, or textInfo, or Paragraph, but got: {type(_message)}. Please fix your quickJump script for bookmark {bookmark.getDisplayName()}.")
+                log.error(e)
+                raise e
+
             if _offset is None:
                 _offset = 0
             elif isinstance(_offset, Paragraph):
@@ -1603,13 +1614,16 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
                 raise e
 
             message = _message or bookmark.message
+            xLocation = _xLocation or _offset
+            if isinstance(xLocation, Paragraph):
+                xLocation = xLocation.textInfo
 
             if isinstance(_offset, int):
                 result = moveParagraphWithSkipClutter(None, textInfo, _offset, skipClutterBookmarks=skipClutterBookmarks)
                 if result == _offset:
-                    return (textInfo, message)
+                    return (textInfo, message, xLocation)
             else:
-                return (_offset, message)
+                return (_offset, message, xLocation)
         except ScriptError as e:
             message = str(e)
             log.error("ScriptError: {}", e)
@@ -1618,19 +1632,19 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
         #    e2 = QuickJumpScriptException(f"Exception while running script for bookmark '{bookmark.getDisplayName()}'.", e)
         #    log.error(e2)
         #    raise e
-    return (None, None)
+    return (None, None, None)
 
 def matchAndScript(bookmarks, skipClutterBookmarks, textInfo):
     #mylog("matchAndScript start")
     for match in matchTextAndAttributes(bookmarks, textInfo):
         #mylog("q1")
-        result, message = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks)
+        result, message, xLocation = runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks)
         #mylog("q2")
         if result  is not None:
             #mylog("matchAndScript Result is not None :(")
-            return result, message, match
+            return result, message, xLocation, match
     #mylog("matchAndScript Result is  None :(")
-    return None, None, None
+    return None, None, None, None
 
 def isMatchInRightDirection(oldSelection, direction, textInfo):
     origin = oldSelection.copy()
@@ -1669,7 +1683,7 @@ def _quickJump(self, gesture, bookmarks, direction, errorMsg):
         distance += 1
         adjustedDistance += 1
 
-        matchInfo, message, dummyMatch = matchAndScript(bookmarks, [], textInfo)
+        matchInfo, message, __, dummyMatch = matchAndScript(bookmarks, [], textInfo)
         if matchInfo is not None:
             if not isMatchInRightDirection(oldSelection, direction, matchInfo):
                 continue
@@ -1769,7 +1783,7 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
     textToSpeak = []
     textToSpeakByBookmark = {}
     while True:
-        matchInfo, thisMessage, match = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
+        matchInfo, thisMessage, __, match = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
         if matchInfo is not None:
             thisInfo = matchInfo
             if isClick:
@@ -1911,12 +1925,17 @@ def scanLevelsSync(self, config, bookmarks):
         distance = 0
         #mylog(f"loop:sltf->matchTextAndAttributes({len(bookmarks)})")
         while True:
-            matchInfo, message, dummyMatch = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
+            matchInfo, message, xLocation, dummyMatch = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
             if matchInfo is not None:
                 # We compute x screen coordinate of the match
                 # Computing it in thread pool for performance reasons.
                 innerFuture = utils.Future()
-                utils.threadPool.add_task(getIndentFunc, matchInfo, documentHolder, innerFuture)
+                if isinstance(xLocation, textInfos.TextInfo):
+                    utils.threadPool.add_task(getIndentFunc, xLocation, documentHolder, innerFuture)
+                elif isinstance(xLocation, int):
+                    innerFuture.set(xLocation)
+                else:
+                    raise RuntimeError(f"Invalid type of xLocation: {type(xLocation)}")
                 futures.append(innerFuture)
             distance += 1
             result = moveParagraph(textInfo, direction)
@@ -1990,12 +2009,17 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
         adjustedDistance += 1
         #mylog("hqj->matchTextAndAttributes2")
         mylog("HQJ calling matchAndScript")
-        matchInfo, message, dummyMatch = matchAndScript(bookmarks, [], textInfo)
+        matchInfo, message, xLocation, dummyMatch = matchAndScript(bookmarks, [], textInfo)
         if matchInfo is not None:
             if not isMatchInRightDirection(oldSelection, direction, matchInfo):
                 continue
             thisInfo = matchInfo
-            offset = utils.getGeckoParagraphIndent(thisInfo, documentHolder)
+            if isinstance(xLocation, textInfos.TextInfo):
+                offset = utils.getGeckoParagraphIndent(xLocation, documentHolder)
+            elif isinstance(xLocation, int):
+                offset = xLocation
+            else:
+                raise RuntimeError(f"Invalid type of xLocation: {type(xLocation)}")
             mylog(f"thisInfo={thisInfo.text}")
             mylog(f"offset={offset}")
             currentLevel = levelsInfo.index(offset)
