@@ -37,6 +37,8 @@ import ui
 import weakref
 import wx
 import addonHandler
+from .addonConfig import getConfig
+
 addonHandler.initTranslation()
 
 sonifyTextInfo = None # Due to import error we set this value from __init__
@@ -1558,10 +1560,11 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
                     raise RuntimeError("This script is a generator function; it is only allowed for bookmark type Script and Numeric Script.")
                 utils.executeAsynchronously(result)
             elif isinstance(result, tuple):
+                #match(*result)
                 match(*result)
             elif isinstance(result, dict):
                 match(**result)
-            elif result is not None:
+            elif (result is not None) and (result is not False):
                 match(result)
         except QuickJumpMatchPerformedException:
             # Script called match function!
@@ -1844,8 +1847,44 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
 
 class HierarchicalLevelsInfo:
     offsets: List[int]
+    bracketLows: list[int]
+    bracketHighs: list[int]
     def __init__(self, offsets):
         self.offsets = offsets
+        self.computeBrackets()
+    
+    def computeBrackets(self):
+        offsets = sorted(list(set(self.offsets)))
+        margin = getConfig('verticalAlignmentMargin')
+        self.    bracketLows = []
+        self.    bracketHighs = []
+        currentLow = currentHigh = None
+        for offset in offsets:
+            if currentLow is None:
+                currentLow = currentHigh = offset
+            elif offset <= currentHigh + margin:
+                currentHigh = offset
+            else:
+                self.bracketLows.append(currentLow)
+                self.bracketHighs.append(currentHigh)
+                currentLow = currentHigh = offset
+        if currentLow is not None:
+            self.bracketLows.append(currentLow)
+            self.bracketHighs.append(currentHigh)
+        n = len(self.bracketLows)
+        if (
+            (len(self.bracketLows) != len(self.bracketHighs))
+            or not all([self.bracketLows[i] <= self.bracketHighs[i] for i in range(n)])
+            or not all([self.bracketHighs[i] < self.bracketLows[i+1] for i in range(n-1)])
+        ):
+            raise RuntimeError
+    
+    def index(self, offset):
+        n = len(self.bracketLows)
+        for i in range(n):
+            if self.bracketLows[i] <= offset <= self.bracketHighs[i]:
+                return i
+        return None
 
 hierarchicalCache = weakref.WeakKeyDictionary()
 def getIndentFunc(textInfo, documentHolder, future):
@@ -1855,8 +1894,7 @@ def getIndentFunc(textInfo, documentHolder, future):
     except Exception as e:
         future.setException(e)
 
-def scanLevelsThreadFunc(self, config, future, bookmarks):
-    #mylog("sltf begin")
+def scanLevelsSync(self, config, bookmarks):
     futures = []
     direction = 1
     try:
@@ -1880,7 +1918,6 @@ def scanLevelsThreadFunc(self, config, future, bookmarks):
                 innerFuture = utils.Future()
                 utils.threadPool.add_task(getIndentFunc, matchInfo, documentHolder, innerFuture)
                 futures.append(innerFuture)
-
             distance += 1
             result = moveParagraph(textInfo, direction)
             if result == 0:
@@ -1889,27 +1926,14 @@ def scanLevelsThreadFunc(self, config, future, bookmarks):
                     inner.get()
                     for inner in futures
                 })))
-                future.set(result)
-                #mylog("sltf success")
-                #mylog(f"sltf result={result.offsets}")
-                return
+                return result
     except Exception as e:
-        #mylog("sltf fail")
-        future.setException(e)
-
+        raise e
 
 def scanLevels(self, bookmarks):
     global globalConfig, hierarchicalCache
-    config = globalConfig
-    future = utils.Future()
-    utils.threadPool.add_task(scanLevelsThreadFunc, self, config, future, bookmarks)
-    try:
-        innerDict = hierarchicalCache[self]
-    except KeyError:
-        innerDict = {}
-        hierarchicalCache[self] = innerDict
-    innerDict[config] = future
-    return future
+    result = scanLevelsSync(self, globalConfig, bookmarks)
+    return result
 
 def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg):
     url = getUrl(self)
@@ -1927,6 +1951,7 @@ def hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, 
             return endOfDocument(_('No hierarchical quickJump bookmarks or numeric script bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
 
 def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded, errorMsg):
+    global hierarchicalCache
     oldSelection = self.selection
     url = getUrl(self)
     bookmarks = findApplicableBookmarks(globalConfig, url, category)
@@ -1935,12 +1960,16 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
     if len(bookmarks) == 0:
         return endOfDocument(_('No hierarchical quickJump bookmarks configured for current website. Please add QuickJump bookmarks in BrowserNav settings in NVDA settings window.'))
     try:
-        levelsInfo = hierarchicalCache[self][globalConfig].get()
+        levelsInfo = hierarchicalCache[self][globalConfig]
     except KeyError:
         levelsInfo = None
-        scanLevels(self, bookmarks)
-        mylog(f"levelsInfo is None")
-        levelsInfo = hierarchicalCache[self][globalConfig].get()
+        levelsInfo = scanLevels(self, bookmarks)
+        try:
+            innerDict = hierarchicalCache[self]
+        except KeyError:
+            innerDict = {}
+            hierarchicalCache[self] = innerDict
+        innerDict[globalConfig] = levelsInfo
     mylog(f"level={level} levelsInfo={levelsInfo.offsets}")
     textInfo = self.makeTextInfo(textInfos.POSITION_CARET)
     textInfo.collapse()
@@ -1969,12 +1998,14 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
             offset = utils.getGeckoParagraphIndent(thisInfo, documentHolder)
             mylog(f"thisInfo={thisInfo.text}")
             mylog(f"offset={offset}")
+            currentLevel = levelsInfo.index(offset)
             if (
                 levelsInfo is None
                 or level is None
                 or (
-                    offset in levelsInfo.offsets
-                    and levelsInfo.offsets.index(offset) == level
+                    #offset in levelsInfo.offsets
+                    #and levelsInfo.offsets.index(offset) == level
+                    currentLevel == level
                 )
             ):
                 mylog("Perfect")
@@ -1983,7 +2014,7 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
                     and levelsInfo is not None
                     and offset in levelsInfo.offsets
                 ):
-                    announceLevel = levelsInfo.offsets.index(offset) + 1
+                    announceLevel = levelsInfo.index(offset) + 1
                     ui.message(_("Level {announceLevel}").format(announceLevel=announceLevel))
                 if message is not None and len(message) > 0:
                     ui.message(message)
@@ -1994,16 +2025,19 @@ def _hierarchicalQuickJump(self, gesture, category, direction, level, unbounded,
                 self.selection = thisInfo
                 sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
                 return
-            elif offset not in levelsInfo.offsets:
+            #elif offset not in levelsInfo.offsets:
+            elif currentLevel is None:
                 # Something must have happened that current level is not recorded in the previous scan. Rescan after this script.
                 mylog("offset not in levelsInfo")
                 scanLevels(self, bookmarks)
                 endOfDocument(_("BrowserNav error: inconsistent indents in the document. Recomputing indents, please try again."))
                 return
-            elif levelsInfo.offsets.index(offset) > level:
+            #elif levelsInfo.offsets.index(offset) > level:            
+            elif currentLevel > level:
                 #mylog("levelsInfo.offsets.index(offset) > level")
                 continue
-            elif levelsInfo.offsets.index(offset) < level:
+            #elif levelsInfo.offsets.index(offset) < level:
+            elif currentLevel < level:
                 #mylog("levelsInfo.offsets.index(offset) < level")
                 if unbounded:
                     continue

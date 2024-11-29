@@ -631,19 +631,6 @@ def browserNavPopup(selfself,gesture):
     finally:
         gui.mainFrame.postPopup()
 
-def getIA2FocusedObject(obj):
-    if obj is None:
-        return None
-    tup = IAccessibleHandler.accFocus(obj.IAccessibleObject)
-    if tup is None:
-        return None
-    ia2Focus, ia2ChildId = tup
-    realObj = NVDAObjects.IAccessible.IAccessible(
-        IAccessibleObject=ia2Focus,
-        IAccessibleChildID=ia2ChildId,
-    )
-    return realObj
-
 def getFocusedURL():
     focus = api.getFocusObject()
     if isinstance(focus, UIA):
@@ -656,23 +643,12 @@ def getFocusedURL():
             # using def _get_documentConstantIdentifier from NVDAObjects/UIA/chromium.py
             return obj.parent._getUIACacheablePropertyValue(UIAHandler.UIA_AutomationIdPropertyId)
         # Retrieve topmost IA2 object in the window
-        obj = NVDAObjects.IAccessible.getNVDAObjectFromEvent(focus.windowHandle, winUser.OBJID_CLIENT, 0)
+        obj = utils.getIA2DocumentInThread()
         if obj is None:
             return None
-        if obj.role == controlTypes.Role.DOCUMENT:
-            try:
-                return obj.IAccessibleObject.accValue(0)
-            except COMError:
-                return None
-        else:
-            obj = getIA2FocusedObject(obj)
-            while obj is not None:
-                if obj.role == controlTypes.Role.DOCUMENT:
-                    try:
-                        return obj.IAccessibleObject.accValue(0)
-                    except COMError:
-                        return None
-                obj = obj.parent
+        try:
+            return obj.IAccessibleObject.accValue(0)
+        except COMError:
             return None
     elif isinstance(focus, NVDAObjects.IAccessible.IAccessible):
         document = utils.getIA2Document()
@@ -1789,4 +1765,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         url = api.getCurrentURL()
         #api.d = utils.getIA2Document()
         #api.url = getFocusedURL()
-        ui.message(url)
+        #ui.message(url)
+        focus = api.getFocusObject()
+        textInfo = focus.treeInterceptor.makeTextInfo('caret')
+        x = utils.getGeckoParagraphIndent(textInfo)
+        ui.message(f"{x=}")
