@@ -443,6 +443,7 @@ class QJBookmark(QJImmutable):
     enableAutoSpeak: bool
     autoSpeakMode: AutoSpeakMode
     builtInWavFile: str
+    wavFileVolume: int
 
     def __init__(self, d):
         object.__setattr__(self, 'enabled', d['enabled'])
@@ -479,6 +480,10 @@ class QJBookmark(QJImmutable):
         object.__setattr__(self, 'enableAutoSpeak', d.get('enableAutoSpeak', False))
         object.__setattr__(self, 'autoSpeakMode', AutoSpeakMode(d.get('autoSpeakMode', AutoSpeakMode.OFF.value)))
         object.__setattr__(self, 'builtInWavFile', d.get('builtInWavFile', None))
+        volume = d.get('wavFileVolume', 100)
+        if volume is None:
+            volume = 100.0
+        object.__setattr__(self, 'wavFileVolume', volume)
 
     def asDict(self):
         return {
@@ -499,6 +504,7 @@ class QJBookmark(QJImmutable):
             'enableAutoSpeak': self.enableAutoSpeak,
             'autoSpeakMode': self.autoSpeakMode.value,
             'builtInWavFile': self.builtInWavFile,
+            'wavFileVolume': self.wavFileVolume,
         }
 
     def getDisplayName(self):
@@ -1037,8 +1043,10 @@ def diffAndExtractInterestingLines(s1, s2):
         elif mode == 'old' and len(line) > 0 and line[0] in {'-'}:
             yield line
 
-def playBiw(bookmark=None, earcon=None):
-    volume = 100.0
+def playBiw(bookmark=None, earcon=None, volume=None):
+    if volume is None:
+        volume = bookmark.wavFileVolume if bookmark is not None else 100
+    volume = 1.0 * volume
     absPath = os.path.join(
         utils.getSoundsPath(),
         earcon or bookmark.builtInWavFile,
@@ -2503,6 +2511,11 @@ class EditBookmarkDialog(wx.Dialog):
         )
         self.biwList.control.Bind(wx.EVT_CHOICE,self.onBiw)
         self.setBiw(self.bookmark.builtInWavFile)
+      # Volume slider
+        label = _("Volume")
+        self.volumeSlider = sHelper.addLabeledControl(label, wx.Slider, minValue=0,maxValue=100)
+        self.volumeSlider.SetValue(100)
+        self.volumeSlider.SetValue(self.bookmark.wavFileVolume)
       # Edit script button
         self.editScriptButton = sHelper.addItem (wx.Button (self, label = _("Edit &script in new window; press Control+Enter when Done.")))
         self.editScriptButton.Bind(wx.EVT_BUTTON, self.OnEditScriptClick)
@@ -2584,6 +2597,7 @@ class EditBookmarkDialog(wx.Dialog):
             #'enableAutoSpeak': self.autoSpeakEnabledCheckBox.Value,
             'autoSpeakMode': self.getAutoSpeakMode(),
             'builtInWavFile': self.getBiw(),
+            'wavFileVolume': self.volumeSlider.GetValue(),
         })
         return bookmark
 
@@ -2666,12 +2680,13 @@ class EditBookmarkDialog(wx.Dialog):
     def onAutoSpeakMode(self, event):
         asm = self.getAutoSpeakMode()
         biwControls = [
-            self.biwCategory,
-            self.biwList,
+            self.biwCategory.control,
+            self.biwList.control,
+            self.volumeSlider,
         ]
-        [biw.control.Enable() for biw in biwControls] if (
+        [biw.Enable() for biw in biwControls] if (
             asm.value.startswith("chime")
-        ) else [biw.control.Disable() for biw in biwControls]
+        ) else [biw.Disable() for biw in biwControls]
 
     def OnEditScriptClick(self,evt):
         _snippet = self.snippet
@@ -2788,8 +2803,9 @@ class EditBookmarkDialog(wx.Dialog):
     def onBiw(self, evt):
         soundsPath = utils.getSoundsPath()
         biw = self.getBiw()
-        fullPath = os.path.join(soundsPath, biw)
-        nvwave.playWaveFile(fullPath)
+        #fullPath = os.path.join(soundsPath, biw)
+        #nvwave.playWaveFile(fullPath)
+        playBiw(None, biw, self.volumeSlider.GetValue())
 
     def getBiwCategory(self):
         return   self.getBiwCategories()[self.biwCategory.control.GetSelection()]
