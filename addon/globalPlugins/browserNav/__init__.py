@@ -69,6 +69,7 @@ from NVDAObjects.UIA import UIA
 import UIAHandler
 import globalVars
 from gui import nvdaControls
+import extensionPoints
 
 debug = False
 if debug:
@@ -670,7 +671,13 @@ def getCurrentURL():
 
 
 api.getCurrentURL = getCurrentURL
+api.postFocusOrURLChange = extensionPoints.Action()
 updateURLLock = threading.Lock()
+def updateURLIfChanged():
+    newURL = getFocusedURL()
+    if globalVars.currentURL != newURL:
+        api.postFocusOrURLChange.notify()
+    globalVars.currentURL = newURL
 URL_WATCH_DELAYS_MS = [300, 700, 2000, 7000]
 def watchURLAsync(localUpdateUrlCounter, delays=None):
     delays = delays or URL_WATCH_DELAYS_MS
@@ -680,25 +687,22 @@ def watchURLAsync(localUpdateUrlCounter, delays=None):
             global globalUpdateUrlCounter
             if globalUpdateUrlCounter != localUpdateUrlCounter:
                 return
-            globalVars.currentURL = getFocusedURL()
+            updateURLIfChanged()
 
 def watchURL(initialDelayMs=None):
     with updateURLLock:
         global globalUpdateUrlCounter
         globalUpdateUrlCounter += 1
         localUpdateUrlCounter = globalUpdateUrlCounter
-    delays = None
-    if initialDelayMs is None:
-        globalVars.currentURL = getFocusedURL()
-    else:
-        delays = [initialDelayMs] + URL_WATCH_DELAYS_MS
-    utils.executeAsynchronously(watchURLAsync(localUpdateUrlCounter, delays))
+        updateURLIfChanged()
+    utils.executeAsynchronously(watchURLAsync(localUpdateUrlCounter, None))
 
 originalSetFocusObject = None
 originalVirtualBufferHandleUpdate = None
 def bnSetFocusObject(obj):
     result = originalSetFocusObject(obj)
     watchURL()
+    api.postFocusOrURLChange.notify()
     return result
 
 def bnVirtualBufferHandleUpdate(self):
