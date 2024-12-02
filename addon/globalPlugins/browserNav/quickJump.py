@@ -817,7 +817,7 @@ def getSuppressTreeLevel(url, config):
     return mode
 
 def getUrl(self=None, onlyFromCache=False):
-    return api.getCurrentURL()
+    return api.getCurrentURL() or ""
 
 @functools.lru_cache()
 def getBookmarksWithKeystrokesForUrl(url, config, keystroke, category=None):

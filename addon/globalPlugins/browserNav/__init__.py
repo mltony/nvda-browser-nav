@@ -1760,14 +1760,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             ),
             doc=_("Show BrowserNav popup menu."))
             
-    @script(description=_("Speak current URL for debug purpose."), gestures=['kb:NVDA+windows+z'])
+    @script(description=_("Speak current URL."), gestures=['kb:NVDA+control+L'])
     def script_speakCurrentURL(self, gesture):
         #url = getFocusedURL()
         url = api.getCurrentURL()
-        #api.d = utils.getIA2Document()
-        #api.url = getFocusedURL()
-        #ui.message(url)
-        focus = api.getFocusObject()
-        textInfo = focus.treeInterceptor.makeTextInfo('caret')
-        x = utils.getGeckoParagraphIndent(textInfo)
-        ui.message(f"{x=}")
+        ui.message(url)
