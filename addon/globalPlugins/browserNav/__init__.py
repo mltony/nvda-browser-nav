@@ -1760,7 +1760,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             ),
             doc=_("Show BrowserNav popup menu."))
             
-    @script(description=_("Speak current URL."), gestures=['kb:NVDA+control+L'])
+    @script(description=_("Speak current URL."), gestures=['kb:NVDA+l'])
     def script_speakCurrentURL(self, gesture):
         #url = getFocusedURL()
         url = api.getCurrentURL()
