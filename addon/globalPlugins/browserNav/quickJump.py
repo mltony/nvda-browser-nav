@@ -958,6 +958,7 @@ class AutoSpeakCacheEntry:
 
 AutoSpeakCache = weakref.WeakKeyDictionary()
 def onVirtualBufferUpdate(browse):
+    global virtualBufferUpdateFlag
     url = getUrl(browse, onlyFromCache=True)
     if url is None:
         return
@@ -968,13 +969,18 @@ def onVirtualBufferUpdate(browse):
         cacheEntry = {}
         AutoSpeakCache[browse] = cacheEntry
     try:
-        processAutoSpeakEntry(browse, bookmarks, cacheEntry)
+        #processAutoSpeakEntry(browse, bookmarks, cacheEntry)
+        virtualBufferUpdateFlag = True
+        core.callLater(0, processAutoSpeakEntry, browse, bookmarks, cacheEntry)
     except Exception as e:
         log.exception("Exception during virtual buffer update processing in BrowserNav QuickJump", e)
 
+virtualBufferUpdateFlag = False
 def processAutoSpeakEntry(browse, bookmarks, cacheEntry):
-    if len(bookmarks) == 0:
+    global virtualBufferUpdateFlag
+    if len(bookmarks) == 0 or not virtualBufferUpdateFlag:
         return
+    virtualBufferUpdateFlag = False
     newLinesByBookmark = _autoClick(browse, gesture=None, category=BookmarkCategory.QUICK_SPEAK, bookmarks=bookmarks,  automated=True)
     for bookmark in bookmarks:
         textToSpeak = newLinesByBookmark.get(bookmark, [])
