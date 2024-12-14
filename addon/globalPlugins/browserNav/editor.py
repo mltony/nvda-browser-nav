@@ -53,7 +53,7 @@ import weakref
 import winUser
 import wx
 from wx.stc import StyledTextCtrl
-
+from . import clipboard
 class GoToLineDialog(wx.Dialog):
     def __init__(self, parent, lineNum):
         # Translators: Title of Go To Line dialog
@@ -136,7 +136,7 @@ class EditTextDialog(wx.Dialog):
         #self.textCtrl = StyledTextCtrl(self, style=wx.TE_MULTILINE|wx.TE_DONTWRAP)
         self.textCtrl.Bind(wx.EVT_CHAR, self.onChar)
         self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
-        self.textCtrl.Bind(wx.EVT_TEXT_PASTE, self.onClipboardPaste)
+        self.textCtrl.Bind(wx.EVT_TEXT_PASTE, self.onClipboardPaste2)
         sHelper.addItem(self.textCtrl)
         self.textCtrl.SetValue(text)
         self.SetFocus()
@@ -329,8 +329,32 @@ class EditTextDialog(wx.Dialog):
             wx.CallAfter(lambda: self.onTextComplete(wx.ID_CANCEL, self.text, hasChanged, lineNum, columnNum, None))
         event.Skip()
 
-    def onClipboardPaste(self, event):
+    def onClipboardPasteOld(self, event):
+        # With this function Control+V works unreliably. In 1-2% of cases it fails to paste, and failiure rate sometimes spikes up to 50%.
+        # I haven't been able to figure out why.
         s = api.getClipData()
         s = s.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
         api.copyToClip(s)
         event.Skip()
+    
+    def onClipboardPasteExperimental(self, event):
+        def updateLineEndings():
+            text = self.textCtrl.GetValue()
+            caretOffset = self.textCtrl.GetInsertionPoint()
+            caretOffsetFromEnd = len(text) - caretOffset
+            text = re.sub(r'(?<!\r)\n', '\r\n', text)
+            self.textCtrl.SetValue(text)
+            newCaretOffset = len(text) - caretOffsetFromEnd
+            self.textCtrl.SetInsertionPoint(newCaretOffset)
+        core.callLater(10, updateLineEndings)
+        tones.beep(500, 50)
+        event.Skip()
+
+    def onClipboardPaste2(self, event):
+        s = api.getClipData()
+        originalClipboardText = s
+        s = re.sub(r'(?<!\r)\n', '\r\n', s)
+        clipboard.ephemeralCopyToClip(s)
+        time.sleep(0.1)
+        event.Skip()
+        core.callLater(300, clipboard.ephemeralCopyToClip, originalClipboardText)
