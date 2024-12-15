@@ -1764,4 +1764,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def script_speakCurrentURL(self, gesture):
         #url = getFocusedURL()
         url = api.getCurrentURL()
-        ui.message(url)
+        if url is None:
+            ui.message(_("No URL"))
+            return
+        count=scriptHandler.getLastScriptRepeatCount()
+        if count >= 1:
+            api.copyToClip(url)
+            ui.message(_("Copied to clipboard: {}").format(url))
+        else:
+            ui.message(url)
