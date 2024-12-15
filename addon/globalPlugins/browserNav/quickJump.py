@@ -1183,9 +1183,8 @@ class AdjustedTextInfo:
 
 original_event_treeInterceptor_gainFocus = None
 def pre_event_treeInterceptor_gainFocus(self):
+    onVirtualBufferUpdate(self)
     if not self._hadFirstGainFocus:
-        #tones.beep(1000, 100)
-        #utils.executeAsynchronously(asyncBrowseMonitor(self))
         url = getUrl(self)
         sites = findSites(url, globalConfig)
         autoClickSites = [site for site in sites if site.autoClickOnFocus]
