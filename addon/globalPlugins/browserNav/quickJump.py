@@ -1798,7 +1798,7 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
             if isClick:
                 mylog(f"Autoclick Match {distance} {thisInfo.text}")
                 focusable = thisInfo.focusableNVDAObjectAtStart
-                if focusable.role in {ROLE_DOCUMENT, ROLE_DIALOG}:
+                if focusable is None or focusable.role in {ROLE_DOCUMENT, ROLE_DIALOG}:
                     if focusableErrorMsg is None:
                         mylog("Bookmark points to non-focusable NVDA object, cannot click it.")
                         focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
