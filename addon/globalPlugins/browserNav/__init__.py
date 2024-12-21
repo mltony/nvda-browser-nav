@@ -509,7 +509,6 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
     if (
         (
             quickJump.isSkipClutterEnabledForThisUnit(unit)
-            or quickJump.needOverride_caretMovement(self)
         )
         and direction is not None
         and posConstant==textInfos.POSITION_SELECTION

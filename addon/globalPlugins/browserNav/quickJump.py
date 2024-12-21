@@ -1696,12 +1696,6 @@ def _quickJump(self, gesture, bookmarks, direction, errorMsg):
             sonifyTextInfo(self.selection, oldTextInfo=oldSelection, includeCrackle=True)
             return
 
-def needOverride_caretMovement(self):
-    url = getUrl(self)
-    suppressAriaLabelEditable = getSuppressAriaLabelEditable(url, globalConfig)
-    suppressTreeLevel = getSuppressTreeLevel(url, globalConfig)
-    return suppressAriaLabelEditable or suppressTreeLevel
-
 def isSkipClutterEnabledForThisUnit(unit):
     return (
         (
