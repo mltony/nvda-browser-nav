@@ -1702,6 +1702,16 @@ def needOverride_caretMovement(self):
     suppressTreeLevel = getSuppressTreeLevel(url, globalConfig)
     return suppressAriaLabelEditable or suppressTreeLevel
 
+def isSkipClutterEnabledForThisUnit(unit):
+    return (
+        (
+            getConfig("skipEmptyParagraphs")
+            and unit == textInfos.UNIT_PARAGRAPH
+        ) or  (
+            getConfig("skipEmptyLines")
+            and unit == textInfos.UNIT_LINE
+        )
+    )
 
 def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=textInfos.POSITION_SELECTION, *args, **kwargs):
     url = getUrl(self)
@@ -1722,7 +1732,7 @@ def caretMovementWithAutoSkip(self, gesture,unit, direction=None,posConstant=tex
         expandInfo = info.copy()
         expandInfo.expand(unit)
         expandText = expandInfo.text
-        if shouldSkipClutter(expandInfo, bookmarks):
+        if isSkipClutterEnabledForThisUnit(unit) and shouldSkipClutter(expandInfo, bookmarks):
             skipped = True
             continue
         break

@@ -508,15 +508,8 @@ def preCaretMovementScriptHelper(self, gesture,unit, direction=None,posConstant=
     oldSelection = self.selection
     if (
         (
-            (
-                getConfig("skipEmptyParagraphs")
-                and unit == textInfos.UNIT_PARAGRAPH
-            ) or  (
-                getConfig("skipEmptyLines")
-                and unit == textInfos.UNIT_LINE
-            ) or (
-                quickJump.needOverride_caretMovement(self)
-            )
+            quickJump.isSkipClutterEnabledForThisUnit(unit)
+            or quickJump.needOverride_caretMovement(self)
         )
         and direction is not None
         and posConstant==textInfos.POSITION_SELECTION
