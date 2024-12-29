@@ -547,6 +547,8 @@ class QJSite(QJImmutable):
     suppressAriaLabel: bool
     suppressAriaLabelEditable: bool
     suppressTreeLevel: bool
+    description: str
+    version: str
 
     def __init__(self, d):
         super().__init__()
@@ -571,6 +573,8 @@ class QJSite(QJImmutable):
         self.suppressAriaLabel = d.get('suppressAriaLabel', False)
         self.suppressAriaLabelEditable = d.get('suppressAriaLabelEditable', False)
         self.suppressTreeLevel = d.get('suppressTreeLevel', False)
+        self.description = d.get('description', "")
+        self.version= d.get('version', "")
         self.freeze()
 
     def asDict(self):
@@ -593,6 +597,8 @@ class QJSite(QJImmutable):
             'suppressAriaLabel': self.suppressAriaLabel,
             'suppressAriaLabelEditable': self.suppressAriaLabelEditable,
             'suppressTreeLevel': self.suppressTreeLevel,
+            'description': self.description,
+            'version': self.version,
         }
 
 
@@ -3025,12 +3031,20 @@ class EditSiteDialog(wx.Dialog):
                 'autoClickContinuous': False,
                 'autoClickContinuousDelay': 500,
             })
+        self.description  = self.site.description
         self.config = config
         self.knownSites = knownSites
       # Translators: label for comment edit box
         commentLabelText = _("&Website name")
         self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
         self.commentTextCtrl.SetValue(self.site.name)
+      # Edit description button
+        self.editDescription = sHelper.addItem (wx.Button (self, label = _("Edit &Description")))
+        self.editDescription.Bind(wx.EVT_BUTTON, self.OnEditDescriptionClick)
+      # Version edit box
+        label = _("&Version (optional for exported bookmarks)")
+        self.versionTextCtrl=sHelper.addLabeledControl(label, wx.TextCtrl)
+        self.versionTextCtrl.SetValue(self.site.version)
       # Translators: domain
         patternLabelText = _("&URL")
         self.patternTextCtrl=sHelper.addLabeledControl(patternLabelText, wx.TextCtrl)
@@ -3240,6 +3254,8 @@ class EditSiteDialog(wx.Dialog):
             'suppressAriaLabel': self.suppressAriaLabelCheckBox.Value,
             'suppressAriaLabelEditable': self.suppressAriaLabelEditableCheckBox.Value,
             'suppressTreeLevel': self.suppresstreeLevelCheckBox.Value,
+            'description': self.description,
+            'version': self.versionTextCtrl.GetValue(),
         })
         return site
 
@@ -3255,6 +3271,16 @@ class EditSiteDialog(wx.Dialog):
             self.config = entryDialog.config
             mylog(f"EditSiteDialog.editBookmarks2 nb={len(self.site.bookmarks)}")
         entryDialog.Destroy()
+
+    def OnEditDescriptionClick(self,evt):
+        title = _("Edit site description")
+        dlg = wx.TextEntryDialog(gui.mainFrame, title, title, style = wx.OK | wx.CANCEL | wx.TE_MULTILINE)
+        dlg.SetValue(self.description)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.description = dlg.GetValue()
+        dlg.Destroy()
+
+
     def getAutoClickCombo(self):
         return self.autoClickOptions[self.autoClickComboBox.control.GetSelection()]
 
