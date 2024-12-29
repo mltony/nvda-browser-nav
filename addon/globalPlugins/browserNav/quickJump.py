@@ -38,6 +38,7 @@ import weakref
 import wx
 import addonHandler
 from .addonConfig import getConfig
+import uuid
 
 addonHandler.initTranslation()
 
@@ -225,8 +226,8 @@ autoSpeakModeNames = {
     AutoSpeakMode.CHIME_ON_ADD: _("Play chime when bookmark appears on the page"),
     AutoSpeakMode.CHIME_ON_REMOVE: _("Play chime when bookmark disappears from the page"),
     AutoSpeakMode.CHIME_ON_CHANGE: _("Play chime when text matched by bookmark changes"),
-
 }
+
 class QJImmutable:
     def __init__(self):
         object.__setattr__(self, 'frozen', False)
@@ -444,6 +445,7 @@ class QJBookmark(QJImmutable):
     autoSpeakMode: AutoSpeakMode
     builtInWavFile: str
     wavFileVolume: int
+    uuid: str
 
     def __init__(self, d):
         object.__setattr__(self, 'enabled', d['enabled'])
@@ -484,6 +486,7 @@ class QJBookmark(QJImmutable):
         if volume is None:
             volume = 100.0
         object.__setattr__(self, 'wavFileVolume', volume)
+        object.__setattr__(self, 'uuid', d.get('uuid', None) or str(uuid.uuid4()))
 
     def asDict(self):
         return {
@@ -505,6 +508,7 @@ class QJBookmark(QJImmutable):
             'autoSpeakMode': self.autoSpeakMode.value,
             'builtInWavFile': self.builtInWavFile,
             'wavFileVolume': self.wavFileVolume,
+            'uuid': self.uuid,
         }
 
     def getDisplayName(self):
@@ -2618,6 +2622,16 @@ class EditBookmarkDialog(wx.Dialog):
             return self.oldSite
         newSite = self.config.sites[self.siteComboBox.control.GetSelection()]
         if newSite != self.oldSite:
+            existingUuids = [bookmark.uuid for bookmark in newSite.bookmarks]
+            if self.bookmark.uuid in existingUuids:
+                result = gui.messageBox(
+                    _("Warning: you are trying to  move this bookmark to site %(new_site)s. "
+                    "However it already contains a bookmark with the same UUID. This is not supported. Please create a new bookmark instead.") % {"new_site": newSite.getDisplayName(), "old_site": self.oldSite.getDisplayName()},
+                    _("Bookmark Entry error"),
+                    wx.OK|wx.ICON_ERROR,
+                    self
+                )
+                return None
             result = gui.messageBox(
                 _("Warning: you are about to move this bookmark to site %(new_site)s. "
                 "This bookmark will disappear from the old site %(old_site)s. Would you like to proceed?") % {"new_site": newSite.getDisplayName(), "old_site": self.oldSite.getDisplayName()},
