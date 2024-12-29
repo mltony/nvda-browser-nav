@@ -3028,7 +3028,7 @@ class EditSiteDialog(wx.Dialog):
         self.config = config
         self.knownSites = knownSites
       # Translators: label for comment edit box
-        commentLabelText = _("&Display name (optional)")
+        commentLabelText = _("&Website name")
         self.commentTextCtrl=sHelper.addLabeledControl(commentLabelText, wx.TextCtrl)
         self.commentTextCtrl.SetValue(self.site.name)
       # Translators: domain
@@ -3211,6 +3211,13 @@ class EditSiteDialog(wx.Dialog):
             return
         if urlMatch in {URLMatch.DOMAIN, URLMatch.SUBDOMAIN}:
             domain = domain.lower()
+        name = self.commentTextCtrl.Value
+        if len(name) > 0 and name in [site.name for site in self.knownSites]:
+            errorMsg = _("Another website with this name already exists. Please choose a different name.")
+            gui.messageBox(errorMsg, _("Site Entry Error"), wx.OK|wx.ICON_ERROR, self)
+            self.commentTextCtrl.SetFocus()
+            return
+
         site = QJSite({
             'domain':domain,
             'urlMatch':urlMatch,
