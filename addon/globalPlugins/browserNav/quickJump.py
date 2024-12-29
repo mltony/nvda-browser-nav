@@ -659,12 +659,15 @@ def loadConfig():
     except FileNotFoundError:
         rulesConfig = open(defaultRulesFileName, "r").read()
         mylog(defaultRulesFileName)
-    return QJConfig(json.loads(rulesConfig))
+    result = QJConfig(json.loads(rulesConfig))
+    saveConfig(result)
+    return result
 
 
-def saveConfig():
+def saveConfig(config=None):
     global globalConfig
-    configDict = globalConfig.asDict()
+    config = config or globalConfig
+    configDict = config.asDict()
     rulesJson = json.dumps(configDict, indent=4, sort_keys=True)
     rulesFile = open(rulesFileName, "w")
     try:
