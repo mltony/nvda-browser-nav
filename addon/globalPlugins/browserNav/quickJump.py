@@ -3177,6 +3177,9 @@ class EditSiteDialog(wx.Dialog):
         Text = _("Suppress tree level announcements")
         self.suppresstreeLevelCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
         self.suppresstreeLevelCheckBox.SetValue(self.site.suppressTreeLevel)
+      # Export button
+        self.exportButton = sHelper.addItem (wx.Button (self, label = _("E&xport site and all bookmarks")))
+        self.exportButton.Bind(wx.EVT_BUTTON, self.OnExportButtonClick)
       #  OK/cancel buttons
         sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
 
@@ -3279,6 +3282,66 @@ class EditSiteDialog(wx.Dialog):
         if dlg.ShowModal() == wx.ID_OK:
             self.description = dlg.GetValue()
         dlg.Destroy()
+
+    def OnExportButtonClick(self,evt):
+        site = self.make()
+        if site is None:
+            return
+        if len(site.name) == 0:
+            errorMsg = _(
+                "Please enter website name in order to export it."
+            )
+            gui.messageBox(errorMsg, _("Website export Error"), wx.OK|wx.ICON_WARNING, self)
+            self.commentTextCtrl.SetFocus()
+            return
+        if len(site.version) == 0:
+            errorMsg = _(
+                "Please enter a version in order to  export this website.\n"
+                "We recommend to use date-based versions, like v2025.01.31.\n"
+            )
+            gui.messageBox(errorMsg, _("Website export Error"), wx.OK|wx.ICON_WARNING, self)
+            self.versionTextCtrl.SetFocus()
+            return
+        file_dialog = wx.FileDialog(
+            self,
+            message="Select a directory and enter a filename",
+            defaultDir="C:",
+            defaultFile=f"{site.name}",
+            wildcard="BrowserNav website (*.browsernav-website)|*.browsernav-website",
+            #style=wx.FD_SAVE | wx.FD_CREATE_DIR | wx.FD_OVERWRITE_PROMPT
+            style=wx.FD_SAVE,
+        )
+        if file_dialog.ShowModal() == wx.ID_OK:
+            fileName = file_dialog.GetPath()
+            if os.path.exists(fileName):
+                msg = _(
+                    "File {} already exists. Would you like to replace it?"
+                )
+                result = gui.messageBox(msg, _("File exists"), wx.YES_NO | wx.ICON_QUESTION, self)
+                if result != wx.YES:
+                    return
+            try:
+                f = open(fileName, 'w', encoding='utf-8')
+                try:
+                    print(
+                        json.dumps(
+                            site.asDict(),
+                            indent=4,
+                            sort_keys=True
+                        ),
+                        file=f,
+                    )
+                finally:
+                    f.close()
+            except OSError as e:
+                errorMsg = _("Could not save website to {}: {}").format(
+                    fileName,
+                    str(e),
+                )
+                gui.messageBox(errorMsg, _("Site Entry Error"), wx.OK|wx.ICON_WARNING, self)
+        file_dialog.Destroy()
+
+
 
 
     def getAutoClickCombo(self):
