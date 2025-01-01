@@ -1754,6 +1754,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             
     @script(description=_("Speak current URL."), gestures=['kb:NVDA+l'])
     def script_speakCurrentURL(self, gesture):
+        #return quickJump.testOverwriteSiteDialog()
         #url = getFocusedURL()
         url = api.getCurrentURL()
         if url is None:

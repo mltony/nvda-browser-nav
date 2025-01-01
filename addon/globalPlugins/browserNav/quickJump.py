@@ -39,6 +39,7 @@ import wx
 import addonHandler
 from .addonConfig import getConfig
 import uuid
+import requests
 
 addonHandler.initTranslation()
 
@@ -1007,21 +1008,7 @@ def processAutoSpeakEntry(browse, bookmarks, cacheEntry):
 def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
     if not cachedLines.enabled:
         return
-    if False:
-        api.c = cachedLines
-        api.t = textToSpeak
-        mylog(f"l={len(cachedLines.lines)}")
-        if len(cachedLines.lines)>0:
-            mylog(f" 0={cachedLines.lines[0]}")
-        mylog(f"l={len(textToSpeak)}")
-        if len(textToSpeak) > 0:
-            mylog(f" 0={textToSpeak[0]}")
 
-    if False:
-        if cachedLines.lines == textToSpeak:
-            tones.beep(500, 50)
-        else:
-            tones.beep(1000, 100)
     firstUtterance = True
     if bookmark.autoSpeakMode == AutoSpeakMode.PARAGRAPH_DIFF:
         for line in diffAndExtractInterestingLines(cachedLines.lines, textToSpeak):
@@ -1118,14 +1105,6 @@ def processWholePageDiff(browse, url):
             counter = kinds.get(kind, 0)
             kinds[kind] = counter + 1
         if len(linesToSpeak) > 0:
-            if False:
-                api.t .append(len(newText))
-                api.d.append(len(linesToSpeak))
-                api.c.append(c2-c1)
-                global debugi
-                with open(f"H:\\bn{debugi}.txt", 'w', encoding='utf-8') as f:
-                    print(newText, file=f)
-                debugi += 1
 
             def speakLines(lines):
                 speech.speakText("\n".join(lines))
@@ -1227,9 +1206,6 @@ def postGetAlternativeScript(self,gesture,script):
         return result
     bookmarks = getBookmarksWithKeystrokesForUrl(url, globalConfig, keystroke)
     mylog(f"{keystroke} >> {url} b={len(bookmarks)}")
-    if '8' in keystroke:
-        import api
-        api.g=gesture
     if "shift+" in keystroke:
         quickJumpKeystroke = keystroke.replace('shift+', '')
         quickJumpDirection = -1
@@ -2776,7 +2752,6 @@ class EditBookmarkDialog(wx.Dialog):
     blackListedKeystrokes = "escape enter numpadenter space nvda+space nvda+n nvda+q nvda+j j tab uparrow downarrow leftarrow rightarrow home end control+home control+end delete".split()
 
     def _addCaptured(self, gesture):
-        api.g = gesture
         g = getKeystrokeFromGesture(gesture)
         if g in ["escape", "delete"]:
             self.keystroke = None
@@ -3316,7 +3291,7 @@ class EditSiteDialog(wx.Dialog):
             if os.path.exists(fileName):
                 msg = _(
                     "File {} already exists. Would you like to replace it?"
-                )
+                ).format(fileName)
                 result = gui.messageBox(msg, _("File exists"), wx.YES_NO | wx.ICON_QUESTION, self)
                 if result != wx.YES:
                     return
@@ -3379,6 +3354,215 @@ class EditSiteDialog(wx.Dialog):
             self.site = site
             evt.Skip()
 
+class OverwriteSiteDialog(wx.Dialog):
+    def __init__(self, parent, id=-1, title="", pos=wx.DefaultPosition,
+                 size=wx.DefaultSize, style=wx.DEFAULT_DIALOG_STYLE,
+                 name="CustomDialog", message="",
+                 callback=None,
+    ):
+        super().__init__(parent, id, title, pos, size, style, name)
+        
+        self.panel = wx.Panel(self)
+        
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        static_text = wx.StaticText(self.panel, label=message)
+        main_sizer.Add(static_text, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Buttons Sizer
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        label = _("Over&write existing website definition")
+        self.button1 = wx.Button(self.panel, label=label)
+        label = _("Keep existing website definition, but overwrite all &bookmarks")
+        self.button2 = wx.Button(self.panel, label=label)
+        label = _("Save this website under a different &name")
+        self.button3 = wx.Button(self.panel, label=label)
+        self.button4 = wx.Button(self.panel, label="Cancel")
+        
+        button_sizer.Add(self.button1)
+        button_sizer.Add(self.button2)
+        button_sizer.Add(self.button3)
+        button_sizer.Add(self.button4)
+        
+        main_sizer.Add(button_sizer, 0, wx.ALL | wx.CENTER, 5)
+        
+        self.panel.SetSizer(main_sizer)
+        self.Fit()
+        
+        self.Bind(wx.EVT_BUTTON, self.onOverwriteSite, self.button1)
+        self.Bind(wx.EVT_BUTTON, self.onOverwriteBookmarks, self.button2)
+        self.Bind(wx.EVT_BUTTON, self.onRename, self.button3)
+        self.Bind(wx.EVT_BUTTON, self.onCancel, self.button4)
+        self.SetEscapeId(self.button4.GetId())
+        self.callback = callback
+        
+    def onOverwriteSite(self, event):
+        #wx.CallAfter(self.Destroy)
+        #self.callback(option=1)
+        self.EndModal(wx.ID_YES)
+
+    def onOverwriteBookmarks(self, event):
+        #wx.CallAfter(self.Destroy)
+        #self.callback(option=2)
+        self.EndModal(wx.ID_YES + 1)
+
+    def onRename(self, event):
+        #wx.CallAfter(self.Destroy)
+        #self.callback(option=3)
+        self.EndModal(wx.ID_YES + 2)
+
+    def onCancel(self, event):
+        self.EndModal(wx.ID_CANCEL)
+        #self.Close()
+        #wx.CallAfter(self.Destroy)
+        
+    def ShowModal(self):
+        result = super().ShowModal()
+        return result
+
+def importImpl(self, sites, site):
+    if len(site.name) == 0 or len(site.version) == 0:
+        if len(site.name) == 0:
+            errorMsg = _("This website doesn't have a name. Cannot import it.")
+        else:
+            errorMsg = _("This website doesn't have a version. Cannot import it.")
+        gui.messageBox(errorMsg, _("Site Entry Error"), wx.OK|wx.ICON_ERROR)
+        return
+
+    sameNameSites = [(i, s) for i, s in enumerate(sites) if s.name == site.name]
+    if len(sameNameSites) > 1:
+        raise RuntimeError("Impossible - found multiple sites with the same name")
+    elif len(sameNameSites) == 0:
+        sites.append(site)
+        return sites
+    else: # There is exactly 1 existing site with the same name
+        existingSiteIndex, existingSite = sameNameSites[0]
+        title = _("BrowserNav website import conflict")
+        message = _("You already have website {} in your BrowserNav configuration. What would you like to do?").format(site.name)
+        dialog = OverwriteSiteDialog(parent=self, title=title, message=message)
+        result = dialog.ShowModal()
+        if result == wx.ID_YES:
+            # overwrite the whole site
+            sites = sites[:]
+            sites[existingSiteIndex] = site
+            return sites
+        elif result == wx.ID_YES + 1:
+            # Only overwrite the bookmarks
+            d = existingSite.asDict()
+            existingBookmarks =d['bookmarks']
+            newBookmarks = site.asDict()['bookmarks']
+            for bookmark in newBookmarks:
+                uuid = bookmark['uuid']
+                ii = [i for i, bookmark in enumerate(existingBookmarks) if bookmark['uuid'] == uuid]
+                if len(ii) == 0:
+                    existingBookmarks.append(bookmark)
+                else:
+                    i = ii[0]
+                    existingBookmarks[i] = bookmark
+            newSite = QJSite(d)
+            sites[existingSiteIndex] = newSite
+            return sites
+        elif result == wx.ID_YES + 2:
+            # Rename
+            d = site.asDict()
+            oldName = site.name
+            existingNames = set([s.name for s in sites])
+            name = None
+            for i in range(2,   100):
+                name = f"{site.name} ({i})"
+                if name not in existingNames:
+                    break
+            while True:
+                dialog = wx.TextEntryDialog(
+                    self,
+                    "Please enter a new name:",
+                    "Enter New Name",
+                    name,
+                )
+                if dialog.ShowModal() == wx.ID_OK:
+                    newName = dialog.GetValue()
+                    if newName in existingNames:
+                        errorMsg = _("There is already a website with this name. Please enter a different name.")
+                        gui.messageBox(errorMsg, _("Site Entry Error"), wx.OK|wx.ICON_ERROR, self)
+                        continue
+                    d['name'] = newName
+                    newSite = QJSite(d)
+                    sites.append(newSite)
+                    return sites
+                else:
+                    return None
+
+
+def downloadAllWebsitesFromStore():
+    url = "https://raw.githubusercontent.com/mltony/nvda-browser-nav-bookmark-store/refs/heads/main/output/websites.json"
+    response = requests.get(url)
+    response.raise_for_status()
+    data = json.loads(response.text)
+    return data
+
+class WebsiteStoreDialog(
+    gui.dpiScalingHelper.DpiScalingHelperMixinWithoutInit,
+    wx.Dialog,
+):
+    def __init__(self, parent, j):
+        title=_("Available BrowserNav websites")
+        super().__init__(parent,title=title)
+        self.j = j
+        self.sites = list(j['websites'].values())
+        mainSizer=wx.BoxSizer(wx.VERTICAL)
+        sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
+      # websites table
+        label = _("&Websites")
+        self.sitesList = sHelper.addLabeledControl(
+            label,
+            nvdaControls.AutoWidthColumnListCtrl,
+            autoSizeColumn=2,
+            itemTextCallable=self.getItemTextForList,
+            style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.LC_VIRTUAL
+        )
+
+        self.sitesList.InsertColumn(0, _("Name"), width=self.scaleSize(150))
+        self.sitesList.InsertColumn(1, _("Version"))
+        self.sitesList.InsertColumn(2, _("URL"))
+        self.sitesList.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.onListItemFocused)
+        self.sitesList.ItemCount = len(self.sites)
+
+        bHelper = sHelper.addItem(guiHelper.ButtonHelper(orientation=wx.HORIZONTAL))
+      # Description edit field
+        self.textCtrl = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_DONTWRAP)
+        sHelper.addItem(self.textCtrl)
+        self.textCtrl.SetValue("")
+
+      # OK/Cancel buttons
+        sHelper.addDialogDismissButtons(self.CreateButtonSizer(wx.OK|wx.CANCEL))
+        self.Bind(wx.EVT_BUTTON,self.onOk,id=wx.ID_OK)
+        self.sitesList.SetFocus()
+
+    def getItemTextForList(self, item, column):
+        site = self.sites[item]['website']
+        if column == 0:
+            return site['name']
+        elif column == 1:
+            return site['version']
+        elif column == 2:
+            return site['domain']
+        else:
+            raise ValueError("Unknown column: %d" % column)
+
+    def onListItemFocused(self, evt):
+        if self.sitesList.GetSelectedItemCount()!=1:
+            return
+        index=self.sitesList.GetFirstSelected()
+        site = self.sites[index]['website']
+        self.textCtrl.SetValue(site['description'])
+
+    def onOk(self,evt):
+        if self.sitesList.GetSelectedItemCount()!=1:
+            return
+        index=self.sitesList.GetFirstSelected()
+        self.site = self.sites[index]['website']
+        evt.Skip()
+
 
 class SettingsDialog(SettingsPanel):
     title = _("BrowserNav QuickSearch websites and bookmarks")
@@ -3423,6 +3607,10 @@ class SettingsDialog(SettingsPanel):
         self.moveDownButton.Bind(wx.EVT_BUTTON, lambda evt: self.OnMoveClick(evt, 1))
         self.sortButton = bHelper.addButton(self, label=_("&Sort"))
         self.sortButton.Bind(wx.EVT_BUTTON, self.OnSortClick)
+        self.importButton = bHelper.addButton(self, label=_("&Import website from file"))
+        self.importButton.Bind(wx.EVT_BUTTON, self.OnImportClick)
+        self.importFromStoreButton = bHelper.addButton(self, label=_("Import website from bookmar&k store"))
+        self.importFromStoreButton.Bind(wx.EVT_BUTTON, self.OnImportFromStoreClick)
 
     def postInit(self):
         self.sitesList.SetFocus()
@@ -3531,6 +3719,55 @@ class SettingsDialog(SettingsPanel):
         sites = list(self.config.sites)
         sites.sort(key=QJSite.getDisplayName)
         self.config = self.config.updateSites(sites)
+
+    def OnImportClick(self,evt):
+        sites = list(self.config.sites)
+        file_dialog = wx.FileDialog(
+            self,
+            message="Select a directory and enter a filename",
+            defaultDir="C:",
+            wildcard="BrowserNav website (*.browsernav-website)|*.browsernav-website",
+            #style=wx.FD_OPEN | wx.FD_CREATE_DIR | wx.FD_OVERWRITE_PROMPT
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        )
+        if file_dialog.ShowModal() == wx.ID_OK:
+            fileName = file_dialog.GetPath()
+            try:
+                j = json.loads(open(fileName, 'r', encoding='utf-8').read())
+                site = QJSite(j)
+            except Exception as e:
+                errorMsg = _("Could not load website from {}: {}").format(
+                    fileName,
+                    str(e),
+                )
+                gui.messageBox(errorMsg, _("Site Entry Error"), wx.OK|wx.ICON_WARNING, self)
+                return
+        file_dialog.Destroy()
+        sites = importImpl(self, sites, site)
+        if sites is not None:
+            self.config = self.config.updateSites(sites)
+            self.sitesList.ItemCount = len(self.config.sites)
+
+    def OnImportFromStoreClick(self,evt):
+        try:
+            self.j = downloadAllWebsitesFromStore()
+        except Exception as e:
+            errorMsg = _(
+                "Error retrieving contents of BrowserNav bookmark store: {}.\n"
+                "Please check your Internet connectivity and try again.\n"
+            ).format(str(e))
+            gui.messageBox(errorMsg, _("Bookmark store communication error"), wx.OK|wx.ICON_ERROR, self)
+            return
+        dialog=WebsiteStoreDialog(self, self.j)
+        if dialog.ShowModal()!=wx.ID_OK:
+            return
+        site = QJSite(dialog.site)
+        sites = list(self.config.sites)
+        sites = importImpl(self, sites, site)
+        if sites is not None:
+            self.config = self.config.updateSites(sites)
+            self.sitesList.ItemCount = len(self.config.sites)
+
 
     def onSave(self):
         global globalConfig
