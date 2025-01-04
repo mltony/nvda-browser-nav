@@ -3438,7 +3438,16 @@ def importImpl(self, sites, site):
     else: # There is exactly 1 existing site with the same name
         existingSiteIndex, existingSite = sameNameSites[0]
         title = _("BrowserNav website import conflict")
-        message = _("You already have website {} in your BrowserNav configuration. What would you like to do?").format(site.name)
+        message = _(
+            "You already have website {} in your BrowserNav configuration.\n"
+            "Existing site version: {}.\n"
+            "To be imported site version: {}.\n"
+            "What would you like to do?"
+        ).format(
+            site.name,
+            existingSite.version,
+            site.version,
+        )
         dialog = OverwriteSiteDialog(parent=self, title=title, message=message)
         result = dialog.ShowModal()
         if result == wx.ID_YES:
