@@ -40,6 +40,7 @@ import addonHandler
 from .addonConfig import getConfig
 import uuid
 import requests
+import scriptHandler
 
 addonHandler.initTranslation()
 
@@ -972,38 +973,36 @@ class AutoSpeakCacheEntry:
 
 AutoSpeakCache = weakref.WeakKeyDictionary()
 def onVirtualBufferUpdate(browse):
-    global virtualBufferUpdateFlag
     url = getUrl(browse, onlyFromCache=True)
     if url is None:
         return
     bookmarks = getAutoSpeakBookmarksForUrl(url, globalConfig)
-    try:
-        cacheEntry = AutoSpeakCache[browse]
-    except KeyError:
-        cacheEntry = {}
-        AutoSpeakCache[browse] = cacheEntry
-    try:
-        #processAutoSpeakEntry(browse, bookmarks, cacheEntry)
-        virtualBufferUpdateFlag = True
-        core.callLater(0, processAutoSpeakEntry, browse, bookmarks, cacheEntry)
-    except Exception as e:
-        log.exception("Exception during virtual buffer update processing in BrowserNav QuickJump", e)
-
-virtualBufferUpdateFlag = False
-def processAutoSpeakEntry(browse, bookmarks, cacheEntry):
-    global virtualBufferUpdateFlag
-    if len(bookmarks) == 0 or not virtualBufferUpdateFlag:
+    if len(bookmarks) == 0:
         return
-    virtualBufferUpdateFlag = False
-    newLinesByBookmark = _autoClick(browse, gesture=None, category=BookmarkCategory.QUICK_SPEAK, bookmarks=bookmarks,  automated=True)
-    for bookmark in bookmarks:
-        textToSpeak = newLinesByBookmark.get(bookmark, [])
+    launchAutoSpeak = False
+    with AutoSpeakStatesLock:
         try:
-            cachedLines = cacheEntry[bookmark]
+            state = AutoSpeakStates[browse]
         except KeyError:
-            cachedLines = AutoSpeakCacheEntry([])
-            cacheEntry[bookmark] = cachedLines
-        processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines)
+            state = AutoSpeakState(isVirtualBufferUpdated=False, isAutoSpeakHandlerRunning=False)
+            AutoSpeakStates[browse] = state
+        flag = state.isVirtualBufferUpdated
+        isRunning = state.isAutoSpeakHandlerRunning
+        state.isVirtualBufferUpdated = True
+        if isRunning:
+            # Currently running autoSpeak function will pick up this update eventually
+            return
+        else:
+            # Launch autoSpeak function
+            try:
+                cacheEntry = AutoSpeakCache[browse]
+            except KeyError:
+                cacheEntry = {}
+                AutoSpeakCache[browse] = cacheEntry
+            state.isAutoSpeakHandlerRunning = True
+            launchAutoSpeak = True
+    if launchAutoSpeak:
+        utils.executeAsynchronously(_autoSpeak(browse, gesture=None, category=BookmarkCategory.QUICK_SPEAK, bookmarks=bookmarks,  automated=True, cacheEntry=cacheEntry))
 
 def processAutoSpeakbookmark(browse, bookmark, textToSpeak, cachedLines):
     if not cachedLines.enabled:
@@ -1750,7 +1749,10 @@ def autoClick(self, gesture, category, site=None, automated=False):
 AutoSpeakTextCache = weakref.WeakKeyDictionary()
 def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=None):
     """
+        Sorry for confusing name.
         This function handles both quick_click and quick_speak bookmarks.
+        But not autospeak bookmarks - these are handled in _autoSpeak.
+        Also AutoClick kind of has been deprecated.
     """
     isSpeak = category == BookmarkCategory.QUICK_SPEAK
     isClick = category.name.startswith("QUICK_CLICK")
@@ -1849,6 +1851,95 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
             wx.CallAfter(speak)
     else:
         error
+
+@dataclass
+class AutoSpeakState:
+    isVirtualBufferUpdated: bool
+    isAutoSpeakHandlerRunning: bool
+
+AutoSpeakStates = weakref.WeakKeyDictionary()
+AutoSpeakStatesLock = threading.Lock()
+
+def _autoSpeak(self, gesture, bookmarks, site=None, automated=True, category=None, cacheEntry=None):
+    """
+        Async generator for handling autoSpeak.
+    """
+    isSpeak = category == BookmarkCategory.QUICK_SPEAK
+    isClick = category.name.startswith("QUICK_CLICK")
+    if isSpeak == isClick:
+        raise RuntimeError(f"Invalid category {category.name}")
+    if not (isSpeak and not isClick):
+        raise RuntimeError("This function only supports autoSpeak bookmarks")
+    try:
+        while True:
+            with AutoSpeakStatesLock:
+                flag = AutoSpeakStates[self].isVirtualBufferUpdated
+                if not flag:
+                    return
+                AutoSpeakStates[self].isVirtualBufferUpdated = False
+    
+            textInfo = self.makeTextInfo(textInfos.POSITION_ALL)
+            textInfo.collapse()
+            textInfo.expand(textInfos.UNIT_PARAGRAPH)
+            distance = 0
+            message = None
+            focusableErrorMsg = None
+            focusables = []
+            textToSpeak = []
+            textToSpeakByBookmark = {}
+            while True:
+                if scriptHandler.isScriptWaiting():
+                    # User must have pressed a button.
+                    # Return control and continue later so that NVDA is as snappy as ever.
+                    yield 1
+                matchInfo, thisMessage, __, match = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
+                if matchInfo is not None:
+                    thisInfo = matchInfo
+                    if isClick:
+                        mylog(f"Autoclick Match {distance} {thisInfo.text}")
+                        focusable = thisInfo.focusableNVDAObjectAtStart
+                        if focusable is None or focusable.role in {ROLE_DOCUMENT, ROLE_DIALOG}:
+                            if focusableErrorMsg is None:
+                                mylog("Bookmark points to non-focusable NVDA object, cannot click it.")
+                                focusableErrorMsg = _("Bookmark points to non-focusable NVDA object, cannot click it.")
+                        else:
+                            mylog("Verification skipped since offset is non-zero")
+                            focusables.append(focusable)
+                            if message is None and thisMessage  is not None and len(thisMessage) > 0:
+                                message = thisMessage
+                    elif isSpeak:
+                        entries = []
+                        if thisMessage is not None and len(thisMessage) > 0:
+                            entries.append(thisMessage)
+                        entries.append(thisInfo.text)
+                        textToSpeak.extend(entries)
+                        try:
+                            ttsb = textToSpeakByBookmark[match.bookmark]
+                        except KeyError:
+                            ttsb = []
+                            textToSpeakByBookmark[match.bookmark] = ttsb
+                        ttsb.extend(entries)
+        
+                    else:
+                        error_hahaha
+                distance += 1
+                result = moveParagraph(textInfo, 1)
+                if result == 0:
+                    break
+            newLinesByBookmark = textToSpeakByBookmark
+            for bookmark in bookmarks:
+                textToSpeak = newLinesByBookmark.get(bookmark, [])
+                try:
+                    cachedLines = cacheEntry[bookmark]
+                except KeyError:
+                    cachedLines = AutoSpeakCacheEntry([])
+                    cacheEntry[bookmark] = cachedLines
+                processAutoSpeakbookmark(self, bookmark, textToSpeak, cachedLines)
+    except Exception as e:
+        log.exception("Exception during virtual buffer update processing in BrowserNav QuickJump", e)
+    finally:
+        with AutoSpeakStatesLock:
+            AutoSpeakStates[self].isAutoSpeakHandlerRunning = False
 
 
 class HierarchicalLevelsInfo:
