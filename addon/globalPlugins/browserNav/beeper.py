@@ -38,7 +38,7 @@ class Beeper:
             channels=2,
             samplesPerSec=int(tones.SAMPLE_RATE),
             bitsPerSample=16,
-            outputDevice=config.conf["speech"]["outputDevice"],
+            outputDevice=config.conf["audio"]["outputDevice"],
             wantDucking=False
         )
 
@@ -153,7 +153,7 @@ def skippedParagraphChime():
     global spcFile, spcPlayer, spcBuf
     if spcPlayer is  None:
         spcFile = wave.open(getSoundsPath() + "\\classic\\on.wav","r")
-        spcPlayer = nvwave.WavePlayer(channels=spcFile.getnchannels(), samplesPerSec=spcFile.getframerate(),bitsPerSample=spcFile.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+        spcPlayer = nvwave.WavePlayer(channels=spcFile.getnchannels(), samplesPerSec=spcFile.getframerate(),bitsPerSample=spcFile.getsampwidth()*8, outputDevice=config.conf["audio"]["outputDevice"],wantDucking=False)
         spcFile.rewind()
         spcFile.setpos(100 *         spcFile.getframerate() // 1000)
         spcBuf = spcFile.readframes(spcFile.getnframes())
