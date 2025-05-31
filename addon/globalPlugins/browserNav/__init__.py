@@ -326,15 +326,21 @@ def fromNameSmart(name):
         log.error(f"Couldn't resolve {name} keystroke using English default locale.", exc_info=True)
     return None
 
-kbdControlC = fromNameSmart("Control+c")
-kbdControlV = fromNameSmart("Control+v")
-kbdControlA = fromNameSmart("Control+a")
+def getControlKeyGesture(key, vkCode):
+    try:
+        return keyboardHandler.KeyboardInputGesture.fromName(f"Control+{key}")
+    except LookupError:
+        # This happens if vk code  fails to resolve, when current keyboard layout is for example Russian
+        return keyboardHandler.KeyboardInputGesture(modifiers={(winUser.VK_CONTROL, False)}, vkCode=vkCode, scanCode=0, isExtended=False)
+
+kbdControlC = getControlKeyGesture("c", 67)
+kbdControlV = getControlKeyGesture("v", 86)
+kbdControlA = getControlKeyGesture("a", 65)
 kbdControlHome = fromNameSmart("Control+Home")
 kbdControlShiftHome = fromNameSmart("Control+Shift+Home")
 kbdControlShiftDown = fromNameSmart("Control+Shift+DownArrow")
 kbdShiftRight = fromNameSmart("Shift+RightArrow")
 kbdControlEnd = fromNameSmart("Control+End")
-kbdBackquote = fromNameSmart("`")
 kbdDelete = fromNameSmart("Delete")
 kbdLeft = fromNameSmart("LeftArrow")
 kbdRight = fromNameSmart("RightArrow")
@@ -1175,6 +1181,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             return
         fastChromeMode = appName == 'chrome'
         slowFirefoxMode = appName == 'firefox'
+        url = api.getCurrentURL()
+        hackerRankMode =  re.search(r"^https://www.hackerrank.com/", url or "") is not None
         if isinstance(selfself, editableText.EditableText):
             obj = selfself
         elif not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
@@ -1347,6 +1355,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     if hasChanged:
                         self.copyToClip(text)
                         kbdControlA.send()
+                        if hackerRankMode:
+                            # For some reason there is a race condition in Hacker Rank. Sleep to work around.
+                            time.sleep(0.1)
                         kbdControlV.send()
                   # Step 3.2. Select first character and copy to clip and wait to assure that edit box has processed the previous paste
                     if  hasChanged and not shortTextMode:
