@@ -1860,10 +1860,12 @@ class AutoSpeakState:
 AutoSpeakStates = weakref.WeakKeyDictionary()
 AutoSpeakStatesLock = threading.Lock()
 
+AUTO_SPEAK_TIME_QUANT_MS = 100 # millis
 def _autoSpeak(self, gesture, bookmarks, site=None, automated=True, category=None, cacheEntry=None):
     """
         Async generator for handling autoSpeak.
     """
+    lastRefreshTimestamp = time.time()
     isSpeak = category == BookmarkCategory.QUICK_SPEAK
     isClick = category.name.startswith("QUICK_CLICK")
     if isSpeak == isClick:
@@ -1888,10 +1890,15 @@ def _autoSpeak(self, gesture, bookmarks, site=None, automated=True, category=Non
             textToSpeak = []
             textToSpeakByBookmark = {}
             while True:
-                if scriptHandler.isScriptWaiting():
-                    # User must have pressed a button.
+                if (
+                    scriptHandler.isScriptWaiting() 
+                    or time.time() - lastRefreshTimestamp > AUTO_SPEAK_TIME_QUANT_MS / 1000.0
+                ):
+                    # Either user must have pressed a button.
+                    # Or we have exceeded our time quant.
                     # Return control and continue later so that NVDA is as snappy as ever.
                     yield 1
+                    lastRefreshTimestamp = time.time()
                 matchInfo, thisMessage, __, match = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
                 if matchInfo is not None:
                     thisInfo = matchInfo
