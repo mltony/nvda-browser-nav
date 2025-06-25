@@ -1183,6 +1183,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         slowFirefoxMode = appName == 'firefox'
         url = api.getCurrentURL()
         hackerRankMode =  re.search(r"^https://www.hackerrank.com/", url or "") is not None
+        googleCollabMode =  re.search(r"^https://colab.research.google.com/", url or "") is not None
         if isinstance(selfself, editableText.EditableText):
             obj = selfself
         elif not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
@@ -1358,6 +1359,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         if hackerRankMode:
                             # For some reason there is a race condition in Hacker Rank. Sleep to work around.
                             time.sleep(0.1)
+                        elif googleCollabMode:
+                            # Say hi to awesome Google engineers too
+                            time.sleep(0.3)
                         kbdControlV.send()
                   # Step 3.2. Select first character and copy to clip and wait to assure that edit box has processed the previous paste
                     if  hasChanged and not shortTextMode:
