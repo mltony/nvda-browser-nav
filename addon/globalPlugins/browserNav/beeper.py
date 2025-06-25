@@ -34,12 +34,17 @@ class Beeper:
     MAX_BEEP_COUNT = 40 # Corresponds to about 500 paragraphs with the log formula
 
     def __init__(self):
+        try:
+            outputDevice=config.conf["speech"]["outputDevice"]
+        except KeyError:
+            outputDevice=config.conf["audio"]["outputDevice"]
         self.player = nvwave.WavePlayer(
             channels=2,
             samplesPerSec=int(tones.SAMPLE_RATE),
             bitsPerSample=16,
-            outputDevice=config.conf["speech"]["outputDevice"],
-            wantDucking=False
+            outputDevice=outputDevice,
+            wantDucking=False,
+            purpose=nvwave.AudioPurpose.SOUNDS,
         )
 
 

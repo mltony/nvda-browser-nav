@@ -1076,7 +1076,18 @@ def playBiwInThread(bookmark=None, earcon=None, volume=None):
         unpacked[i] = int(unpacked[i] * volume/100)
     packed = struct.pack(f"<{n}h", *unpacked)
     buf = packed
-    fileWavePlayer = nvwave.WavePlayer(channels=f.getnchannels(), samplesPerSec=f.getframerate(),bitsPerSample=f.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+    try:
+        outputDevice=config.conf["speech"]["outputDevice"]
+    except KeyError:
+        outputDevice=config.conf["audio"]["outputDevice"]
+    fileWavePlayer = nvwave.WavePlayer(
+        channels=f.getnchannels(),
+        samplesPerSec=f.getframerate(),
+        bitsPerSample=f.getsampwidth()*8,
+        outputDevice=outputDevice,
+        wantDucking=False,
+        purpose=nvwave.AudioPurpose.SOUNDS,
+    )
     fileWavePlayer.stop()
     fileWavePlayer.feed(buf)
     fileWavePlayer.idle()
