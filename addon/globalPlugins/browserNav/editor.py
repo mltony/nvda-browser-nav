@@ -231,7 +231,7 @@ class EditTextDialog(wx.Dialog):
                 self.text = self.textCtrl.GetValue()
                 curPos = self.textCtrl.GetInsertionPoint()
                 dummy, columnNum, lineNum = self.textCtrl.PositionToXY(curPos)
-                self.EndModal(wx.ID_OK)
+                self.Close()
                 hasChanged = self.text != self.originalText
                 wx.CallAfter(lambda: self.onTextComplete(wx.ID_OK, self.text, hasChanged, lineNum, columnNum, self.keystroke))
         elif event.GetKeyCode() == wx.WXK_TAB:
@@ -321,7 +321,7 @@ class EditTextDialog(wx.Dialog):
             self.text = self.textCtrl.GetValue()
             curPos = self.textCtrl.GetInsertionPoint()
             dummy, columnNum, lineNum = self.textCtrl.PositionToXY(curPos)
-            self.EndModal(wx.ID_CANCEL)
+            self.Close()
             hasChanged = self.text != self.originalText
             #import globalVars
             #globalVars.s1 = self.originalText
