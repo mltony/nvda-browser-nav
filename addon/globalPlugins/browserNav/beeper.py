@@ -158,7 +158,18 @@ def skippedParagraphChime():
     global spcFile, spcPlayer, spcBuf
     if spcPlayer is  None:
         spcFile = wave.open(getSoundsPath() + "\\classic\\on.wav","r")
-        spcPlayer = nvwave.WavePlayer(channels=spcFile.getnchannels(), samplesPerSec=spcFile.getframerate(),bitsPerSample=spcFile.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+        try:
+            outputDevice=config.conf["speech"]["outputDevice"]
+        except KeyError:
+            outputDevice=config.conf["audio"]["outputDevice"]
+        spcPlayer = nvwave.WavePlayer(
+            channels=spcFile.getnchannels(),
+            samplesPerSec=spcFile.getframerate(),
+            bitsPerSample=spcFile.getsampwidth()*8,
+            outputDevice=outputDevice,
+            wantDucking=False,
+            purpose=nvwave.AudioPurpose.SOUNDS,
+        )
         spcFile.rewind()
         spcFile.setpos(100 *         spcFile.getframerate() // 1000)
         spcBuf = spcFile.readframes(spcFile.getnframes())
