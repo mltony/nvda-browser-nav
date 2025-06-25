@@ -138,7 +138,20 @@ class EditTextDialog(wx.Dialog):
         self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
         self.textCtrl.Bind(wx.EVT_TEXT_PASTE, self.onClipboardPaste2)
         sHelper.addItem(self.textCtrl)
-        self.textCtrl.SetValue(text)
+        
+        # For some reason when text is large, this causes the first typed character to be eaten. Instead setting text incrementally
+        #self.textCtrl.SetValue(text)
+        self.textCtrl.SetValue("")
+        CHUNK_SIZE = 10000
+        i = 0
+        while True:
+            try:
+                text[i]
+            except IndexError:
+                break
+            self.textCtrl.AppendText(text[i:i+CHUNK_SIZE])
+            i += CHUNK_SIZE
+        
         self.SetFocus()
         self.Maximize(True)
         pos = self.textCtrl.XYToPosition(cursorColumn, cursorLine)
