@@ -52,7 +52,6 @@ def generateBeepWrapped(buffer, freq, duration, volLeft, volRight):
             return _cachedBeepFunc(buffer, freq, duration, volLeft, volRight)
 
     except Exception as e:
-        log.debug(f"browserNav: generateBeep detection failure: {e}")
 
     # Fallback only once
     def _fallback(buf, f, d, l, r):
