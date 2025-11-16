@@ -1,8 +1,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
-"POT-Creation-Date: 2023-02-14 21:47+0200\n"
-"PO-Revision-Date: 2023-02-14 21:54+0200\n"
+"Report-Msgid-Bugs-To: 'nvda-translations@groups.io'\n"
+"POT-Creation-Date: 2025-05-03 16:12+0300\n"
+"PO-Revision-Date: 2025-05-05 19:23+0300\n"
 "Last-Translator: Heorhii <nvda.translation.uk@gmail.com>\n"
 "Language-Team: \n"
 "Language: uk\n"
@@ -11,26 +12,32 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
-"X-Generator: Poedit 3.2.2\n"
+"X-Generator: Poedit 3.6\n"
 "X-Poedit-Basepath: .\n"
 
-#: addon/globalPlugins/browserNav/__init__.py:136
+#. Translators: Title for the settings dialog
+#: addon\globalPlugins\browserNav\__init__.py:146
 msgid "BrowserNav settings"
 msgstr "Навігація у браузері - налаштування"
 
-#: addon/globalPlugins/browserNav/__init__.py:146
+#. Translators: volume of crackling slider
+#: addon\globalPlugins\browserNav\__init__.py:156
 msgid "Crackling volume"
 msgstr "Гучність потріскування"
 
-#: addon/globalPlugins/browserNav/__init__.py:156
+#. Translators: volume of beeping  slider
+#: addon\globalPlugins\browserNav\__init__.py:166
 msgid "Beeping volume"
 msgstr "Гучність звукового сигналу"
 
-#: addon/globalPlugins/browserNav/__init__.py:167
+#. Translators: End of document chime volume
+#: addon\globalPlugins\browserNav\__init__.py:177
 msgid "Volume of chime when no more sentences available"
 msgstr "Гучність звукового сигналу, коли немає більше речень"
 
-#: addon/globalPlugins/browserNav/__init__.py:177
+#. Checkboxes
+#. Translators: Checkbox that controls spoken message when no next or previous text paragraph is available in the document
+#: addon\globalPlugins\browserNav\__init__.py:187
 msgid ""
 "Speak message when no next paragraph containing text available in the "
 "document"
@@ -38,101 +45,126 @@ msgstr ""
 "Промовляти повідомлення, коли в документі немає наступного абзацу, що "
 "містить текст"
 
-#: addon/globalPlugins/browserNav/__init__.py:182
+#. Translators: Checkbox that controls whether font family should be used for style
+#: addon\globalPlugins\browserNav\__init__.py:192
 msgid "Use font family for style"
 msgstr "Використовувати сімейство шрифтів для стилю"
 
-#: addon/globalPlugins/browserNav/__init__.py:187
+#. Translators: Checkbox that controls whether font color should be used for style
+#: addon\globalPlugins\browserNav\__init__.py:197
 msgid "Use font color for style"
 msgstr "Використовувати колір шрифту для стилю"
 
-#: addon/globalPlugins/browserNav/__init__.py:192
+#. Translators: Checkbox that controls whether background color should be used for style
+#: addon\globalPlugins\browserNav\__init__.py:202
 msgid "Use background color for style"
 msgstr "Використовувати колір фону для стилю"
 
-#: addon/globalPlugins/browserNav/__init__.py:197
+#. Translators: Checkbox that controls whether bold and italic should be used for style
+#: addon\globalPlugins\browserNav\__init__.py:207
 msgid "Use bold and italic attributes for style"
 msgstr "Використовувати атрибути жирного та курсивного шрифту для стилю"
 
-#: addon/globalPlugins/browserNav/__init__.py:201
+#: addon\globalPlugins\browserNav\__init__.py:211
 msgid "Jump to the first cell of the table when T or Shift+T is pressed."
 msgstr "Перехід до першої комірки таблиці при натисканні клавіш T або Shift+T."
 
-#: addon/globalPlugins/browserNav/__init__.py:210
+#. Translators: volume of skip chime slider
+#: addon\globalPlugins\browserNav\__init__.py:220
 msgid "Volume of skipClutter chime"
 msgstr "Гучність сигналу під час пропуску перешкод"
 
-#: addon/globalPlugins/browserNav/__init__.py:237
+#. Vertical alignment margin edit box
+#: addon\globalPlugins\browserNav\__init__.py:228
+msgid "Vertical alignment margin in pixels"
+msgstr "Вертикальна межа вирівнювання в пікселях"
+
+#: addon\globalPlugins\browserNav\__init__.py:256
 msgid "horizontal offset"
 msgstr "горизонтальним зміщенням"
 
-#: addon/globalPlugins/browserNav/__init__.py:238
+#: addon\globalPlugins\browserNav\__init__.py:257
 msgid "font size"
 msgstr "розміром шрифту"
 
-#: addon/globalPlugins/browserNav/__init__.py:239
+#: addon\globalPlugins\browserNav\__init__.py:258
 msgid "font size and same style"
 msgstr "розміром шрифту і однаковим стилем"
 
-#: addon/globalPlugins/browserNav/__init__.py:245
+#: addon\globalPlugins\browserNav\__init__.py:266
+#: addon\globalPlugins\browserNav\__init__.py:267
 msgid "smaller"
 msgstr "меншим"
 
-#: addon/globalPlugins/browserNav/__init__.py:246
+#: addon\globalPlugins\browserNav\__init__.py:268
+#: addon\globalPlugins\browserNav\__init__.py:269
 msgid "greater"
 msgstr "більшим"
 
-#: addon/globalPlugins/browserNav/__init__.py:633 buildVars.py:17
+#: addon\globalPlugins\browserNav\__init__.py:615
+msgid "&Bookmark"
+msgstr "& Закладка"
+
+#: addon\globalPlugins\browserNav\__init__.py:616
+msgid "&Website"
+msgstr "&Сайт"
+
+#. Add-on summary, usually the user visible name of the addon.
+#. Translators: Summary for this add-on
+#. to be shown on installation and add-on information found in Add-ons Manager.
+#: addon\globalPlugins\browserNav\__init__.py:711 buildVars.py:23
 msgid "BrowserNav"
 msgstr "Навігація у браузері"
 
-#: addon/globalPlugins/browserNav/__init__.py:699
-#, python-brace-format
+#. Translators: error message if next sibling couldn't be found
+#: addon\globalPlugins\browserNav\__init__.py:797
 msgid "No next paragraph with the same {mode} in the document"
 msgstr "У документі немає наступного абзацу з тим самим {mode}"
 
-#: addon/globalPlugins/browserNav/__init__.py:706
-#, python-brace-format
+#. Translators: error message if previous sibling couldn't be found
+#: addon\globalPlugins\browserNav\__init__.py:804
 msgid "No previous paragraph with the same {mode} in the document"
 msgstr "У документі немає попереднього абзацу з тим самим {mode}"
 
-#: addon/globalPlugins/browserNav/__init__.py:715
-#: addon/globalPlugins/browserNav/__init__.py:743
-#, python-brace-format
+#. Translators: error message if parent could not be found
+#. Translators: error message if child could not be found
+#: addon\globalPlugins\browserNav\__init__.py:812
+#: addon\globalPlugins\browserNav\__init__.py:840
 msgid "No previous paragraph  with {qualifier} {mode} in the document"
 msgstr "У документі немає попереднього абзацу з {qualifier} {mode}"
 
-#: addon/globalPlugins/browserNav/__init__.py:724
-#: addon/globalPlugins/browserNav/__init__.py:734
-#, python-brace-format
+#. Translators: error message if parent could not be found
+#. Translators: error message if child could not be found
+#: addon\globalPlugins\browserNav\__init__.py:821
+#: addon\globalPlugins\browserNav\__init__.py:831
 msgid "No next paragraph  with {qualifier} {mode} in the document"
 msgstr "У документі немає наступного абзацу  з {qualifier} {mode}"
 
-#: addon/globalPlugins/browserNav/__init__.py:752
+#: addon\globalPlugins\browserNav\__init__.py:849
 msgid "BrowserNav navigates by "
 msgstr "Навігація у браузері здійснюється за "
 
-#: addon/globalPlugins/browserNav/__init__.py:876
+#: addon\globalPlugins\browserNav\__init__.py:973
 msgid "Done."
 msgstr "Готово."
 
-#: addon/globalPlugins/browserNav/__init__.py:1023
+#: addon\globalPlugins\browserNav\__init__.py:1120
 msgid "No next format change!"
 msgstr "Немає наступних змін форматування!"
 
-#: addon/globalPlugins/browserNav/__init__.py:1075
+#: addon\globalPlugins\browserNav\__init__.py:1174
 msgid "Cannot edit in this window."
 msgstr "Неможливо редагувати в цьому вікні."
 
-#: addon/globalPlugins/browserNav/__init__.py:1102
+#: addon\globalPlugins\browserNav\__init__.py:1203
 msgid "Timeout while trying to focus current edit box."
 msgstr "Час очікування при спробі сфокусувати поточне поле редагування."
 
-#: addon/globalPlugins/browserNav/__init__.py:1111
+#: addon\globalPlugins\browserNav\__init__.py:1212
 msgid "Not editable"
 msgstr "Неможливо редагувати"
 
-#: addon/globalPlugins/browserNav/__init__.py:1128
+#: addon\globalPlugins\browserNav\__init__.py:1229
 msgid ""
 "Cannot copy text out of edit box. Please make sure edit box is not empty and "
 "not read-only!"
@@ -140,7 +172,15 @@ msgstr ""
 "Неможливо скопіювати текст із поля редагування. Переконайтеся, що поле "
 "редагування не порожнє та не доступне лише для читання!"
 
-#: addon/globalPlugins/browserNav/__init__.py:1142
+#: addon\globalPlugins\browserNav\__init__.py:1237
+msgid ""
+"Warning! While copying text out of edit box, focused elementon the page has "
+"changed. Please try again."
+msgstr ""
+"Увага! Під час копіювання тексту з поля редагування фокусований елемент на "
+"сторінці змінився. Спробуйте ще раз."
+
+#: addon\globalPlugins\browserNav\__init__.py:1249
 #, python-format
 msgid ""
 "Browser state has changed. Focused element is not an edit box. Role: %d."
@@ -148,45 +188,63 @@ msgstr ""
 "Стан браузера змінився. Сфокусований елемент не є полем редагування. Роль: "
 "%d."
 
-#: addon/globalPlugins/browserNav/__init__.py:1145
+#: addon\globalPlugins\browserNav\__init__.py:1252
 msgid ""
 "Browser state has changed. Different element on the page is now focused."
 msgstr "Стан браузера змінився. Тепер на сторінці сфокусовано інший елемент."
 
-#: addon/globalPlugins/browserNav/__init__.py:1187
+#: addon\globalPlugins\browserNav\__init__.py:1294
 msgid "Timed out during release modifiers stage"
 msgstr "Час очікування на етапі відпускання модифікаторів"
 
-#: addon/globalPlugins/browserNav/__init__.py:1191
+#: addon\globalPlugins\browserNav\__init__.py:1298
 msgid "Timed out during switch to browser window stage"
 msgstr "Час очікування на етапі переходу до вікна браузера"
 
-#: addon/globalPlugins/browserNav/__init__.py:1204
+#: addon\globalPlugins\browserNav\__init__.py:1313
 msgid "Timed out during switch to window stage"
 msgstr "Час очікування на етапі переходу до вікна"
 
-#: addon/globalPlugins/browserNav/__init__.py:1223
+#: addon\globalPlugins\browserNav\__init__.py:1332
 #, python-format
 msgid "Error during switch to window stage, focused element role is %d"
 msgstr "Помилка на етапі переходу до вікна, роль сфокусованого елемента є %d"
 
-#: addon/globalPlugins/browserNav/__init__.py:1250
+#: addon\globalPlugins\browserNav\__init__.py:1337
+msgid ""
+"Error! When switching back to browser window, a different edit box is "
+"focused."
+msgstr ""
+"Помилка! При поверненні до вікна браузера фокусується інше поле для "
+"редагування."
+
+#: addon\globalPlugins\browserNav\__init__.py:1365
 msgid "Timed out during single-character control+C stage"
 msgstr "Час очікування одного символа під час етапу Control+C"
 
-#: addon/globalPlugins/browserNav/__init__.py:1326
+#: addon\globalPlugins\browserNav\__init__.py:1436
+msgid ""
+"Error! Focused element on the page has changed while pasting updated text. "
+"Possibly content of a different edit box has changed. Please inspect edit "
+"boxes manually and undo if needed."
+msgstr ""
+"Помилка! Під час вставки оновленого тексту змінився фокус елемента на "
+"сторінці. Можливо, змінився вміст іншого поля редагування. Будь ласка, "
+"перевірте поля редагування вручну і скасуйте зміни, якщо це необхідно."
+
+#: addon\globalPlugins\browserNav\__init__.py:1446
 msgid "Last edited text has been copied to the clipboard."
 msgstr "Останній редагований текст скопійовано в буфер обміну."
 
-#: addon/globalPlugins/browserNav/__init__.py:1340
+#: addon\globalPlugins\browserNav\__init__.py:1460
 msgid "Last Jupyter text has been copied to clipboard."
 msgstr "Останній текст Jupyter скопійовано в буфер обміну."
 
-#: addon/globalPlugins/browserNav/__init__.py:1342
+#: addon\globalPlugins\browserNav\__init__.py:1462
 msgid "No last Jupyter text., or last Jupyter text is empty."
 msgstr "Немає останнього тексту Jupyter, або останній текст Jupyter порожній."
 
-#: addon/globalPlugins/browserNav/__init__.py:1352
+#: addon\globalPlugins\browserNav\__init__.py:1472
 msgid ""
 "Failed to read clipboard data. Please make sure clipboard is not empty - "
 "copy some text to clipboard."
@@ -194,42 +252,42 @@ msgstr ""
 "Не вдалося прочитати дані буфера обміну. Будь ласка, переконайтеся, що буфер "
 "обміну не порожній - скопіюйте якийсь текст у буфер обміну."
 
-#: addon/globalPlugins/browserNav/__init__.py:1427
+#: addon\globalPlugins\browserNav\__init__.py:1548
 msgid "No cursor history available"
 msgstr "Історія курсора недоступна"
 
-#: addon/globalPlugins/browserNav/__init__.py:1432
+#: addon\globalPlugins\browserNav\__init__.py:1553
 msgid "Cannot go back any more"
 msgstr "Неможливо повернутися назад"
 
-#: addon/globalPlugins/browserNav/__init__.py:1461
+#: addon\globalPlugins\browserNav\__init__.py:1582
 msgid "Moves to next sibling in browser"
 msgstr "Переходить до наступного елемента того ж рівня в браузері"
 
-#: addon/globalPlugins/browserNav/__init__.py:1465
+#: addon\globalPlugins\browserNav\__init__.py:1586
 msgid "Moves to previous sibling in browser"
 msgstr "Переходить до попереднього елемента того ж рівня в браузері"
 
-#: addon/globalPlugins/browserNav/__init__.py:1469
-#: addon/globalPlugins/browserNav/__init__.py:1473
+#: addon\globalPlugins\browserNav\__init__.py:1590
+#: addon\globalPlugins\browserNav\__init__.py:1594
 msgid "Moves to next parent in browser"
 msgstr "Переходить до наступного батьківського елемента в браузері"
 
-#: addon/globalPlugins/browserNav/__init__.py:1477
+#: addon\globalPlugins\browserNav\__init__.py:1598
 msgid "Moves to next child in browser"
 msgstr "Перехід до наступного дочірнього елемента в браузері"
 
-#: addon/globalPlugins/browserNav/__init__.py:1481
+#: addon\globalPlugins\browserNav\__init__.py:1602
 msgid "Moves to previous child in browser"
 msgstr "Переходить до попереднього дочірнього елемента в браузері"
 
-#: addon/globalPlugins/browserNav/__init__.py:1486
+#: addon\globalPlugins\browserNav\__init__.py:1607
 msgid "Adjusts BrowserNav rotor"
 msgstr "Налаштування кільця Навігації у браузері"
 
-#: addon/globalPlugins/browserNav/__init__.py:1492
-#: addon/globalPlugins/browserNav/__init__.py:1497
-#: addon/globalPlugins/browserNav/quickJump.py:946
+#: addon\globalPlugins\browserNav\__init__.py:1613
+#: addon\globalPlugins\browserNav\__init__.py:1618
+#: addon\globalPlugins\browserNav\quickJump.py:1223
 msgid ""
 "No next QuickJump result. To configure QuickJump rules, please go to "
 "BrowserNav settings in NVDA configuration window."
@@ -238,7 +296,7 @@ msgstr ""
 "швидкого переходу, перейдіть до налаштувань Навігації у браузері у вікні "
 "конфігурації NVDA."
 
-#: addon/globalPlugins/browserNav/__init__.py:1493
+#: addon\globalPlugins\browserNav\__init__.py:1614
 msgid ""
 "QuickJump forward according to BrowserNav QuickJump bookmarks; please check "
 "browserNav configuration panel for the list of bookmarks."
@@ -247,7 +305,7 @@ msgstr ""
 "браузері; будь ласка, зверніться до панелі налаштувань Навігації у браузері, "
 "щоб переглянути список закладок."
 
-#: addon/globalPlugins/browserNav/__init__.py:1498
+#: addon\globalPlugins\browserNav\__init__.py:1619
 msgid ""
 "QuickJump back according to BrowserNav QuickJump bookmarks; please check "
 "browserNav configuration panel for the list of bookmarks."
@@ -256,63 +314,7 @@ msgstr ""
 "браузері; будь ласка, зверніться до панелі налаштувань Навігації у браузері, "
 "щоб переглянути список закладок."
 
-#: addon/globalPlugins/browserNav/__init__.py:1503
-#: addon/globalPlugins/browserNav/__init__.py:1508
-msgid ""
-"No next QuickJump result for QuickJump2 bookmarks. To configure QuickJump "
-"rules, please go to BrowserNav settings in NVDA configuration window."
-msgstr ""
-"Немає наступних результатів швидкого переходу для закладок швидкого "
-"переходу2. Щоб налаштувати правила швидкого переходу, перейдіть до "
-"налаштувань Навігації у браузері у вікні конфігурації NVDA."
-
-#: addon/globalPlugins/browserNav/__init__.py:1504
-msgid ""
-"QuickJump forward according to BrowserNav QuickJump2 bookmarks; please check "
-"browserNav configuration panel for the list of bookmarks."
-msgstr ""
-"Швидкий перехід назад відповідно до закладок швидкого переходу2 Навігації у "
-"браузері; будь ласка, зверніться до панелі налаштувань Навігації у браузері, "
-"щоб переглянути список закладок."
-
-#: addon/globalPlugins/browserNav/__init__.py:1509
-msgid ""
-"QuickJump back according to BrowserNav QuickJump2 bookmarks; please check "
-"browserNav configuration panel for the list of bookmarks."
-msgstr ""
-"Швидкий перехід назад відповідно до закладок швидкого переходу2 Навігації у "
-"браузері; будь ласка, зверніться до панелі налаштувань Навігації у браузері, "
-"щоб переглянути список закладок."
-
-#: addon/globalPlugins/browserNav/__init__.py:1513
-#: addon/globalPlugins/browserNav/__init__.py:1518
-msgid ""
-"No next QuickJump result for QuickJump3 bookmarks. To configure QuickJump "
-"rules, please go to BrowserNav settings in NVDA configuration window."
-msgstr ""
-"Немає наступних результатів швидкого переходу для закладок швидкого "
-"переходу3. Щоб налаштувати правила швидкого переходу, перейдіть до "
-"налаштувань Навігації у браузері у вікні конфігурації NVDA."
-
-#: addon/globalPlugins/browserNav/__init__.py:1514
-msgid ""
-"QuickJump forward according to BrowserNav QuickJump3 bookmarks; please check "
-"browserNav configuration panel for the list of bookmarks."
-msgstr ""
-"Швидкий перехід назад відповідно до закладок швидкого переходу3 Навігації у "
-"браузері; будь ласка, зверніться до панелі налаштувань Навігації у браузері, "
-"щоб переглянути список закладок."
-
-#: addon/globalPlugins/browserNav/__init__.py:1519
-msgid ""
-"QuickJump back according to BrowserNav QuickJump3 bookmarks; please check "
-"browserNav configuration panel for the list of bookmarks."
-msgstr ""
-"Швидкий перехід назад відповідно до закладок швидкого переходу3 Навігації у "
-"браузері; будь ласка, зверніться до панелі налаштувань Навігації у браузері, "
-"щоб переглянути список закладок."
-
-#: addon/globalPlugins/browserNav/__init__.py:1526
+#: addon\globalPlugins\browserNav\__init__.py:1625
 msgid ""
 "AutoClick  according to BrowserNav AutoClick bookmark; please check "
 "browserNav configuration panel for the list of bookmarks."
@@ -321,7 +323,7 @@ msgstr ""
 "браузері; будь ласка, перевірте панель конфігурації Навігації у браузері для "
 "отримання списку закладок."
 
-#: addon/globalPlugins/browserNav/__init__.py:1531
+#: addon\globalPlugins\browserNav\__init__.py:1630
 msgid ""
 "AutoClick  according to BrowserNav AutoClick2 bookmark; please check "
 "browserNav configuration panel for the list of bookmarks."
@@ -330,7 +332,7 @@ msgstr ""
 "браузері; будь ласка, перевірте панель конфігурації Навігації у браузері для "
 "отримання списку закладок."
 
-#: addon/globalPlugins/browserNav/__init__.py:1536
+#: addon\globalPlugins\browserNav\__init__.py:1635
 msgid ""
 "AutoClick  according to BrowserNav AutoClick3 bookmark; please check "
 "browserNav configuration panel for the list of bookmarks."
@@ -339,18 +341,15 @@ msgstr ""
 "браузері; будь ласка, перевірте панель конфігурації Навігації у браузері для "
 "отримання списку закладок."
 
-#: addon/globalPlugins/browserNav/__init__.py:1543
-#, python-brace-format
+#: addon\globalPlugins\browserNav\__init__.py:1642
 msgid "at level {level}"
 msgstr "на рівні {level}"
 
-#: addon/globalPlugins/browserNav/__init__.py:1557
-#, python-brace-format
+#: addon\globalPlugins\browserNav\__init__.py:1656
 msgid "No next hierarchical bookmark {levelStr}"
 msgstr "Немає наступної ієрархічної закладки {levelStr}"
 
-#: addon/globalPlugins/browserNav/__init__.py:1559
-#, python-brace-format
+#: addon\globalPlugins\browserNav\__init__.py:1658
 msgid ""
 "Jump to next hierarchical bookmark {levelStr}; please check browserNav "
 "configuration panel for hierarchical bookmark configuration."
@@ -359,13 +358,11 @@ msgstr ""
 "до панелі налаштувань Навігації у браузері для налаштування ієрархічних "
 "закладок."
 
-#: addon/globalPlugins/browserNav/__init__.py:1572
-#, python-brace-format
+#: addon\globalPlugins\browserNav\__init__.py:1671
 msgid "No previous hierarchical bookmark {levelStr}"
 msgstr "Немає попередньої ієрархічної закладки {levelStr}"
 
-#: addon/globalPlugins/browserNav/__init__.py:1574
-#, python-brace-format
+#: addon\globalPlugins\browserNav\__init__.py:1673
 msgid ""
 "Jump to previous hierarchical bookmark {levelStr}; please check browserNav "
 "configuration panel for hierarchical bookmark configuration."
@@ -374,7 +371,7 @@ msgstr ""
 "зверніться до панелі налаштувань Навігації у браузері для налаштування "
 "ієрархічних закладок."
 
-#: addon/globalPlugins/browserNav/__init__.py:1582
+#: addon\globalPlugins\browserNav\__init__.py:1681
 msgid ""
 "QuickSpeak  according to BrowserNav QuickSpeak bookmark; please check "
 "browserNav configuration panel for the list of bookmarks."
@@ -383,208 +380,127 @@ msgstr ""
 "браузері; будь ласка, зверніться до панелі налаштувань браузера для "
 "перегляду списку закладок."
 
-#: addon/globalPlugins/browserNav/__init__.py:1593
-msgid "No next tab"
-msgstr "Немає наступної вкладки"
-
-#: addon/globalPlugins/browserNav/__init__.py:1596
-msgid "Jump to next tab"
-msgstr "Перейти до наступної вкладки"
-
-#: addon/globalPlugins/browserNav/__init__.py:1603
-msgid "No previous tab"
-msgstr "Немає попередньої вкладки"
-
-#: addon/globalPlugins/browserNav/__init__.py:1606
-msgid "Jump to previous tab"
-msgstr "Перейти до попередньої вкладки"
-
-#: addon/globalPlugins/browserNav/__init__.py:1616
-msgid "No next dialog"
-msgstr "Немає наступного діалогу"
-
-#: addon/globalPlugins/browserNav/__init__.py:1617
-msgid "Jump to next dialog"
-msgstr "Перейти до наступного діалогу"
-
-#: addon/globalPlugins/browserNav/__init__.py:1624
-msgid "No previous dialog"
-msgstr "Немає попереднього діалогу"
-
-#: addon/globalPlugins/browserNav/__init__.py:1625
-msgid "Jump to previous dialog"
-msgstr "Перейти до попереднього діалогу"
-
-#: addon/globalPlugins/browserNav/__init__.py:1643
-msgid "No next menu"
-msgstr "Немає наступного меню"
-
-#: addon/globalPlugins/browserNav/__init__.py:1646
-msgid "Jump to next menu"
-msgstr "Перейти до наступного меню"
-
-#: addon/globalPlugins/browserNav/__init__.py:1653
-msgid "No previous menu"
-msgstr "Немає попереднього меню"
-
-#: addon/globalPlugins/browserNav/__init__.py:1656
-msgid "Jump to previous menu"
-msgstr "Перейти до попереднього меню"
-
-#: addon/globalPlugins/browserNav/__init__.py:1665
-msgid "No next tree view"
-msgstr "Немає наступного перегляду дерева"
-
-#: addon/globalPlugins/browserNav/__init__.py:1666
-msgid "Jump to next tree view"
-msgstr "Перейти до наступного перегляду дерева"
-
-#: addon/globalPlugins/browserNav/__init__.py:1673
-msgid "No previous tree view"
-msgstr "Немає попереднього перегляду дерева"
-
-#: addon/globalPlugins/browserNav/__init__.py:1674
-msgid "Jump to previous tree view"
-msgstr "Перейти до попереднього перегляду дерева"
-
-#: addon/globalPlugins/browserNav/__init__.py:1681
-msgid "No next tool bar"
-msgstr "Немає наступної панелі інструментів"
-
-#: addon/globalPlugins/browserNav/__init__.py:1682
-msgid "Jump to next tool bar"
-msgstr "Перейти до наступної панелі інструментів"
-
-#: addon/globalPlugins/browserNav/__init__.py:1689
-msgid "No previous tool bar"
-msgstr "Немає попередньої панелі інструментів"
-
-#: addon/globalPlugins/browserNav/__init__.py:1690
-msgid "Jump to previous tool bar"
-msgstr "Перейти до попередньої панелі інструментів"
-
-#: addon/globalPlugins/browserNav/__init__.py:1698
-msgid "No next format change"
-msgstr "Немає наступної зміни форматування"
-
-#: addon/globalPlugins/browserNav/__init__.py:1699
-msgid "Jump to next format change"
-msgstr "Перейти до наступної зміни форматування"
-
-#: addon/globalPlugins/browserNav/__init__.py:1706
-msgid "No previous format change"
-msgstr "Немає попередньої зміни форматування"
-
-#: addon/globalPlugins/browserNav/__init__.py:1707
-msgid "Jump to previous format change"
-msgstr "Перейти до попередньої зміни форматування"
-
-#: addon/globalPlugins/browserNav/__init__.py:1714
+#: addon\globalPlugins\browserNav\__init__.py:1689
 msgid "Scrolling forward. This may load more elements on the page."
 msgstr ""
 "Прокручування вперед. Це допоможе завантажити більше елементів на сторінці."
 
-#: addon/globalPlugins/browserNav/__init__.py:1715
+#: addon\globalPlugins\browserNav\__init__.py:1690
 msgid "Scroll to all possible elements forward"
 msgstr "Прокрутити всі можливі елементи вперед"
 
-#: addon/globalPlugins/browserNav/__init__.py:1721
+#: addon\globalPlugins\browserNav\__init__.py:1696
 msgid "Scrolling backward. This may load more elements on the page."
 msgstr ""
 "Прокручування назад. Це допоможе завантажити більше елементів на сторінці."
 
-#: addon/globalPlugins/browserNav/__init__.py:1722
+#: addon\globalPlugins\browserNav\__init__.py:1697
 msgid "Scroll to all possible elements backward"
 msgstr "Прокрутити всі можливі елементи назад"
 
-#: addon/globalPlugins/browserNav/__init__.py:1729
+#: addon\globalPlugins\browserNav\__init__.py:1704
 msgid "Edit semi-accessible edit box."
 msgstr "Редагувати напівдоступне поле редагування."
 
-#: addon/globalPlugins/browserNav/__init__.py:1734
+#: addon\globalPlugins\browserNav\__init__.py:1709
 msgid "Copy the last text from semi-accessible edit box to clipboard."
 msgstr ""
 "Скопіювати останній текст з напівдоступного поля редагування в буфер обміну."
 
-#: addon/globalPlugins/browserNav/__init__.py:1744
+#: addon\globalPlugins\browserNav\__init__.py:1719
 msgid "Skip clutter off for paragraph navigation"
 msgstr "Пропуск перешкод для навігації по абзацах вимкнено"
 
-#: addon/globalPlugins/browserNav/__init__.py:1745
+#: addon\globalPlugins\browserNav\__init__.py:1720
 msgid "Skip clutter on for paragraph navigation"
 msgstr "Пропуск перешкод для навігації по абзацах увімкнено"
 
-#: addon/globalPlugins/browserNav/__init__.py:1748
+#: addon\globalPlugins\browserNav\__init__.py:1723
 msgid "Toggle skip clutter for paragraph navigation"
 msgstr "Перемикає пропуск перешкод для навігації по абзацах"
 
-#: addon/globalPlugins/browserNav/__init__.py:1757
+#: addon\globalPlugins\browserNav\__init__.py:1732
 msgid "Skip clutter off for line navigation"
 msgstr "Пропуск перешкод для навігації по рядках вимкнено"
 
-#: addon/globalPlugins/browserNav/__init__.py:1758
+#: addon\globalPlugins\browserNav\__init__.py:1733
 msgid "Skip clutter on for line navigation"
 msgstr "Пропуск перешкод для навігації по рядках увімкнено"
 
-#: addon/globalPlugins/browserNav/__init__.py:1761
+#: addon\globalPlugins\browserNav\__init__.py:1736
 msgid "Toggle skip clutter for line navigation"
 msgstr "Перемикає пропуск перешкод для навігації по рядках"
 
-#: addon/globalPlugins/browserNav/__init__.py:1770
+#: addon\globalPlugins\browserNav\__init__.py:1745
 msgid ""
 "Experimental: go back to the previous location of cursor in current document"
 msgstr ""
 "Експериментально: повернутися до попереднього розташування курсора в "
 "поточному документі"
 
-#: addon/globalPlugins/browserNav/__init__.py:1778
+#: addon\globalPlugins\browserNav\__init__.py:1753
 msgid "Show BrowserNav popup menu."
 msgstr "Показати спливаюче меню Навігації у браузері."
 
-#: addon/globalPlugins/browserNav/editor.py:60
+#: addon\globalPlugins\browserNav\__init__.py:1755
+msgid "Speak current URL."
+msgstr "Промовляти поточний URL."
+
+#: addon\globalPlugins\browserNav\__init__.py:1761
+msgid "No URL"
+msgstr "Немає URL"
+
+#: addon\globalPlugins\browserNav\__init__.py:1766
+msgid "Copied to clipboard: {}"
+msgstr "Скопійовано в буфер обміну: {}"
+
+#. Translators: Title of Go To Line dialog
+#: addon\globalPlugins\browserNav\editor.py:60
 msgid "Go to line"
 msgstr "Перейти до рядка"
 
-#: addon/globalPlugins/browserNav/editor.py:65
-#: addon/globalPlugins/browserNav/editor.py:96
+#. sHelper = gui.guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
+#: addon\globalPlugins\browserNav\editor.py:65
+#: addon\globalPlugins\browserNav\editor.py:96
 msgid "Go to line:"
 msgstr "Перейти до рядка:"
 
-#: addon/globalPlugins/browserNav/editor.py:80
+#: addon\globalPlugins\browserNav\editor.py:80
 msgid "Line number must be a positive integer!"
 msgstr "Номер рядка повинен бути натуральним числом!"
 
-#: addon/globalPlugins/browserNav/editor.py:81
+#: addon\globalPlugins\browserNav\editor.py:81
 msgid "Wrong line number"
 msgstr "Неправильний номер рядка"
 
-#: addon/globalPlugins/browserNav/editor.py:92
+#: addon\globalPlugins\browserNav\editor.py:92
 msgid "Regex search"
 msgstr "Пошук регулярних виразів"
 
-#: addon/globalPlugins/browserNav/editor.py:107
+#: addon\globalPlugins\browserNav\editor.py:107
 msgid "Invalid regular expression"
 msgstr "Неправильний регулярний вираз"
 
-#: addon/globalPlugins/browserNav/editor.py:108
+#: addon\globalPlugins\browserNav\editor.py:108
 msgid "Wrong regex"
 msgstr "Неправильний регулярний вираз"
 
-#: addon/globalPlugins/browserNav/editor.py:124
+#. Translators: Title of calibration dialog
+#: addon\globalPlugins\browserNav\editor.py:124
 msgid "Edit text"
 msgstr "Редагувати текст"
 
-#: addon/globalPlugins/browserNav/editor.py:179
+#: addon\globalPlugins\browserNav\editor.py:179
 msgid "No match!"
 msgstr "Немає збігу!"
 
-#: addon/globalPlugins/browserNav/paragraph.py:85
+#: addon\globalPlugins\browserNav\paragraph.py:85
 msgid ""
 "Next paragraph not found: current position is at the end of the document."
 msgstr ""
 "Наступного абзацу не знайдено: поточна позиція знаходиться в кінці документа."
 
-#: addon/globalPlugins/browserNav/paragraph.py:88
+#: addon\globalPlugins\browserNav\paragraph.py:88
 msgid ""
 "Previous paragraph not found: current position is at the beginning of the "
 "document."
@@ -592,98 +508,95 @@ msgstr ""
 "Попередній абзац не знайдено: поточна позиція знаходиться на початку "
 "документа."
 
-#: addon/globalPlugins/browserNav/paragraph.py:139
-#, python-brace-format
+#: addon\globalPlugins\browserNav\paragraph.py:143
 msgid "Plain text not found: tried to search for '{text}' {direction}."
 msgstr "Звичайний текст не знайдено: виконано пошук за '{text}' {direction}."
 
-#: addon/globalPlugins/browserNav/paragraph.py:141
-#: addon/globalPlugins/browserNav/paragraph.py:157
-#: addon/globalPlugins/browserNav/paragraph.py:179
+#: addon\globalPlugins\browserNav\paragraph.py:145
+#: addon\globalPlugins\browserNav\paragraph.py:161
+#: addon\globalPlugins\browserNav\paragraph.py:183
 msgid "backward"
 msgstr "назад"
 
-#: addon/globalPlugins/browserNav/paragraph.py:141
-#: addon/globalPlugins/browserNav/paragraph.py:157
-#: addon/globalPlugins/browserNav/paragraph.py:179
+#: addon\globalPlugins\browserNav\paragraph.py:145
+#: addon\globalPlugins\browserNav\paragraph.py:161
+#: addon\globalPlugins\browserNav\paragraph.py:183
 msgid "forward"
 msgstr "вперед"
 
-#: addon/globalPlugins/browserNav/paragraph.py:155
-#, python-brace-format
+#: addon\globalPlugins\browserNav\paragraph.py:159
 msgid "Regexp text not found: tried to search for '{text}' {direction}."
 msgstr ""
-"Текст регулярного виразу не знайдено: здійснено спробу пошуку "
-"'{text}' {direction}."
+"Текст регулярного виразу не знайдено: здійснено спробу пошуку '{text}' "
+"{direction}."
 
-#: addon/globalPlugins/browserNav/paragraph.py:177
-#, python-brace-format
+#: addon\globalPlugins\browserNav\paragraph.py:181
 msgid "QuickNav item not found: tried to search for '{text}' {direction}."
 msgstr ""
-"Елемент швидкої навігації не знайдено: здійснено спробу пошуку "
-"'{text}' {direction}."
+"Елемент швидкої навігації не знайдено: здійснено спробу пошуку '{text}' "
+"{direction}."
 
-#: addon/globalPlugins/browserNav/quickJump.py:92
+#: addon\globalPlugins\browserNav\quickJump.py:113
 msgid "QuickJump"
 msgstr "Швидкий перехід"
 
-#: addon/globalPlugins/browserNav/quickJump.py:93
-#: addon/globalPlugins/browserNav/quickJump.py:108
+#: addon\globalPlugins\browserNav\quickJump.py:114
+#: addon\globalPlugins\browserNav\quickJump.py:129
 msgid "QuickJump2"
 msgstr "Швидкий перехід2"
 
-#: addon/globalPlugins/browserNav/quickJump.py:94
-#: addon/globalPlugins/browserNav/quickJump.py:109
+#: addon\globalPlugins\browserNav\quickJump.py:115
+#: addon\globalPlugins\browserNav\quickJump.py:130
 msgid "QuickJump3"
 msgstr "Швидкий перехід3"
 
-#: addon/globalPlugins/browserNav/quickJump.py:95
+#: addon\globalPlugins\browserNav\quickJump.py:116
 msgid "SkipClutter"
 msgstr "Пропуск перешкод"
 
-#: addon/globalPlugins/browserNav/quickJump.py:96
-#: addon/globalPlugins/browserNav/quickJump.py:111
+#: addon\globalPlugins\browserNav\quickJump.py:117
+#: addon\globalPlugins\browserNav\quickJump.py:132
 msgid "QuickClick"
 msgstr "Швидке натискання"
 
-#: addon/globalPlugins/browserNav/quickJump.py:97
-#: addon/globalPlugins/browserNav/quickJump.py:112
+#: addon\globalPlugins\browserNav\quickJump.py:118
+#: addon\globalPlugins\browserNav\quickJump.py:133
 msgid "QuickClick2"
 msgstr "Швидке натискання2"
 
-#: addon/globalPlugins/browserNav/quickJump.py:98
-#: addon/globalPlugins/browserNav/quickJump.py:113
+#: addon\globalPlugins\browserNav\quickJump.py:119
+#: addon\globalPlugins\browserNav\quickJump.py:134
 msgid "QuickClick3"
 msgstr "Швидке натискання3"
 
-#: addon/globalPlugins/browserNav/quickJump.py:99
-#: addon/globalPlugins/browserNav/quickJump.py:114
+#: addon\globalPlugins\browserNav\quickJump.py:120
+#: addon\globalPlugins\browserNav\quickJump.py:135
 msgid "Hierarchical quick jump"
 msgstr "Ієрархічний швидкий перехід"
 
-#: addon/globalPlugins/browserNav/quickJump.py:100
-#: addon/globalPlugins/browserNav/quickJump.py:115
+#: addon\globalPlugins\browserNav\quickJump.py:121
+#: addon\globalPlugins\browserNav\quickJump.py:136
 msgid "Quick speak"
 msgstr "Швидке промовляння"
 
-#: addon/globalPlugins/browserNav/quickJump.py:101
-#: addon/globalPlugins/browserNav/quickJump.py:116
+#: addon\globalPlugins\browserNav\quickJump.py:122
+#: addon\globalPlugins\browserNav\quickJump.py:137
 msgid "Quick speak 2"
 msgstr "Швидке промовляння 2"
 
-#: addon/globalPlugins/browserNav/quickJump.py:102
+#: addon\globalPlugins\browserNav\quickJump.py:123
 msgid "Script"
 msgstr "Скрипт"
 
-#: addon/globalPlugins/browserNav/quickJump.py:103
+#: addon\globalPlugins\browserNav\quickJump.py:124
 msgid "Numeric Script"
 msgstr "Числовий скрипт"
 
-#: addon/globalPlugins/browserNav/quickJump.py:107
+#: addon\globalPlugins\browserNav\quickJump.py:128
 msgid "QuickJump - assigned to J by default"
 msgstr "Швидкий перехід - стандартно призначено J"
 
-#: addon/globalPlugins/browserNav/quickJump.py:110
+#: addon\globalPlugins\browserNav\quickJump.py:131
 msgid ""
 "SkipClutter - will automatically skip this paragraph or line when navigating "
 "via Control+Up/Down or Up/Down keystrokes; must match the whole paragraph. "
@@ -693,11 +606,11 @@ msgstr ""
 "навігації за допомогою комбінації клавіш Control+Вгору/Вниз або Вгору/Вниз; "
 "має відповідати всьому абзацу. чи "
 
-#: addon/globalPlugins/browserNav/quickJump.py:117
+#: addon\globalPlugins\browserNav\quickJump.py:138
 msgid "Script: runs a custom Python script"
 msgstr "Скрипт: запускає користувацький скрипт Python"
 
-#: addon/globalPlugins/browserNav/quickJump.py:118
+#: addon\globalPlugins\browserNav\quickJump.py:139
 msgid ""
 "Numeric Script - script that can consume a numeric argument by pressing "
 "Alt+digits"
@@ -705,91 +618,111 @@ msgstr ""
 "Числовий скрипт - сценарій, який може використовувати числовий аргумент під "
 "час натискання Alt+цифри"
 
-#: addon/globalPlugins/browserNav/quickJump.py:131
+#: addon\globalPlugins\browserNav\quickJump.py:152
 msgid "Match all sites (domain field ignored) "
 msgstr "Зіставити всі сайти (поле домену ігнорується) "
 
-#: addon/globalPlugins/browserNav/quickJump.py:132
+#: addon\globalPlugins\browserNav\quickJump.py:153
 msgid "Match domain name"
 msgstr "Збіг доменного імені"
 
-#: addon/globalPlugins/browserNav/quickJump.py:133
+#: addon\globalPlugins\browserNav\quickJump.py:154
 msgid "Match domain and its subdomains"
 msgstr "Зіставлення домену та його піддоменів"
 
-#: addon/globalPlugins/browserNav/quickJump.py:134
+#: addon\globalPlugins\browserNav\quickJump.py:155
 msgid "Match substring in URL"
 msgstr "Збіг підрядка в URL-адресі"
 
-#: addon/globalPlugins/browserNav/quickJump.py:135
+#: addon\globalPlugins\browserNav\quickJump.py:156
 msgid "Exact URL match"
 msgstr "Точний збіг адреси"
 
-#: addon/globalPlugins/browserNav/quickJump.py:136
+#: addon\globalPlugins\browserNav\quickJump.py:157
 msgid "Regex match of URL"
 msgstr "Збіг регулярного виразу URL-адреси"
 
-#: addon/globalPlugins/browserNav/quickJump.py:137
+#: addon\globalPlugins\browserNav\quickJump.py:158
 msgid "Match empty URL only, that is pages without URL"
 msgstr "Шукати тільки порожні URL-адреси, тобто сторінки без URL-адреси"
 
-#: addon/globalPlugins/browserNav/quickJump.py:146
+#: addon\globalPlugins\browserNav\quickJump.py:167
 msgid "Keep default NVDA focus behavior"
 msgstr "Зберегти стандартну поведінку фокуса NVDA"
 
-#: addon/globalPlugins/browserNav/quickJump.py:147
+#: addon\globalPlugins\browserNav\quickJump.py:168
 msgid "React to focus event, but prevent entering focus mode"
 msgstr ""
 "Реагувати на подію у фокусі, але запобігати переходу в режим фокусування"
 
-#: addon/globalPlugins/browserNav/quickJump.py:148
+#: addon\globalPlugins\browserNav\quickJump.py:169
 msgid "Ignore all focus events - good for websites that misuse focus events"
 msgstr ""
 "Ігнорувати всі події у фокусі - корисно для веб-сайтів, які зловживають "
 "подіями у фокусі"
 
-#: addon/globalPlugins/browserNav/quickJump.py:157
+#: addon\globalPlugins\browserNav\quickJump.py:178
 msgid "Speak live regions"
 msgstr "Промовляти динамічну область"
 
-#: addon/globalPlugins/browserNav/quickJump.py:158
+#: addon\globalPlugins\browserNav\quickJump.py:179
 msgid "Mute live regions"
 msgstr "Вимкнути динамічну область"
 
-#: addon/globalPlugins/browserNav/quickJump.py:168
+#: addon\globalPlugins\browserNav\quickJump.py:189
 msgid "No beeps"
 msgstr "Без звукових сигналів"
 
-#: addon/globalPlugins/browserNav/quickJump.py:169
+#: addon\globalPlugins\browserNav\quickJump.py:190
 msgid "Beep on every focus event"
 msgstr "Звуковий сигнал про кожну подію у фокусі"
 
-#: addon/globalPlugins/browserNav/quickJump.py:170
+#: addon\globalPlugins\browserNav\quickJump.py:191
 msgid "Beep on every successful autoClick"
 msgstr "Звуковий сигнал при кожному успішному автонатисканні"
 
-#: addon/globalPlugins/browserNav/quickJump.py:171
+#: addon\globalPlugins\browserNav\quickJump.py:192
 msgid "Beep on every update from live region"
 msgstr "Звуковий сигнал при кожному оновленні динамічної області"
 
-#: addon/globalPlugins/browserNav/quickJump.py:180
+#: addon\globalPlugins\browserNav\quickJump.py:201
 msgid "Exact paragraph match"
 msgstr "Точний збіг абзацу"
 
-#: addon/globalPlugins/browserNav/quickJump.py:181
+#: addon\globalPlugins\browserNav\quickJump.py:202
 msgid "Substring paragraph match"
 msgstr "Збіг підрядкового абзацу"
 
-#: addon/globalPlugins/browserNav/quickJump.py:182
+#: addon\globalPlugins\browserNav\quickJump.py:203
 msgid "Regex paragraph match"
 msgstr "Збіг абзацу регулярного виразу"
 
-#: addon/globalPlugins/browserNav/quickJump.py:891
-#, python-format
-msgid "Warning: BrowserNav browse monitor thread crashed: %s"
-msgstr "Попередження: збій потоку монітора перегляду Навігації у браузері: %s"
+#: addon\globalPlugins\browserNav\quickJump.py:225
+msgid "AutoSpeak disabled"
+msgstr "Автоматичне мовлення вимкнено"
 
-#: addon/globalPlugins/browserNav/quickJump.py:903
+#: addon\globalPlugins\browserNav\quickJump.py:226
+msgid "Speak changed paragraphs"
+msgstr "Промовляти змінені абзаци"
+
+#: addon\globalPlugins\browserNav\quickJump.py:227
+msgid "Speak only changed words (diff)"
+msgstr "Промовляти тільки змінені слова (diff)"
+
+#: addon\globalPlugins\browserNav\quickJump.py:228
+msgid "Play chime when bookmark appears on the page"
+msgstr "Відтворювати звуковий сигнал, коли закладка з'являється на сторінці"
+
+#: addon\globalPlugins\browserNav\quickJump.py:229
+msgid "Play chime when bookmark disappears from the page"
+msgstr "Відтворювати звуковий сигнал, коли закладка зникає з сторінки"
+
+#: addon\globalPlugins\browserNav\quickJump.py:230
+msgid "Play chime when text matched by bookmark changes"
+msgstr ""
+"Відтворювати звуковий сигнал, коли текст, позначений закладкою, змінюється"
+
+#: addon\globalPlugins\browserNav\quickJump.py:1183
 msgid ""
 "BrowserNav warning: Two or more sites matching this URL are configured to "
 "perform autoClick on load. This is not supported."
@@ -798,11 +731,11 @@ msgstr ""
 "цій адресі, налаштовані на автонатискання під час завантаження. Це не "
 "підтримується."
 
-#: addon/globalPlugins/browserNav/quickJump.py:953
+#: addon\globalPlugins\browserNav\quickJump.py:1230
 msgid "BrowserNav temporary action configured only for this website."
 msgstr "Тимчасова дія Навігації у браузері налаштована тільки для цього сайту."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1366
+#: addon\globalPlugins\browserNav\quickJump.py:1658
 msgid ""
 "No quickJump bookmarks configured for current website. Please add QuickJump "
 "bookmarks in BrowserNav settings in NVDA settings window."
@@ -811,8 +744,7 @@ msgstr ""
 "додайте закладки швидкого переходу в налаштуваннях Навігації у браузері у "
 "вікні налаштувань NVDA."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1449
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:1766
 msgid ""
 "No {category} bookmarks configured for current website. Please add "
 "{category} bookmarks in BrowserNav settings in NVDA settings window."
@@ -821,21 +753,21 @@ msgstr ""
 "закладки {category} у налаштуваннях Навігації у браузері у вікні налаштувань "
 "NVDA."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1471
+#: addon\globalPlugins\browserNav\quickJump.py:1789
+#: addon\globalPlugins\browserNav\quickJump.py:1904
 msgid "Bookmark points to non-focusable NVDA object, cannot click it."
 msgstr ""
 "Закладка вказує на нефокусований об'єкт NVDA, не можна натиснути на нього."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1498
+#: addon\globalPlugins\browserNav\quickJump.py:1825
 msgid "No bookmarks matched!"
 msgstr "Немає відповідних закладок!"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1507
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:1834
 msgid "Clicked {n} objects."
 msgstr "Натиснуто {n} об’єктів."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1619
+#: addon\globalPlugins\browserNav\quickJump.py:2046
 msgid ""
 "Both hierarchical and numeric script bookmarks are configured for this "
 "website. This is not supported; please disable either hierarchical or "
@@ -845,7 +777,17 @@ msgstr ""
 "підтримується; будь ласка, вимкніть ієрархічні або числові скриптові "
 "закладки."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1635
+#: addon\globalPlugins\browserNav\quickJump.py:2053
+msgid ""
+"No hierarchical quickJump bookmarks or numeric script bookmarks configured "
+"for current website. Please add QuickJump bookmarks in BrowserNav settings "
+"in NVDA settings window."
+msgstr ""
+"Для поточного сайту не налаштовано ієрархічних закладок швидкого переходу "
+"або закладок з числовим скриптом. Будь ласка, додайте закладки швидкого "
+"переходу у налаштуваннях BrowserNav у діалозі налаштувань NVDA."
+
+#: addon\globalPlugins\browserNav\quickJump.py:2063
 msgid ""
 "No hierarchical quickJump bookmarks configured for current website. Please "
 "add QuickJump bookmarks in BrowserNav settings in NVDA settings window."
@@ -854,12 +796,11 @@ msgstr ""
 "Будь ласка, додайте закладки Швидкого переходу у налаштуваннях Навігації у "
 "браузері у вікні налаштувань NVDA."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1688
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:2125
 msgid "Level {announceLevel}"
 msgstr "Рівень {announceLevel}"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1702
+#: addon\globalPlugins\browserNav\quickJump.py:2140
 msgid ""
 "BrowserNav error: inconsistent indents in the document. Recomputing indents, "
 "please try again."
@@ -867,34 +808,33 @@ msgstr ""
 "Помилка Навігації у браузері: невідповідні відступи в документі. Повторне "
 "обчислення відступів, повторіть спробу."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1753
+#: addon\globalPlugins\browserNav\quickJump.py:2195
 msgid "Cannot combine tilde with digits for numeric script!"
 msgstr "Неможливо поєднати тильду з цифрами для числового скрипта!"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1762
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:2204
 msgid "Invalid level for numeric script: '{level}'"
 msgstr "Неправильний рівень для числового скрипта: '{level}'"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1804
+#: addon\globalPlugins\browserNav\quickJump.py:2246
 #, python-format
 msgid "Edit existing website %s"
 msgstr "Редагувати наявний сайт %s"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1814
+#: addon\globalPlugins\browserNav\quickJump.py:2256
 #, python-format
 msgid "Create new website for domain %s"
 msgstr "Створити новий сайт для домену %s"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1823
+#: addon\globalPlugins\browserNav\quickJump.py:2265
 msgid "Create new website with custom URL matching options"
 msgstr "Створити новий сайт з користувацькими параметрами відповідності адрес"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1900
+#: addon\globalPlugins\browserNav\quickJump.py:2342
 msgid "Current selection spans across multiple paragraphs."
 msgstr "Поточне виділення охоплює кілька абзаців."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1901
+#: addon\globalPlugins\browserNav\quickJump.py:2343
 msgid ""
 "Bookmarks that span across paragraphs is not supported by BrowserNav. Please "
 "clear the selection or select something within a single paragraph."
@@ -902,21 +842,20 @@ msgstr ""
 "Навігація у браузері не підтримує закладки, які охоплюють кілька абзаців. "
 "Будь ласка, зніміть виділення або виберіть щось в межах одного абзацу."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1905
-#: addon/globalPlugins/browserNav/quickJump.py:1917
+#: addon\globalPlugins\browserNav\quickJump.py:2347
+#: addon\globalPlugins\browserNav\quickJump.py:2359
 msgid "Bookmark Error"
 msgstr "Помилка закладки"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1912
+#: addon\globalPlugins\browserNav\quickJump.py:2354
 msgid "No sites are configured for current URL."
 msgstr "Для поточної адреси не налаштовано жодного сайту."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1913
+#: addon\globalPlugins\browserNav\quickJump.py:2355
 msgid "Please create a new site configuration in site submenu."
 msgstr "Будь ласка, створіть нову конфігурацію сайту в підменю «Сайт»."
 
-#: addon/globalPlugins/browserNav/quickJump.py:1941
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:2383
 msgid ""
 "Edit perfect match bookmark {bookmark} of category {category} from site "
 "{site}"
@@ -924,8 +863,7 @@ msgstr ""
 "Редагувати ідеальну відповідну закладку {bookmark} категорії {category} з "
 "сайту {site}"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1943
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:2385
 msgid ""
 "Edit bookmark {bookmark} of category {category} that doesn't match "
 "formatting for current paragraph from site {site}"
@@ -933,49 +871,56 @@ msgstr ""
 "Редагувати закладку {bookmark} категорії {category}, яка не відповідає "
 "формату поточного абзацу з сайту {site}"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1956
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:2398
 msgid "Create new bookmark from current paragraph for site {site}"
 msgstr "Створити нову закладку з поточного абзацу для сайту {site}"
 
-#: addon/globalPlugins/browserNav/quickJump.py:1970
+#: addon\globalPlugins\browserNav\quickJump.py:2449
 msgid "Edit browserNav bookmark"
 msgstr "Редагувати закладку Навігації у браузері"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2000
+#. Translators: pattern
+#: addon\globalPlugins\browserNav\quickJump.py:2478
 msgid "&Pattern"
 msgstr "&Шаблон"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2005
+#. Translators: Pattern match type comboBox
+#: addon\globalPlugins\browserNav\quickJump.py:2483
 msgid "Pattern &match type:"
 msgstr "Шаблон &тип відповідності:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2017
+#. Translators:  Category combo box
+#: addon\globalPlugins\browserNav\quickJump.py:2495
 msgid "&Category:"
 msgstr "&Категорія:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2027
+#. Translators:  Custom keystroke button
+#: addon\globalPlugins\browserNav\quickJump.py:2507
 msgid "Custom &Keystroke"
 msgstr "Користувацьке &натискання клавіш"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2031
+#. Translators: site  comboBox
+#: addon\globalPlugins\browserNav\quickJump.py:2511
 msgid "&Site this bookmark belongs to:"
 msgstr "&Сайт, до якого належить ця закладка:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2048
+#. Translators: label for enabled checkbox
+#: addon\globalPlugins\browserNav\quickJump.py:2528
 msgid "Bookmark enabled"
 msgstr "Закладку ввімкнено"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2053
-#: addon/globalPlugins/browserNav/quickJump.py:2487
+#. Translators: label for comment edit box
+#: addon\globalPlugins\browserNav\quickJump.py:2533
 msgid "&Display name (optional)"
-msgstr "&Відображуване ім’я (необов’язково)"
+msgstr "&Назва для показу (необов'язково)"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2057
+#. Translators: label for Message edit box
+#: addon\globalPlugins\browserNav\quickJump.py:2537
 msgid "Spoken &message when bookmark is found:"
 msgstr "Голосове &повідомлення, коли закладку знайдено:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2061
+#. offset spin
+#: addon\globalPlugins\browserNav\quickJump.py:2541
 msgid ""
 "Offset in paragraphs - select a value to place the cursor on following or "
 "preceding paragraph from the bookmark match:"
@@ -983,11 +928,13 @@ msgstr ""
 "Зміщення в абзацах - виберіть значення, щоб розмістити курсор на наступному "
 "або попередньому абзаці зі списку закладок:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2068
+#. attributes
+#: addon\globalPlugins\browserNav\quickJump.py:2548
 msgid "&Attributes (space separated list):"
 msgstr "&Атрибути (список, розділений пробілами):"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2076
+#. available attributes in current paragraph
+#: addon\globalPlugins\browserNav\quickJump.py:2556
 msgid ""
 "Available attributes in current paragraph (press space to add to current "
 "bookmark):"
@@ -995,35 +942,60 @@ msgstr ""
 "Доступні атрибути в поточному абзаці (натисніть пробіл, щоб додати до "
 "поточної закладки):"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2093
+#: addon\globalPlugins\browserNav\quickJump.py:2573
+msgid "Automatically detect and speak changes to this bookmark"
+msgstr "Автоматично виявляти та промовляти про зміни в цій закладці"
+
+#. Translators:  AutospeakMode comboBox
+#: addon\globalPlugins\browserNav\quickJump.py:2577
+msgid "AutoSpeak mode"
+msgstr "Режим автоматичного мовлення"
+
+#. Translators: built in wav category  combo box
+#: addon\globalPlugins\browserNav\quickJump.py:2587
+msgid "Chime &category:"
+msgstr "&Категорія звуку:"
+
+#. Translators: built in wav file combo box
+#: addon\globalPlugins\browserNav\quickJump.py:2597
+msgid "C&hime:"
+msgstr "&Звуковий сигнал:"
+
+#. Volume slider
+#: addon\globalPlugins\browserNav\quickJump.py:2607
+msgid "Volume"
+msgstr "Гучність"
+
+#. Edit script button
+#: addon\globalPlugins\browserNav\quickJump.py:2612
 msgid "Edit &script in new window; press Control+Enter when Done."
 msgstr ""
 "Редагувати &Скрипт у новому вікні; натисніть Control+Enter, коли буде готово."
 
-#: addon/globalPlugins/browserNav/quickJump.py:2120
+#: addon\globalPlugins\browserNav\quickJump.py:2640
 msgid "Pattern cannot be empty!"
 msgstr "Шаблон не може бути порожнім!"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2125
-#: addon/globalPlugins/browserNav/quickJump.py:2633
+#: addon\globalPlugins\browserNav\quickJump.py:2645
+#: addon\globalPlugins\browserNav\quickJump.py:3278
 #, python-format
 msgid "Failed to compile regular expression: %s"
 msgstr "Не вдалося скомпілювати регулярний вираз: %s"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2129
+#. Translators: This is an error message to let the user know that the pattern field is not valid.
+#: addon\globalPlugins\browserNav\quickJump.py:2649
 msgid "Bookmark entry error"
 msgstr "Помилка внесення закладки"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2138
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:2658
 msgid "Cannot parse attribute: {e}"
 msgstr "Неможливо проаналізувати атрибут: {e}"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2139
+#: addon\globalPlugins\browserNav\quickJump.py:2659
 msgid "Bookmark Entry Error"
 msgstr "Помилка внесення закладки"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2144
+#: addon\globalPlugins\browserNav\quickJump.py:2664
 msgid ""
 "Warning: you are about to create or update a skip clutter bookmark. If your "
 "pattern is too generic, it might hide significant part of your website. For "
@@ -1039,59 +1011,75 @@ msgstr ""
 "що ви розумієте, як працює пропуск перешкод і як скасувати цю зміну, якщо це "
 "необхідно. Бажаєте продовжити?"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2145
-#: addon/globalPlugins/browserNav/quickJump.py:2179
+#: addon\globalPlugins\browserNav\quickJump.py:2665
+#: addon\globalPlugins\browserNav\quickJump.py:2714
 msgid "Bookmark Entry warning"
 msgstr "Попередження про внесення закладки"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2178
+#: addon\globalPlugins\browserNav\quickJump.py:2704
 #, python-format
 msgid ""
-"Warning: you are about to move this bookmark to site %s. This bookmark will "
-"disappear from the old site %s. Would you like to proceed?"
+"Warning: you are trying to  move this bookmark to site %(new_site)s. However "
+"it already contains a bookmark with the same UUID. This is not supported. "
+"Please create a new bookmark instead."
 msgstr ""
-"Попередження: ви збираєтеся перемістити цю закладку на сайт %s. Ця закладка "
-"зникне зі старого сайту %s. Бажаєте продовжити?"
+"Увага: ви намагаєтеся перемістити цю закладку на сайт %(new_site)s. Однак "
+"він уже містить закладку з таким самим UUID. Це не підтримується. Будь "
+"ласка, створіть нову закладку."
 
-#: addon/globalPlugins/browserNav/quickJump.py:2202
-#, python-brace-format
+#: addon\globalPlugins\browserNav\quickJump.py:2706
+msgid "Bookmark Entry error"
+msgstr "Помилка при введенні закладки"
+
+#: addon\globalPlugins\browserNav\quickJump.py:2712
+#, python-format
+msgid ""
+"Warning: you are about to move this bookmark to site %(new_site)s. This "
+"bookmark will disappear from the old site %(old_site)s. Would you like to "
+"proceed?"
+msgstr ""
+"Увага: ви збираєтеся перемістити цю закладку на сайт %(new_site)s. Ця "
+"закладка зникне зі старого сайту %(old_site)s. Бажаєте продовжити?"
+
+#: addon\globalPlugins\browserNav\quickJump.py:2737
 msgid "Added '{item} to matched attributes edit box.'"
 msgstr "Додано '{item}' до поля редагування відповідних атрибутів."
 
-#: addon/globalPlugins/browserNav/quickJump.py:2253
+#: addon\globalPlugins\browserNav\quickJump.py:2808
 msgid "Script compilation failed "
 msgstr "Помилка компіляції скрипта "
 
-#: addon/globalPlugins/browserNav/quickJump.py:2258
+#: addon\globalPlugins\browserNav\quickJump.py:2813
 #, python-format
 msgid "Editing script for %s"
 msgstr "Редагування скрипта для %s"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2269
+#: addon\globalPlugins\browserNav\quickJump.py:2825
 #, python-format
 msgid "Custom &Keystroke: %s"
 msgstr "Користувацьке &натискання клавіш: %s"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2269
-msgid "None"
-msgstr "Немає"
+#: addon\globalPlugins\browserNav\quickJump.py:2827
+#, python-format
+msgid "Default &Keystroke: %s"
+msgstr "Початкове &Натискання клавіш: %s"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2282
+#: addon\globalPlugins\browserNav\quickJump.py:2841
 msgid "Press desired keystroke now"
 msgstr "Натисніть потрібну комбінацію клавіш зараз"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2291
+#: addon\globalPlugins\browserNav\quickJump.py:2849
 msgid "Keystroke reset to default"
 msgstr "Скидання натискання клавіш до стандартних"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2293
+#: addon\globalPlugins\browserNav\quickJump.py:2851
 #, python-format
 msgid "Invalid keystroke %s: cannot overload essential  NVDA keystrokes!"
 msgstr ""
 "Неправильне натискання клавіш %s: не можна перевантажувати основні "
 "натискання клавіш NVDA!"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2295
+#: addon\globalPlugins\browserNav\quickJump.py:2853
 #, python-format
 msgid ""
 "Invalid keystroke %s: Cannot use keystrokes with shift modifier for "
@@ -1100,170 +1088,355 @@ msgstr ""
 "Неправильне натискання клавіш %s: Неможливо використовувати комбінації "
 "клавіш з модифікатором shift для закладок Швидкого переходу!"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2317
+#: addon\globalPlugins\browserNav\quickJump.py:2933
 #, python-format
 msgid "Edit bookmarks for %s"
 msgstr "Редагувати закладки для %s"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2325
+#. Bookmarks table
+#: addon\globalPlugins\browserNav\quickJump.py:2941
 msgid "&Bookmarks"
 msgstr "&Закладки"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2334
-#: addon/globalPlugins/browserNav/quickJump.py:2743
+#: addon\globalPlugins\browserNav\quickJump.py:2950
+#: addon\globalPlugins\browserNav\quickJump.py:3624
+#: addon\globalPlugins\browserNav\quickJump.py:3688
 msgid "Name"
-msgstr "Ім'я"
+msgstr "Назва"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2335
+#: addon\globalPlugins\browserNav\quickJump.py:2951
 msgid "Pattern"
 msgstr "Шаблон"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2336
+#: addon\globalPlugins\browserNav\quickJump.py:2952
 msgid "Match type"
 msgstr "Тип відповідності"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2337
+#: addon\globalPlugins\browserNav\quickJump.py:2953
 msgid "Category"
 msgstr "Категорія"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2338
-#: addon/globalPlugins/browserNav/quickJump.py:2371
+#: addon\globalPlugins\browserNav\quickJump.py:2954
+#: addon\globalPlugins\browserNav\quickJump.py:2987
 msgid "Enabled"
 msgstr "Увімкнено"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2344
-#: addon/globalPlugins/browserNav/quickJump.py:2751
+#. Buttons
+#: addon\globalPlugins\browserNav\quickJump.py:2960
+#: addon\globalPlugins\browserNav\quickJump.py:3696
 msgid "&Add"
 msgstr "&Додати"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2346
+#: addon\globalPlugins\browserNav\quickJump.py:2962
 msgid "&Edit"
 msgstr "&Редагувати"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2348
+#: addon\globalPlugins\browserNav\quickJump.py:2964
 msgid "&Remove bookmark"
 msgstr "&Видалити закладку"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2350
-#: addon/globalPlugins/browserNav/quickJump.py:2759
+#: addon\globalPlugins\browserNav\quickJump.py:2966
+#: addon\globalPlugins\browserNav\quickJump.py:3704
 msgid "Move &up"
 msgstr "&Перемістити вгору"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2352
-#: addon/globalPlugins/browserNav/quickJump.py:2761
+#: addon\globalPlugins\browserNav\quickJump.py:2968
+#: addon\globalPlugins\browserNav\quickJump.py:3706
 msgid "Move &down"
 msgstr "&Перемістити вниз"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2354
-#: addon/globalPlugins/browserNav/quickJump.py:2763
+#: addon\globalPlugins\browserNav\quickJump.py:2970
+#: addon\globalPlugins\browserNav\quickJump.py:3708
 msgid "&Sort"
 msgstr "&Сортувати"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2371
-#: addon/globalPlugins/browserNav/quickJump.py:2556
-#: addon/globalPlugins/browserNav/quickJump.py:2598
+#: addon\globalPlugins\browserNav\quickJump.py:2987
+#: addon\globalPlugins\browserNav\quickJump.py:3181
+#: addon\globalPlugins\browserNav\quickJump.py:3224
 msgid "Disabled"
 msgstr "Вимкнено"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2463
+#: addon\globalPlugins\browserNav\quickJump.py:3079
 msgid "Edit site configuration"
 msgstr "Редагувати конфігурацію сайту"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2491
+#. Translators: label for comment edit box
+#: addon\globalPlugins\browserNav\quickJump.py:3104
+msgid "&Website name"
+msgstr "&Назва сайту"
+
+#. Edit description button
+#: addon\globalPlugins\browserNav\quickJump.py:3108
+msgid "Edit &Description"
+msgstr "Редагувати &Опис"
+
+#. Version edit box
+#: addon\globalPlugins\browserNav\quickJump.py:3111
+msgid "&Version (optional for exported bookmarks)"
+msgstr "&Версія (необов’язково для експортованих закладок)"
+
+#. Translators: domain
+#: addon\globalPlugins\browserNav\quickJump.py:3115
 msgid "&URL"
 msgstr "&URL"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2495
+#. Translators:  label for type selector radio buttons
+#: addon\globalPlugins\browserNav\quickJump.py:3119
 msgid "&Match type"
 msgstr "&Тип відповідності"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2505
-#: addon/globalPlugins/browserNav/quickJump.py:2755
+#. Edit bookmarks button
+#: addon\globalPlugins\browserNav\quickJump.py:3129
+#: addon\globalPlugins\browserNav\quickJump.py:3700
 msgid "Edit &bookmarks"
 msgstr "Редагувати &закладки"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2509
+#. Translators: Focus Mode comboBox
+#: addon\globalPlugins\browserNav\quickJump.py:3133
 msgid "&Focus mode"
-msgstr "&Режим фокуса"
+msgstr "&Режим фокусУвання"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2521
+#. Translators: Live region Mode comboBox
+#: addon\globalPlugins\browserNav\quickJump.py:3145
 msgid "&Live region mode"
 msgstr "&Режим динамічної області"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2533
+#. Translators: Debug Beep  comboBox
+#: addon\globalPlugins\browserNav\quickJump.py:3158
 msgid "Debug &beep mode"
 msgstr "&Режим налагодження і звукового сигналу"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2545
+#. Translators:  AutoClick on load combo box
+#: addon\globalPlugins\browserNav\quickJump.py:3170
 msgid "Perform autoClick on page load automatically:"
 msgstr "Виконувати автонатискання при автоматичному завантаженні сторінки:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2563
+#. Initial delay spin
+#: addon\globalPlugins\browserNav\quickJump.py:3188
 msgid "Delay before initial autoClick in milliseconds:"
 msgstr "Затримка перед першим автонатисканням у мілісекундах:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2570
+#. Translators: label for enable recurrent auto click checkbox
+#: addon\globalPlugins\browserNav\quickJump.py:3195
 msgid "Enable recurrent auto click"
 msgstr "Увімкнути повторне автонатискання"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2575
+#. Recurrent  delay spin
+#: addon\globalPlugins\browserNav\quickJump.py:3200
 msgid "Delay between recurring autoClicks  in milliseconds:"
 msgstr "Затримка між повторюваними автонатисканнями в мілісекундах:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2583
+#: addon\globalPlugins\browserNav\quickJump.py:3208
 msgid "Enable recurrent auto speak of "
 msgstr "Увімкнути автоповторення "
 
-#: addon/globalPlugins/browserNav/quickJump.py:2588
+#: addon\globalPlugins\browserNav\quickJump.py:3214
 msgid "Perform autoSpeak (live region) for:"
 msgstr "Увімкнути автопромовляння (динамічна область) для:"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2621
+#. Suppress descriptions checkbox
+#: addon\globalPlugins\browserNav\quickJump.py:3231
+msgid "Suppress descriptions"
+msgstr "Приховати описи"
+
+#. Checkbox suppress aria label announcements
+#: addon\globalPlugins\browserNav\quickJump.py:3235
+msgid "Suppress aria label announcements for landmarks and regions"
+msgstr "Приховати оголошення Aria Label про орієнтири та регіони"
+
+#. Checkbox suppress aria name announcements for editables and comboboxes
+#: addon\globalPlugins\browserNav\quickJump.py:3239
+msgid "Suppress aria name announcements for editables and combo boxes"
+msgstr ""
+"Приховати оголошення про назву арії для редагованих елементів і комбінованих "
+"списків"
+
+#. Checkbox suppress tree level announcements
+#: addon\globalPlugins\browserNav\quickJump.py:3243
+msgid "Suppress tree level announcements"
+msgstr "Приховати оголошення рівня дерева"
+
+#. Export button
+#: addon\globalPlugins\browserNav\quickJump.py:3247
+msgid "E&xport site and all bookmarks"
+msgstr "&Експортувати сайт та всі закладки"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3266
 msgid "You must specify blank domain for this match option."
 msgstr "Ви повинні вказати порожній домен для цього параметра відповідності."
 
-#: addon/globalPlugins/browserNav/quickJump.py:2624
+#: addon\globalPlugins\browserNav\quickJump.py:3269
 msgid "You must specify non-empty string as domain"
 msgstr "Як  домен необхідно вказати непорожній рядок"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2628
+#: addon\globalPlugins\browserNav\quickJump.py:3273
 msgid "Wrong domain format. An example is: en.wikipedia.com "
 msgstr "Неправильний формат домену. Приклад: en.wikipedia.com "
 
-#: addon/globalPlugins/browserNav/quickJump.py:2642
+#: addon\globalPlugins\browserNav\quickJump.py:3287
 #, python-format
 msgid "This site is a duplicate of another existing site %s"
 msgstr "Цей сайт є дублікатом іншого наявного сайту %s"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2647
+#. Translators: This is an error message to let the user know that the pattern field is not valid.
+#: addon\globalPlugins\browserNav\quickJump.py:3292
+#: addon\globalPlugins\browserNav\quickJump.py:3300
+#: addon\globalPlugins\browserNav\quickJump.py:3407
+#: addon\globalPlugins\browserNav\quickJump.py:3520
+#: addon\globalPlugins\browserNav\quickJump.py:3586
+#: addon\globalPlugins\browserNav\quickJump.py:3843
 msgid "Site Entry Error"
 msgstr "Помилка при вході на сайт"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2723
+#: addon\globalPlugins\browserNav\quickJump.py:3299
+msgid ""
+"Another website with this name already exists. Please choose a different "
+"name."
+msgstr "Інший сайт з цією назвою вже існує. Будь ласка, виберіть іншу назву."
+
+#: addon\globalPlugins\browserNav\quickJump.py:3345
+msgid "Edit site description"
+msgstr "Редагувати опис сайту"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3358
+msgid "Please enter website name in order to export it."
+msgstr "Будь ласка, введіть назву сайту для експорту."
+
+#: addon\globalPlugins\browserNav\quickJump.py:3360
+#: addon\globalPlugins\browserNav\quickJump.py:3368
+msgid "Website export Error"
+msgstr "Помилка експорту сайту"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3365
+msgid ""
+"Please enter a version in order to  export this website.\n"
+"We recommend to use date-based versions, like v2025.01.31.\n"
+msgstr ""
+"Будь ласка, введіть версію для експорту цього сайту. Ми рекомендуємо "
+"використовувати версії на основі дат, наприклад, v2025.01.31.\n"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3384
+msgid "File {} already exists. Would you like to replace it?"
+msgstr "Файл {} вже існує. Ви хотіли б його замінити?"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3386
+msgid "File exists"
+msgstr "Файл існує"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3403
+msgid "Could not save website to {}: {}"
+msgstr "Не вдалося зберегти сайт {}: {}"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3465
+msgid "Over&write existing website definition"
+msgstr "&Перезаписати визначення існуючого сайту"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3467
+msgid "Keep existing website definition, but overwrite all &bookmarks"
+msgstr "Зберегтиь існуюче визначення сайту, але перезаписати усі &закладки"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3469
+msgid "Save this website under a different &name"
+msgstr "Зберегти цей сайт під іншою &назвою"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3517
+msgid "This website doesn't have a name. Cannot import it."
+msgstr "Цей сайт не має назви. Неможливо імпортувати його."
+
+#: addon\globalPlugins\browserNav\quickJump.py:3519
+msgid "This website doesn't have a version. Cannot import it."
+msgstr "Цей сайт не має версії. Неможливо імпортувати його."
+
+#: addon\globalPlugins\browserNav\quickJump.py:3531
+msgid "BrowserNav website import conflict"
+msgstr "Конфлікт імпорту сайту в BrowserNav"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3533
+msgid ""
+"You already have website {} in your BrowserNav configuration.\n"
+"Existing site version: {}.\n"
+"To be imported site version: {}.\n"
+"What would you like to do?"
+msgstr ""
+"Сайт {} вже є у вашій конфігурації BrowserNav.  \n"
+"Версія наявного сайту: {}.  \n"
+"Версія сайту для імпорту: {}.  \n"
+"Що ви хочете зробити?"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3585
+msgid ""
+"There is already a website with this name. Please enter a different name."
+msgstr "Вже є сайт з цією назвою. Введіть іншу назву."
+
+#: addon\globalPlugins\browserNav\quickJump.py:3608
+msgid "Available BrowserNav websites"
+msgstr "Доступні сайти BrowserNav"
+
+#. websites table
+#: addon\globalPlugins\browserNav\quickJump.py:3615
+msgid "&Websites"
+msgstr "&Сайти"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3625
+msgid "Version"
+msgstr "Версія"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3626
+msgid "URL"
+msgstr "URL"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3668
 msgid "BrowserNav QuickSearch websites and bookmarks"
 msgstr "Навігація у браузері  Швидкий пошук сайтів і закладок"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2734
+#. Sites table
+#: addon\globalPlugins\browserNav\quickJump.py:3679
 msgid "&Sites"
 msgstr "&Сайти"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2744
+#: addon\globalPlugins\browserNav\quickJump.py:3689
 msgid "Domain"
 msgstr "Домен"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2745
+#: addon\globalPlugins\browserNav\quickJump.py:3690
 msgid "Type"
 msgstr "Тип"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2753
+#: addon\globalPlugins\browserNav\quickJump.py:3698
 msgid "&Edit site"
 msgstr "&Редагувати сайт"
 
-#: addon/globalPlugins/browserNav/quickJump.py:2757
+#: addon\globalPlugins\browserNav\quickJump.py:3702
 msgid "&Remove site"
 msgstr "&Видалити сайт"
 
-#: buildVars.py:20
+#: addon\globalPlugins\browserNav\quickJump.py:3710
+msgid "&Import website from file"
+msgstr "&Імпортувати сайт з файлу"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3712
+msgid "Import website from bookmar&k store"
+msgstr "&Імпорт сайту з магазину закладок"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3839
+msgid "Could not load website from {}: {}"
+msgstr "Неможливо завантажити сайт з {}: {}"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3856
+msgid ""
+"Error retrieving contents of BrowserNav bookmark store: {}.\n"
+"Please check your Internet connectivity and try again.\n"
+msgstr ""
+"Помилка при отриманні вмісту магазину закладок BrowserNav: {}.\n"
+"Будь ласка, перевірте підключення до Інтернету та повторіть спробу.\n"
+
+#: addon\globalPlugins\browserNav\quickJump.py:3859
+msgid "Bookmark store communication error"
+msgstr "Помилка при зв'язку з магазином закладок"
+
+#. Add-on description
+#. Translators: Long description to be shown for this add-on on add-on information from add-ons manager
+#: buildVars.py:26
 msgid ""
 "Browser Navigation addon.\n"
 "In browsers it allows to quickly find vertically aligned paragraphs with the "
@@ -1277,3 +1450,131 @@ msgstr ""
 "рівня в ієрархічному дереві коментарів.\n"
 "Він також може знаходити абзаци з однаковим розміром шрифту або однаковим "
 "стилем шрифту."
+
+#~ msgid ""
+#~ "No next QuickJump result for QuickJump2 bookmarks. To configure QuickJump "
+#~ "rules, please go to BrowserNav settings in NVDA configuration window."
+#~ msgstr ""
+#~ "Немає наступних результатів швидкого переходу для закладок швидкого "
+#~ "переходу2. Щоб налаштувати правила швидкого переходу, перейдіть до "
+#~ "налаштувань Навігації у браузері у вікні конфігурації NVDA."
+
+#~ msgid ""
+#~ "QuickJump forward according to BrowserNav QuickJump2 bookmarks; please "
+#~ "check browserNav configuration panel for the list of bookmarks."
+#~ msgstr ""
+#~ "Швидкий перехід назад відповідно до закладок швидкого переходу2 Навігації "
+#~ "у браузері; будь ласка, зверніться до панелі налаштувань Навігації у "
+#~ "браузері, щоб переглянути список закладок."
+
+#~ msgid ""
+#~ "QuickJump back according to BrowserNav QuickJump2 bookmarks; please check "
+#~ "browserNav configuration panel for the list of bookmarks."
+#~ msgstr ""
+#~ "Швидкий перехід назад відповідно до закладок швидкого переходу2 Навігації "
+#~ "у браузері; будь ласка, зверніться до панелі налаштувань Навігації у "
+#~ "браузері, щоб переглянути список закладок."
+
+#~ msgid ""
+#~ "No next QuickJump result for QuickJump3 bookmarks. To configure QuickJump "
+#~ "rules, please go to BrowserNav settings in NVDA configuration window."
+#~ msgstr ""
+#~ "Немає наступних результатів швидкого переходу для закладок швидкого "
+#~ "переходу3. Щоб налаштувати правила швидкого переходу, перейдіть до "
+#~ "налаштувань Навігації у браузері у вікні конфігурації NVDA."
+
+#~ msgid ""
+#~ "QuickJump forward according to BrowserNav QuickJump3 bookmarks; please "
+#~ "check browserNav configuration panel for the list of bookmarks."
+#~ msgstr ""
+#~ "Швидкий перехід назад відповідно до закладок швидкого переходу3 Навігації "
+#~ "у браузері; будь ласка, зверніться до панелі налаштувань Навігації у "
+#~ "браузері, щоб переглянути список закладок."
+
+#~ msgid ""
+#~ "QuickJump back according to BrowserNav QuickJump3 bookmarks; please check "
+#~ "browserNav configuration panel for the list of bookmarks."
+#~ msgstr ""
+#~ "Швидкий перехід назад відповідно до закладок швидкого переходу3 Навігації "
+#~ "у браузері; будь ласка, зверніться до панелі налаштувань Навігації у "
+#~ "браузері, щоб переглянути список закладок."
+
+#~ msgid "No next tab"
+#~ msgstr "Немає наступної вкладки"
+
+#~ msgid "Jump to next tab"
+#~ msgstr "Перейти до наступної вкладки"
+
+#~ msgid "No previous tab"
+#~ msgstr "Немає попередньої вкладки"
+
+#~ msgid "Jump to previous tab"
+#~ msgstr "Перейти до попередньої вкладки"
+
+#~ msgid "No next dialog"
+#~ msgstr "Немає наступного діалогу"
+
+#~ msgid "Jump to next dialog"
+#~ msgstr "Перейти до наступного діалогу"
+
+#~ msgid "No previous dialog"
+#~ msgstr "Немає попереднього діалогу"
+
+#~ msgid "Jump to previous dialog"
+#~ msgstr "Перейти до попереднього діалогу"
+
+#~ msgid "No next menu"
+#~ msgstr "Немає наступного меню"
+
+#~ msgid "Jump to next menu"
+#~ msgstr "Перейти до наступного меню"
+
+#~ msgid "No previous menu"
+#~ msgstr "Немає попереднього меню"
+
+#~ msgid "Jump to previous menu"
+#~ msgstr "Перейти до попереднього меню"
+
+#~ msgid "No next tree view"
+#~ msgstr "Немає наступного перегляду дерева"
+
+#~ msgid "Jump to next tree view"
+#~ msgstr "Перейти до наступного перегляду дерева"
+
+#~ msgid "No previous tree view"
+#~ msgstr "Немає попереднього перегляду дерева"
+
+#~ msgid "Jump to previous tree view"
+#~ msgstr "Перейти до попереднього перегляду дерева"
+
+#~ msgid "No next tool bar"
+#~ msgstr "Немає наступної панелі інструментів"
+
+#~ msgid "Jump to next tool bar"
+#~ msgstr "Перейти до наступної панелі інструментів"
+
+#~ msgid "No previous tool bar"
+#~ msgstr "Немає попередньої панелі інструментів"
+
+#~ msgid "Jump to previous tool bar"
+#~ msgstr "Перейти до попередньої панелі інструментів"
+
+#~ msgid "No next format change"
+#~ msgstr "Немає наступної зміни форматування"
+
+#~ msgid "Jump to next format change"
+#~ msgstr "Перейти до наступної зміни форматування"
+
+#~ msgid "No previous format change"
+#~ msgstr "Немає попередньої зміни форматування"
+
+#~ msgid "Jump to previous format change"
+#~ msgstr "Перейти до попередньої зміни форматування"
+
+#, python-format
+#~ msgid "Warning: BrowserNav browse monitor thread crashed: %s"
+#~ msgstr ""
+#~ "Попередження: збій потоку монітора перегляду Навігації у браузері: %s"
+
+#~ msgid "None"
+#~ msgstr "Немає"

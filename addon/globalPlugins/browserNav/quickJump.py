@@ -549,6 +549,7 @@ class QJSite(QJImmutable):
     suppressAriaLabel: bool
     suppressAriaLabelEditable: bool
     suppressTreeLevel: bool
+    suppressRoleText: bool
     description: str
     version: str
 
@@ -575,6 +576,7 @@ class QJSite(QJImmutable):
         self.suppressAriaLabel = d.get('suppressAriaLabel', False)
         self.suppressAriaLabelEditable = d.get('suppressAriaLabelEditable', False)
         self.suppressTreeLevel = d.get('suppressTreeLevel', False)
+        self.suppressRoleText = d.get('suppressRoleText', False)
         self.description = d.get('description', "")
         self.version= d.get('version', "")
         self.freeze()
@@ -599,6 +601,7 @@ class QJSite(QJImmutable):
             'suppressAriaLabel': self.suppressAriaLabel,
             'suppressAriaLabelEditable': self.suppressAriaLabelEditable,
             'suppressTreeLevel': self.suppressTreeLevel,
+            'suppressRoleText': self.suppressRoleText,
             'description': self.description,
             'version': self.version,
         }
@@ -787,7 +790,7 @@ def getSuppressOptions(url, config):
             getattr(site, option)
             for site in sites
         ])
-        for option in ['suppressDescription','suppressAriaLabel','suppressAriaLabelEditable','suppressTreeLevel']
+        for option in ['suppressDescription','suppressAriaLabel','suppressAriaLabelEditable','suppressTreeLevel', 'suppressRoleText']
     }
     return options
 
@@ -1073,7 +1076,18 @@ def playBiwInThread(bookmark=None, earcon=None, volume=None):
         unpacked[i] = int(unpacked[i] * volume/100)
     packed = struct.pack(f"<{n}h", *unpacked)
     buf = packed
-    fileWavePlayer = nvwave.WavePlayer(channels=f.getnchannels(), samplesPerSec=f.getframerate(),bitsPerSample=f.getsampwidth()*8, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+    try:
+        outputDevice=config.conf["speech"]["outputDevice"]
+    except KeyError:
+        outputDevice=config.conf["audio"]["outputDevice"]
+    fileWavePlayer = nvwave.WavePlayer(
+        channels=f.getnchannels(),
+        samplesPerSec=f.getframerate(),
+        bitsPerSample=f.getsampwidth()*8,
+        outputDevice=outputDevice,
+        wantDucking=False,
+        purpose=nvwave.AudioPurpose.SOUNDS,
+    )
     fileWavePlayer.stop()
     fileWavePlayer.feed(buf)
     fileWavePlayer.idle()
@@ -1131,12 +1145,13 @@ def playDiffEarcons(delete, modify, add):
 
 
 class AdjustedTextInfo:
-    def __init__(self, textInfo, suppressAriaLabel=False, suppressAriaLabelEditable=False, suppressTreeLevel=False, suppressDescription=False):
+    def __init__(self, textInfo, suppressAriaLabel=False, suppressAriaLabelEditable=False, suppressTreeLevel=False, suppressDescription=False, suppressRoleText=False):
         self.textInfo = textInfo
         self.suppressAriaLabel = suppressAriaLabel
         self.suppressAriaLabelEditable = suppressAriaLabelEditable
         self.suppressTreeLevel = suppressTreeLevel
         self.suppressDescription = suppressDescription
+        self.suppressRoleText = suppressRoleText
 
     def getTextWithFields(self, formatConfig=None):
         ff = self.textInfo.getTextWithFields(formatConfig)
@@ -1163,6 +1178,8 @@ class AdjustedTextInfo:
                 
                 if self.suppressDescription and 'description' in field.field:
                     del field.field['description']
+                if self.suppressRoleText and 'roleText' in field.field:
+                    del field.field['roleText']
         return ff
 
     def __getattr__(self, name):
@@ -1860,10 +1877,12 @@ class AutoSpeakState:
 AutoSpeakStates = weakref.WeakKeyDictionary()
 AutoSpeakStatesLock = threading.Lock()
 
+AUTO_SPEAK_TIME_QUANT_MS = 100 # millis
 def _autoSpeak(self, gesture, bookmarks, site=None, automated=True, category=None, cacheEntry=None):
     """
         Async generator for handling autoSpeak.
     """
+    lastRefreshTimestamp = time.time()
     isSpeak = category == BookmarkCategory.QUICK_SPEAK
     isClick = category.name.startswith("QUICK_CLICK")
     if isSpeak == isClick:
@@ -1888,10 +1907,15 @@ def _autoSpeak(self, gesture, bookmarks, site=None, automated=True, category=Non
             textToSpeak = []
             textToSpeakByBookmark = {}
             while True:
-                if scriptHandler.isScriptWaiting():
-                    # User must have pressed a button.
+                if (
+                    scriptHandler.isScriptWaiting() 
+                    or time.time() - lastRefreshTimestamp > AUTO_SPEAK_TIME_QUANT_MS / 1000.0
+                ):
+                    # Either user must have pressed a button.
+                    # Or we have exceeded our time quant.
                     # Return control and continue later so that NVDA is as snappy as ever.
                     yield 1
+                    lastRefreshTimestamp = time.time()
                 matchInfo, thisMessage, __, match = matchAndScript(bookmarks, skipClutterBookmarks=[], textInfo=textInfo)
                 if matchInfo is not None:
                     thisInfo = matchInfo
@@ -3239,10 +3263,14 @@ class EditSiteDialog(wx.Dialog):
         Text = _("Suppress aria name announcements for editables and combo boxes")
         self.suppressAriaLabelEditableCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
         self.suppressAriaLabelEditableCheckBox.SetValue(self.site.suppressAriaLabelEditable)
-      # Checkbox suppress tree level announcements
+      # Checkbox suppress Tree Level
         Text = _("Suppress tree level announcements")
-        self.suppresstreeLevelCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
-        self.suppresstreeLevelCheckBox.SetValue(self.site.suppressTreeLevel)
+        self.suppressTreeLevelCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.suppressTreeLevelCheckBox.SetValue(self.site.suppressTreeLevel)
+      # Checkbox suppress role text
+        Text = _("Suppress aria role text announcements")
+        self.suppressRoleTextCheckBox=sHelper.addItem(wx.CheckBox(self,label=Text))
+        self.suppressRoleTextCheckBox.SetValue(self.site.suppressRoleText)
       # Export button
         self.exportButton = sHelper.addItem (wx.Button (self, label = _("E&xport site and all bookmarks")))
         self.exportButton.Bind(wx.EVT_BUTTON, self.OnExportButtonClick)
@@ -3322,7 +3350,8 @@ class EditSiteDialog(wx.Dialog):
             'suppressDescription': self.suppressDescriptionCheckBox.Value,
             'suppressAriaLabel': self.suppressAriaLabelCheckBox.Value,
             'suppressAriaLabelEditable': self.suppressAriaLabelEditableCheckBox.Value,
-            'suppressTreeLevel': self.suppresstreeLevelCheckBox.Value,
+            'suppressTreeLevel': self.suppressTreeLevelCheckBox.Value,
+            'suppressRoleText': self.suppressRoleTextCheckBox.Value,
             'description': self.description,
             'version': self.versionTextCtrl.GetValue(),
         })

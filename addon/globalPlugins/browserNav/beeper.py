@@ -34,12 +34,17 @@ class Beeper:
     MAX_BEEP_COUNT = 40 # Corresponds to about 500 paragraphs with the log formula
 
     def __init__(self):
+        try:
+            outputDevice=config.conf["speech"]["outputDevice"]
+        except KeyError:
+            outputDevice=config.conf["audio"]["outputDevice"]
         self.player = nvwave.WavePlayer(
             channels=2,
             samplesPerSec=int(tones.SAMPLE_RATE),
             bitsPerSample=16,
-            outputDevice=config.conf["audio"]["outputDevice"],
-            wantDucking=False
+            outputDevice=outputDevice,
+            wantDucking=False,
+            purpose=nvwave.AudioPurpose.SOUNDS,
         )
 
 
@@ -153,7 +158,18 @@ def skippedParagraphChime():
     global spcFile, spcPlayer, spcBuf
     if spcPlayer is  None:
         spcFile = wave.open(getSoundsPath() + "\\classic\\on.wav","r")
-        spcPlayer = nvwave.WavePlayer(channels=spcFile.getnchannels(), samplesPerSec=spcFile.getframerate(),bitsPerSample=spcFile.getsampwidth()*8, outputDevice=config.conf["audio"]["outputDevice"],wantDucking=False)
+        try:
+            outputDevice=config.conf["speech"]["outputDevice"]
+        except KeyError:
+            outputDevice=config.conf["audio"]["outputDevice"]
+        spcPlayer = nvwave.WavePlayer(
+            channels=spcFile.getnchannels(),
+            samplesPerSec=spcFile.getframerate(),
+            bitsPerSample=spcFile.getsampwidth()*8,
+            outputDevice=outputDevice,
+            wantDucking=False,
+            purpose=nvwave.AudioPurpose.SOUNDS,
+        )
         spcFile.rewind()
         spcFile.setpos(100 *         spcFile.getframerate() // 1000)
         spcBuf = spcFile.readframes(spcFile.getnframes())
