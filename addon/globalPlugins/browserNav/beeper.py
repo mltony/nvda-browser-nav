@@ -35,7 +35,6 @@ def generateBeepWrapped(buffer, freq, duration, volLeft, volRight):
         return _cachedBeepFunc(buffer, int(freq), int(duration), int(volLeft), int(volRight))
 
     try:
-        import NVDAHelper
 
         # Preferred modern path
         if hasattr(NVDAHelper, "localLib"):
