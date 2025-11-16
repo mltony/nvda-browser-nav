@@ -744,9 +744,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         quickJump.originalGetAlternativeScript = browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript
         browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript = quickJump.postGetAlternativeScript
 
-        quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
-        NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
-        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
         while len(gc.callbacks) > 0:
             del gc.callbacks[0]
         garbageHandler.terminate = lambda: None
@@ -775,8 +772,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript = quickJump.originalGetAlternativeScript
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.originalShouldPassThrough
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.original_event_treeInterceptor_gainFocus
-        NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.originalReportLiveRegion
-        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
         
         api.setFocusObject = originalSetFocusObject
         virtualBuffers.VirtualBuffer._handleUpdate = originalVirtualBufferHandleUpdate
