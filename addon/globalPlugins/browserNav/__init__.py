@@ -776,7 +776,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.originalShouldPassThrough
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.original_event_treeInterceptor_gainFocus
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.originalReportLiveRegion
-        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
+        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib.dll,"_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
         
         api.setFocusObject = originalSetFocusObject
         virtualBuffers.VirtualBuffer._handleUpdate = originalVirtualBufferHandleUpdate
