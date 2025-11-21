@@ -746,7 +746,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
         quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
-        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
+        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib.dll,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
         while len(gc.callbacks) > 0:
             del gc.callbacks[0]
         garbageHandler.terminate = lambda: None
