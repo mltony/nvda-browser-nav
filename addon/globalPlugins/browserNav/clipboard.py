@@ -11,6 +11,12 @@ import tones
 import ui
 import winUser
 import wx
+import os,sys
+
+def initWinRT():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    site_packages = os.path.join(script_dir, "site-packages")
+    sys.path.insert(0, site_packages)
 
 def ephemeralCopyToClip(text: str):
     """
@@ -40,9 +46,9 @@ def ephemeralCopyToClipAndRestore(text: str):
         
 TEXT_FORMAT = "Text"
 def deleteEntryFromClipboardHistory(textToDelete, maxEntries=10):
-    from .pywinsdk.relative import winsdk
-    from .pywinsdk.relative.winsdk.windows.applicationmodel.datatransfer import Clipboard
-    from .pywinsdk.relative.winsdk.windows.foundation import AsyncStatus
+    #from .pywinsdk.relative import winsdk
+    from winrt.windows.applicationmodel.datatransfer import Clipboard
+    from winrt.windows.foundation import AsyncStatus
     
     def dummyAwait(result):
         while result.status == AsyncStatus.STARTED:

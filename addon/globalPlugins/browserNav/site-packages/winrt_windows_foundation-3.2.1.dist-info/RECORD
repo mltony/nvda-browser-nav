@@ -1,0 +1,11 @@
+winrt/_winrt_windows_foundation.cp313-win_amd64.pyd,sha256=0VlV0O6xjNimcwq4hRGY_cAyPNti6P2T65MCZrKjMgA,348672
+winrt/_winrt_windows_foundation.pyi,sha256=QJMPEYN6K93vzxRbf0fzweMIaQSREjbP7HGZMD4ZTco,33246
+winrt/windows/foundation/__init__.py,sha256=SgKsnQHPja3AX0kEYbwROUK2Wii6QETv-EhPT3RHCbc,3959
+winrt/windows/foundation/__pycache__/__init__.cpython-313.pyc,,
+winrt/windows/foundation/py.typed,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+winrt_windows_foundation-3.2.1.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+winrt_windows_foundation-3.2.1.dist-info/METADATA,sha256=RSl_Qd111DecSk4xGT_6q6e_MBtYYd7ukm4fPEIVbtg,1041
+winrt_windows_foundation-3.2.1.dist-info/RECORD,,
+winrt_windows_foundation-3.2.1.dist-info/REQUESTED,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+winrt_windows_foundation-3.2.1.dist-info/WHEEL,sha256=qV0EIPljj1XC_vuSatRWjn02nZIz3N1t8jsZz7HBr2U,101
+winrt_windows_foundation-3.2.1.dist-info/top_level.txt,sha256=BzwQb4dZRt0NxCXi10ARjWsox7Asmtf_lXrw_KR-D_E,6

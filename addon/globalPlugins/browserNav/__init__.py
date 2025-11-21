@@ -719,6 +719,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def __init__(self, *args, **kwargs):
         super(GlobalPlugin, self).__init__(*args, **kwargs)
+        clipboard.initWinRT()
         self.createMenu()
         self.injectBrowseModeKeystrokes()
         self.lastJupyterText = ""
