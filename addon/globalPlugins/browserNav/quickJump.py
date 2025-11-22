@@ -282,7 +282,7 @@ class QJAttribute(QJImmutable):
             if self.attribute == ParagraphAttribute.ROLE:
                 roleName = tokens[1].lower()
                 try:
-                    value = controlTypes.role.Role.__getattr__(roleName.upper())
+                    value = controlTypes.role.Role[roleName.upper()]
                 except AttributeError:
                     raise ValueError(f"Invalid role '{roleName}'.")
             else:
