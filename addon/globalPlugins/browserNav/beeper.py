@@ -3,7 +3,6 @@
 #This file is covered by the GNU General Public License.
 #See the file LICENSE  for more details.
 
-import api
 import config
 import ctypes
 import functools
@@ -21,6 +20,15 @@ import ui
 import wave
 
 from . addonConfig import *
+
+# helper to avoid attribute errors on older/newer NVDA builds where generateBeep may be missing
+
+def _generate_beep(buf, freq, length, right, left):
+    lib = NVDAHelper.localLib
+    if hasattr(lib, "generateBeep"):
+        return lib.generateBeep(buf, freq, length, right, left)
+    # fallback: no sound
+    return 0
 
 class Beeper:
     BASE_FREQ = speech.IDT_BASE_FREQUENCY
@@ -59,15 +67,15 @@ class Beeper:
         levels = self.uniformSample(levels, min(l, self.MAX_BEEP_COUNT ))
         beepLen = self.BEEP_LEN
         pauseLen = self.PAUSE_LEN
-        initialDelaySize = 0 if initialDelay == 0 else NVDAHelper.localLib.generateBeep(None,self.BASE_FREQ,initialDelay,0, 0)
-        pauseBufSize = NVDAHelper.localLib.generateBeep(None,self.BASE_FREQ,pauseLen,0, 0)
-        beepBufSizes = [NVDAHelper.localLib.generateBeep(None,self.getPitch(l), beepLen, volume, volume) for l in levels]
+        initialDelaySize = 0 if initialDelay == 0 else _generate_beep(None, self.BASE_FREQ, initialDelay, 0, 0)
+        pauseBufSize = _generate_beep(None, self.BASE_FREQ, pauseLen, 0, 0)
+        beepBufSizes = [_generate_beep(None, self.getPitch(l), beepLen, volume, volume) for l in levels]
         bufSize = initialDelaySize + sum(beepBufSizes) + len(levels) * pauseBufSize
         buf = ctypes.create_string_buffer(bufSize)
         bufPtr = 0
         bufPtr += initialDelaySize
         for l in levels:
-            bufPtr += NVDAHelper.localLib.generateBeep(
+            bufPtr += _generate_beep(
                 ctypes.cast(ctypes.byref(buf, bufPtr), ctypes.POINTER(ctypes.c_char)),
                 self.getPitch(l), beepLen, volume, volume)
             bufPtr += pauseBufSize # add a short pause
@@ -97,7 +105,7 @@ class Beeper:
         beepLen = length
         freqs = self.getChordFrequencies(chord)
         intSize = 8 # bytes
-        bufSize = max([NVDAHelper.localLib.generateBeep(None,freq, beepLen, right, left) for freq in freqs])
+        bufSize = max([_generate_beep(None, freq, beepLen, right, left) for freq in freqs])
         if bufSize % intSize != 0:
             bufSize += intSize
             bufSize -= (bufSize % intSize)
@@ -106,7 +114,7 @@ class Beeper:
         result = [0] * (bufSize//intSize)
         for freq in freqs:
             buf = ctypes.create_string_buffer(bufSize)
-            NVDAHelper.localLib.generateBeep(buf, freq, beepLen, right, left)
+            _generate_beep(buf, freq, beepLen, right, left)
             bytes = bytearray(buf)
             unpacked = struct.unpack("<%dQ" % (bufSize // intSize), bytes)
             result = map(operator.add, result, unpacked)

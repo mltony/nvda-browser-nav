@@ -8,51 +8,16 @@
 # Author: Tony Malykh <anton.malykh@gmail.com>
 # https://github.com/mltony/nvda-indent-nav/
 
-import addonHandler
 import api
 from . beeper import *
-import browseMode
-from contextlib import ExitStack
-import controlTypes
-import config
 from . constants import *
 import core
-import ctypes
-import cursorManager
-import documentBase
-import editableText
-import functools
-import globalPluginHandler
 import gui
-from gui.settingsDialogs import SettingsPanel
-import inputCore
-import itertools
 import keyboardHandler
-from logHandler import log
-import math
-import nvwave
-import NVDAHelper
-import operator
-import os
 import re
-import scriptHandler
-from scriptHandler import script
-import speech
-import struct
-import sys
-import textInfos
-import threading
 import time
 import tones
-import types
-import ui
-from . import utils
-from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
-import wave
-import weakref
-import winUser
 import wx
-from wx.stc import StyledTextCtrl
 from . import clipboard
 class GoToLineDialog(wx.Dialog):
     def __init__(self, parent, lineNum):

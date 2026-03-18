@@ -673,9 +673,15 @@ api.postFocusOrURLChange = extensionPoints.Action()
 updateURLLock = threading.Lock()
 def updateURLIfChanged():
     newURL = getFocusedURL()
-    if globalVars.currentURL != newURL:
-        api.postFocusOrURLChange.notify()
+    oldURL = globalVars.currentURL
     globalVars.currentURL = newURL
+    try:
+        quickJump.applyNvdaProfileForUrl(newURL)
+    except Exception:
+        log.exception("Error while applying NVDA profile for URL")
+    if oldURL != newURL:
+        api.postFocusOrURLChange.notify()
+
 URL_WATCH_DELAYS_MS = [300, 700, 2000, 7000]
 def watchURLAsync(localUpdateUrlCounter, delays=None):
     delays = delays or URL_WATCH_DELAYS_MS
@@ -745,9 +751,18 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         quickJump.originalGetAlternativeScript = browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript
         browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript = quickJump.postGetAlternativeScript
 
-        quickJump.originalReportLiveRegion = NVDAHelper.nvdaControllerInternal_reportLiveRegion
+        # override the live region reporting function if available
+        quickJump.originalReportLiveRegion = getattr(NVDAHelper, 'nvdaControllerInternal_reportLiveRegion', None)
         NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.newReportLiveRegion
-        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib.dll,"_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
+        # The C-level symbol may not exist in newer NVDA builds; avoid crashing if missing.
+        try:
+            # localLib may either be a module or expose a .dll attribute depending on NVDA version.
+            lib = getattr(NVDAHelper.localLib, "dll", NVDAHelper.localLib)
+            if hasattr(lib, "_nvdaControllerInternal_reportLiveRegion"):
+                NVDAHelper._setDllFuncPointer(lib, "_nvdaControllerInternal_reportLiveRegion", quickJump.newReportLiveRegion)
+        except Exception:
+            # ignore errors; falling back to Python-level override only
+            pass
         while len(gc.callbacks) > 0:
             del gc.callbacks[0]
         garbageHandler.terminate = lambda: None
@@ -765,6 +780,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(quickJump.SettingsDialog)
 
     def terminate(self):
+        quickJump.stopNvdaProfileAutoSwitch()
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(SettingsDialog)
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(quickJump.SettingsDialog)
         cursorManager.CursorManager._caretMovementScriptHelper = originalCaretMovementScriptHelper
@@ -776,8 +792,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         browseMode.BrowseModeDocumentTreeInterceptor.getAlternativeScript = quickJump.originalGetAlternativeScript
         browseMode.BrowseModeTreeInterceptor.shouldPassThrough = quickJump.originalShouldPassThrough
         browseMode.BrowseModeDocumentTreeInterceptor.event_treeInterceptor_gainFocus = quickJump.original_event_treeInterceptor_gainFocus
-        NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.originalReportLiveRegion
-        NVDAHelper._setDllFuncPointer(NVDAHelper.localLib.dll,"_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
+        if quickJump.originalReportLiveRegion is not None:
+            NVDAHelper.nvdaControllerInternal_reportLiveRegion = quickJump.originalReportLiveRegion
+        try:
+            lib = getattr(NVDAHelper.localLib, "dll", NVDAHelper.localLib)
+            if hasattr(lib, "_nvdaControllerInternal_reportLiveRegion"):
+                NVDAHelper._setDllFuncPointer(lib, "_nvdaControllerInternal_reportLiveRegion", quickJump.originalReportLiveRegion)
+        except Exception:
+            pass
         
         api.setFocusObject = originalSetFocusObject
         virtualBuffers.VirtualBuffer._handleUpdate = originalVirtualBufferHandleUpdate
@@ -1434,12 +1456,12 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                                 return
                             else:
                                 # Something else found in clipboard - likely user has already copied something there. So just exit without restoring state
-                                log.error(f"asdf something else in clipboard!")
+                                log.error("asdf something else in clipboard!")
                                 log.error(f"text='{text}'")
                                 log.error(f"newText='{newText}'")
                                 log.error(f"firstChar='{firstChar}'")
                                 return
-                        log.error(f"asdf Timeout")
+                        log.error("asdf Timeout")
                     utils.executeAsynchronously(watchAndRestoreClipboard())
                     
               # Step 4: send the original keystroke, e.g. Control+Enter

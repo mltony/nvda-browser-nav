@@ -17,7 +17,6 @@ import threading
 from threading import Thread
 from threading import Lock, Condition
 import time
-import tones
 import types
 from virtualBuffers.gecko_ia2 import Gecko_ia2_TextInfo
 import weakref
@@ -238,7 +237,7 @@ def getGeckoParagraphIndent(textInfo, documentHolder=None, oneLastAttempt=False)
         return None
     except LookupError:
         return None
-    except _ctypes.COMError as e:
+    except _ctypes.COMError:
         if oneLastAttempt or documentHolder is None:
             return None
         # This tends to happen when page changes dynamically.

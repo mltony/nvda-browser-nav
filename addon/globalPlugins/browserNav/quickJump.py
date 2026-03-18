@@ -5,15 +5,13 @@
 
 import api
 import browseMode
-from collections import namedtuple, defaultdict
-from contextlib import ExitStack
+from collections import namedtuple
+import config as nvdaConfig
 import controlTypes
 from controlTypes import OutputReason
 import copy
 import core
-import dataclasses
 from dataclasses import dataclass
-import diffHandler
 import difflib as dl
 from enum import Enum
 import functools
@@ -53,7 +51,6 @@ from .editor import EditTextDialog
 from .paragraph import Paragraph, NotFoundError, ScriptError, textInfoRange, pump, retry, getFocusTextInfo, getFocusParagraph
 import types
 import ast
-import inspect
 
 try:
     REASON_CARET = controlTypes.REASON_CARET
@@ -430,7 +427,7 @@ execGlobals = {
     'ui': ui,
 }
 
-EMPTY_PYTHON_LINE_REGEXP = re.compile("^\s*(#.*)?$")
+EMPTY_PYTHON_LINE_REGEXP = re.compile(r"^\s*(#.*)?$")
 class QJBookmark(QJImmutable):
     enabled: bool
     category: BookmarkCategory
@@ -550,6 +547,7 @@ class QJSite(QJImmutable):
     suppressAriaLabelEditable: bool
     suppressTreeLevel: bool
     suppressRoleText: bool
+    nvdaProfile: str
     description: str
     version: str
 
@@ -577,6 +575,7 @@ class QJSite(QJImmutable):
         self.suppressAriaLabelEditable = d.get('suppressAriaLabelEditable', False)
         self.suppressTreeLevel = d.get('suppressTreeLevel', False)
         self.suppressRoleText = d.get('suppressRoleText', False)
+        self.nvdaProfile = d.get('nvdaProfile', "")
         self.description = d.get('description', "")
         self.version= d.get('version', "")
         self.freeze()
@@ -602,6 +601,7 @@ class QJSite(QJImmutable):
             'suppressAriaLabelEditable': self.suppressAriaLabelEditable,
             'suppressTreeLevel': self.suppressTreeLevel,
             'suppressRoleText': self.suppressRoleText,
+            'nvdaProfile': self.nvdaProfile,
             'description': self.description,
             'version': self.version,
         }
@@ -693,7 +693,21 @@ globalConfig  = loadConfig()
 def re_compile(s):
     return re.compile(s)
 
+
+def _normalizeUrl(url):
+    if url is None:
+        return None
+    if isinstance(url, str):
+        return url
+    if isinstance(url, bytes):
+        return url.decode("utf-8", errors="replace")
+    return str(url)
+
+
 def getDomain(url):
+    url = _normalizeUrl(url)
+    if not url:
+        raise ValueError(f"Domain not found in URL {url}")
     m = re_compile(
         # http://
             r'(\w+://)?'
@@ -714,11 +728,12 @@ def getDomain(url):
 
 @functools.lru_cache()
 def isUrlMatch(url, site):
+    normalizedUrl = _normalizeUrl(url)
     if site.urlMatch == URLMatch.IGNORE:
         return True
     elif site.urlMatch in {URLMatch.DOMAIN, URLMatch.SUBDOMAIN}:
         try:
-            domain = getDomain(url)
+            domain = getDomain(normalizedUrl)
         except ValueError:
             return False
         siteDomain = site.domain.lower()
@@ -732,13 +747,13 @@ def isUrlMatch(url, site):
         else:
             raise Exception("Impossible!")
     elif site.urlMatch == URLMatch.SUBSTRING:
-        return site.domain.lower() in url.lower()
+        return normalizedUrl is not None and site.domain.lower() in normalizedUrl.lower()
     elif site.urlMatch == URLMatch.EXACT:
-        return site.domain.lower() ==  url.lower()
+        return normalizedUrl is not None and site.domain.lower() == normalizedUrl.lower()
     elif site.urlMatch == URLMatch.REGEX:
-        return re_compile(site.domain).search(url) is not None
+        return normalizedUrl is not None and re_compile(site.domain).search(normalizedUrl) is not None
     elif site.urlMatch == URLMatch.EMPTY:
-        return url is None or url == ""
+        return normalizedUrl is None or normalizedUrl == ""
     else:
         raise Exception("Impossible!")
 
@@ -833,6 +848,99 @@ def getSuppressTreeLevel(url, config):
         for site in sites
     ])
     return mode
+
+
+def _normalizeNvdaProfileName(name):
+    if name is None:
+        return None
+    name = name.strip()
+    if len(name) == 0:
+        return None
+    return name
+
+
+def getNvdaProfileForUrl(url, config):
+    sites = findSites(url, config)
+    for site in reversed(sites):
+        profileName = _normalizeNvdaProfileName(getattr(site, 'nvdaProfile', None))
+        if profileName is not None:
+            return profileName
+    return None
+
+
+def _getAvailableNvdaProfiles():
+    try:
+        return set(nvdaConfig.conf.listProfiles())
+    except Exception:
+        return set()
+
+
+def _getCurrentManualNvdaProfile():
+    for profile in nvdaConfig.conf.profiles:
+        if getattr(profile, 'manual', False):
+            return getattr(profile, 'name', None)
+    return None
+
+
+class ProfileState(Enum):
+    IDLE = 0
+    AUTO_SWITCHED = 1
+
+_profileSwitchLock = threading.Lock()
+_state = ProfileState.IDLE
+_lastWebsiteNvdaProfile = None
+_previousManualNvdaProfile = None
+
+
+def applyNvdaProfileForUrl(url, force=False):
+    global _state, _lastWebsiteNvdaProfile, _previousManualNvdaProfile
+    targetProfile = _normalizeNvdaProfileName(getNvdaProfileForUrl(url, globalConfig))
+    availableProfiles = _getAvailableNvdaProfiles()
+    if targetProfile is not None and targetProfile not in availableProfiles:
+        targetProfile = None
+    with _profileSwitchLock:
+        log.debug(f"[ProfileSM] applyNvdaProfileForUrl: state={_state.name}, target={targetProfile}, force={force}")
+        if not force and targetProfile == _lastWebsiteNvdaProfile:
+            if targetProfile is not None or _state == ProfileState.IDLE:
+                return
+        currentManualProfile = _getCurrentManualNvdaProfile()
+        if targetProfile is None:
+            if _state == ProfileState.IDLE:
+                return
+            restoreProfile = _previousManualNvdaProfile
+            if restoreProfile not in availableProfiles:
+                restoreProfile = None
+            if currentManualProfile != restoreProfile:
+                nvdaConfig.conf.manualActivateProfile(restoreProfile)
+            _state = ProfileState.IDLE
+            _lastWebsiteNvdaProfile = None
+            _previousManualNvdaProfile = None
+            return
+
+        if _state == ProfileState.IDLE:
+            _previousManualNvdaProfile = currentManualProfile if currentManualProfile != targetProfile else None
+        if currentManualProfile != targetProfile:
+            nvdaConfig.conf.manualActivateProfile(targetProfile)
+        _state = ProfileState.AUTO_SWITCHED
+        _lastWebsiteNvdaProfile = targetProfile
+
+
+def stopNvdaProfileAutoSwitch():
+    global _state, _lastWebsiteNvdaProfile, _previousManualNvdaProfile
+    with _profileSwitchLock:
+        log.debug(f"[ProfileSM] stopNvdaProfileAutoSwitch: state={_state.name}")
+        if _state == ProfileState.IDLE:
+            return
+        availableProfiles = _getAvailableNvdaProfiles()
+        restoreProfile = _previousManualNvdaProfile
+        if restoreProfile not in availableProfiles:
+            restoreProfile = None
+        currentManualProfile = _getCurrentManualNvdaProfile()
+        if currentManualProfile != restoreProfile:
+            nvdaConfig.conf.manualActivateProfile(restoreProfile)
+        _state = ProfileState.IDLE
+        _lastWebsiteNvdaProfile = None
+        _previousManualNvdaProfile = None
 
 def getUrl(self=None, onlyFromCache=False):
     return api.getCurrentURL() or ""
@@ -1077,9 +1185,9 @@ def playBiwInThread(bookmark=None, earcon=None, volume=None):
     packed = struct.pack(f"<{n}h", *unpacked)
     buf = packed
     try:
-        outputDevice=config.conf["speech"]["outputDevice"]
+        outputDevice=nvdaConfig.conf["speech"]["outputDevice"]
     except KeyError:
-        outputDevice=config.conf["audio"]["outputDevice"]
+        outputDevice=nvdaConfig.conf["audio"]["outputDevice"]
     fileWavePlayer = nvwave.WavePlayer(
         channels=f.getnchannels(),
         samplesPerSec=f.getframerate(),
@@ -1539,7 +1647,7 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
         _offset = None
         _message = None
         _xLocation = None
-        def match(offset=None, message=None, xLocation=None):
+        def applyMatch(offset=None, message=None, xLocation=None):
             nonlocal _offset, _message, _xLocation
             if offset is None:
                 offset = 0
@@ -1550,14 +1658,14 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
         execLocals = {
             'p': p,
             't': t,
-            'match': match,
+            'match': applyMatch,
             #'allowGeneratorScripts': bookmark.category == BookmarkCategory.SCRIPT,
         }
         #thisExecGlobals = dict(**execGlobals)
         try:
             #exec(bookmark.bytecode, thisExecGlobals, execLocals)
             scriptFunc = bookmark.scriptFunc
-            result = scriptFunc(p=p, t=t, match=match, level=level, modifiers=modifiers)
+            result = scriptFunc(p=p, t=t, match=applyMatch, level=level, modifiers=modifiers)
             if isinstance(result, types.GeneratorType):
                 allowGeneratorScripts = bookmark.category in [
                     BookmarkCategory.SCRIPT,
@@ -1567,12 +1675,11 @@ def runScriptAndApplyOffset(textInfo, match, skipClutterBookmarks=None, level=No
                     raise RuntimeError("This script is a generator function; it is only allowed for bookmark type Script and Numeric Script.")
                 utils.executeAsynchronously(result)
             elif isinstance(result, tuple):
-                #match(*result)
-                match(*result)
+                applyMatch(*result)
             elif isinstance(result, dict):
-                match(**result)
+                applyMatch(**result)
             elif (result is not None) and (result is not False):
-                match(result)
+                applyMatch(result)
         except QuickJumpMatchPerformedException:
             # Script called match function!
             if not (
@@ -1834,7 +1941,7 @@ def _autoClick(self, gesture, bookmarks, site=None, automated=False, category=No
             try:
                 focusable.doAction()
                 numSuccessfulClicks += 1
-            except NotImplementedError as e:
+            except NotImplementedError:
                 # Not sure why this is occasionally thrown
                 pass
         if numSuccessfulClicks == 0:
@@ -2260,7 +2367,8 @@ def editOrCreateSite(self, site=None, url=None, domain=None):
         config = config.updateSites(sites)
         globalConfig = config
         saveConfig()
-        mylog(f"Config saved!")
+        applyNvdaProfileForUrl(getUrl(self), force=True)
+        mylog("Config saved!")
 def makeWebsiteSubmenu(self, frame):
     url = getUrl(self)
     sites = findSites(url, globalConfig)
@@ -3135,6 +3243,21 @@ class EditSiteDialog(wx.Dialog):
         label = _("&Version (optional for exported bookmarks)")
         self.versionTextCtrl=sHelper.addLabeledControl(label, wx.TextCtrl)
         self.versionTextCtrl.SetValue(self.site.version)
+      # Translators: NVDA profile selection for this website
+        label = _("Switch to NVDA profile")
+        self.nvdaProfileChoices = [None] + sorted(list(nvdaConfig.conf.listProfiles()))
+        profileChoices = [_('Do not switch profile')] + self.nvdaProfileChoices[1:]
+        self.nvdaProfileCombo = guiHelper.LabeledControlHelper(
+            self,
+            label,
+            wx.Choice,
+            choices=profileChoices,
+        )
+        initialNvdaProfile = _normalizeNvdaProfileName(self.site.nvdaProfile)
+        if initialNvdaProfile in self.nvdaProfileChoices:
+            self.nvdaProfileCombo.control.SetSelection(self.nvdaProfileChoices.index(initialNvdaProfile))
+        else:
+            self.nvdaProfileCombo.control.SetSelection(0)
       # Translators: domain
         patternLabelText = _("&URL")
         self.patternTextCtrl=sHelper.addLabeledControl(patternLabelText, wx.TextCtrl)
@@ -3352,10 +3475,14 @@ class EditSiteDialog(wx.Dialog):
             'suppressAriaLabelEditable': self.suppressAriaLabelEditableCheckBox.Value,
             'suppressTreeLevel': self.suppressTreeLevelCheckBox.Value,
             'suppressRoleText': self.suppressRoleTextCheckBox.Value,
+            'nvdaProfile': self.getNvdaProfile() or "",
             'description': self.description,
             'version': self.versionTextCtrl.GetValue(),
         })
         return site
+
+    def getNvdaProfile(self):
+        return self.nvdaProfileChoices[self.nvdaProfileCombo.control.GetSelection()]
 
     def OnEditRulesClick(self,evt):
         mylog(f"EditSiteDialog.editBookmarks nb={len(self.site.bookmarks)}")

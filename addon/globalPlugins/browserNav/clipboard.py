@@ -6,12 +6,10 @@
 import api
 import ctypes
 import gui
-import time
-import tones
-import ui
 import winUser
 import wx
-import os,sys
+import os
+import sys
 
 def initWinRT():
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,7 +34,7 @@ def ephemeralCopyToClipAndRestore(text: str):
     """
     try:
         oldClipboardValue = api.getClipData()
-    except OSError as e:
+    except OSError:
         oldClipboardValue = ""
     ephemeralSetClipboard(text)
     try:
